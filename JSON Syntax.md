@@ -146,7 +146,7 @@ Elemental types follow the TCG conventions:
     "Damage": 10,
     "Description": "Flip a coin. If heads, -",
     "DamageDisplayOverride": "30X", // optional
-    "Effects": [ - ]
+    "Effects": [  ]
   }
 ]
 ```
@@ -172,7 +172,7 @@ Elemental types follow the TCG conventions:
     "Description": "...",
     "PlayableTiming": ["BeforeAttack", "Active"],
     "Target": "Ally",
-    "Effects": [ - ]
+    "Effects": [  ]
   }
 ]
 ```
