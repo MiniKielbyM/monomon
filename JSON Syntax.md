@@ -145,7 +145,7 @@ Elemental types follow the TCG conventions:
     "Cost": ["Psychic"],
     "Damage": 10,
     "Description": "Flip a coin. If heads, -",
-    "DamageDisplayOverride": "30X", // optional
+    "DamageDisplayOverride": "30X", 
     "Effects": [  ]
   }
 ]
