@@ -11,8 +11,8 @@ This document describes the JSON-based data framework for storing card sets, inc
   "Gens": {
     "Base": {
       "Base Set": {
-        "Meta": { ... },
-        "Cards": { ... }
+        "Meta": { - },
+        "Cards": { - }
       }
     }
   }
@@ -47,8 +47,8 @@ Cards are grouped by type (`Pokemon` in this example).
 ```json
 "Cards": {
   "Pokemon": {
-    "Abra": { ... },
-    "Alakazam": { ... }
+    "Abra": { - },
+    "Alakazam": { - }
   }
 }
 ```
@@ -144,9 +144,9 @@ Elemental types follow the TCG conventions:
     "Name": "Psyshock",
     "Cost": ["Psychic"],
     "Damage": 10,
-    "Description": "Flip a coin. If heads, ...",
+    "Description": "Flip a coin. If heads, -",
     "DamageDisplayOverride": "30X", // optional
-    "Effects": [ ... ]
+    "Effects": [ - ]
   }
 ]
 ```
@@ -172,7 +172,7 @@ Elemental types follow the TCG conventions:
     "Description": "...",
     "PlayableTiming": ["BeforeAttack", "Active"],
     "Target": "Ally",
-    "Effects": [ ... ]
+    "Effects": [ - ]
   }
 ]
 ```
