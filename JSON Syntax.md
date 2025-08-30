@@ -133,6 +133,7 @@ Elemental types follow the TCG conventions:
 
 - List of **Energy types** required to retreat the Pokémon.  
 - Allowed values: *(same as Type list above)*  
+- If RetreatCost is not provided, the retreat cost will be assumed to be free.
 
 ---
 
