@@ -11,8 +11,8 @@ This document describes the JSON-based data framework for storing card sets, inc
   "Gens": {
     "Base": {
       "Base Set": {
-        "Meta": { - },
-        "Cards": { - }
+        "Meta": {  },
+        "Cards": {  }
       }
     }
   }
@@ -47,8 +47,8 @@ Cards are grouped by type (`Pokemon` in this example).
 ```json
 "Cards": {
   "Pokemon": {
-    "Abra": { - },
-    "Alakazam": { - }
+    "Abra": {  },
+    "Alakazam": {  }
   }
 }
 ```
