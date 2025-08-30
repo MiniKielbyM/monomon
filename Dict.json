@@ -1,0 +1,254 @@
+{
+    "Gens": {
+        "Base": {
+            "Base Set": {
+                "Meta": {
+                    "Name": "Base Set"
+                },
+                "Cards": {
+                    "Pokemon": {
+                        "Abra": {
+                            "DisplayName": "Abra",
+                            "Pokemon": "Abra",
+                            "Type": "Psychic",
+                            "HP": 30,
+                            "Attacks": [
+                                {
+                                    "Name": "Psyshock",
+                                    "Cost": ["Psychic"],
+                                    "Damage": 10,
+                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Paralyzed.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Paralyze",
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weaknesses": [
+                                {
+                                    "Type": "Psychic",
+                                    "Value": "x2"
+                                }
+                            ],
+                            "Rarity": "Common"
+                        },
+                        "Alakazam": {
+                            "DisplayName": "Alakazam",
+                            "Pokemon": "Alakazam",
+                            "Evolution": "Kadabra",
+                            "Type": "Psychic",
+                            "HP": 80,
+                            "Attacks": [
+                                {
+                                    "Name": "Confuse Ray",
+                                    "Cost": ["Psychic", "Psychic", "Psychic"],
+                                    "Damage": 30,
+                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Confused.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Effect",
+                                            "Effect": "Confuse",
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Abilities": [
+                                {
+                                    "Name": "Telepathy",
+                                    "Description": "Prevent all effects of attacks, including damage, done to this Pokémon by your opponent's Pokémon that have any Energy attached."
+                                }
+                            ],
+                            "Weaknesses": [
+                                {
+                                    "Type": "Psychic",
+                                    "Value": "x2"
+                                }
+                            ],
+                            "RetreatCost": ["Colorless", "Colorless"],
+                            "Rarity": "Rare Holo"
+                        },
+                        "Arcanine": {
+                            "DisplayName": "Arcanine",
+                            "Pokemon": "Arcanine",
+                            "Evolution": "Growlithe",
+                            "Type": "Fire",
+                            "HP": 100,
+                            "Attacks": [
+                                {
+                                    "Name": "Flamethrower",
+                                    "Cost": ["Fire", "Fire", "Colorless"],
+                                    "Damage": 50,
+                                    "Description": "Discard an Energy card attached to Arcanine in order to use this attack.",
+                                    "Effects": [
+                                        {
+                                            "Type": "DiscardEnergy",
+                                            "Target": "Self",
+                                            "Amount": 1
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Name": "Take Down",
+                                    "Cost": ["Colorless", "Colorless", "Colorless", "Colorless"],
+                                    "Damage": 80,
+                                    "Description": "Arcanine does 30 damage to itself.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Damage",
+                                            "Target": "Self",
+                                            "Amount": 30
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weaknesses": [
+                                {
+                                    "Type": "Water",
+                                    "Value": "x2"
+                                }
+                            ],
+                            "RetreatCost": ["Colorless", "Colorless", "Colorless"],
+                            "Rarity": "Uncommon"
+                        },
+                        "Beedrill": {
+                            "DisplayName": "Beedrill",
+                            "Pokemon": "Beedrill",
+                            "Evolution": "Kakuna",
+                            "Type": "Grass",
+                            "HP": 90,
+                            "Attacks": [
+                                {
+                                    "Name": "Twineedle",
+                                    "Cost": ["Colorless", "Colorless", "Colorless"],
+                                    "Damage": 0,
+                                    "DamageDisplayOverride": "30X",
+                                    "Description": "Flip 2 coins. This attack does 30 damage times the number of heads.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 30,
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        },
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 30,
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Name": "Poison Sting",
+                                    "Cost": ["Grass", "Grass", "Grass"],
+                                    "Damage": 40,
+                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Poisoned.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Effect",
+                                            "Effect": "Poison",
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weaknesses": [
+                                {
+                                    "Type": "Fire",
+                                    "Value": "x2"
+                                }
+                            ],
+                            "Resistances": [
+                                {
+                                    "Type": "Fighting",
+                                    "Value": "-30"
+                                }
+                            ],
+                            "Rarity": "Rare"
+                        },
+                        "Blastoise": {
+                            "DisplayName": "Blastoise",
+                            "Pokemon": "Blastoise",
+                            "Evolution": "Wartortle",
+                            "Type": "Water",
+                            "HP": 100,
+                            "Attacks": [
+                                {
+                                    "Name": "Hydro Pump",
+                                    "Cost": ["Water", "Water", "Colorless"],
+                                    "Damage": 60,
+                                    "Description": "Does 60 damage plus 20 more damage for each Water Energy attached to Blastoise.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 60,
+                                            "Target": "Defending"
+                                        },
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 20,
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "EnergyAttached": {
+                                                    "Type": "Water",
+                                                    "Count": 2
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Name": "Surf",
+                                    "Cost": ["Water", "Colorless", "Colorless"],
+                                    "Damage": 40,
+                                    "Description": "Does 40 damage to the Defending Pokémon and 10 damage to each of your Benched Pokémon.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 40,
+                                            "Target": "Defending"
+                                        },
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 10,
+                                            "Target": "Benched"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weaknesses": [
+                                {
+                                    "Type": "Lightning",
+                                    "Value": "x2"
+                                }
+                            ],
+                            "Resistances": [
+                                {
+                                    "Type": "Steel",
+                                    "Value": "-30"
+                                }
+                            ],
+                            "Rarity": "Rare"
+                        }
+                    }
+                }
+            }
+        }
+    }    
+}
