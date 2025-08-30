@@ -196,7 +196,7 @@ Elemental types follow TCG conventions:
 | **`Self`**   | Refers to this Pokémon. | Arcanine’s *Take Down*. | Becomes the default. |
 | **`Defending`** | Opponent’s Active Pokémon. | Abra’s *Psyshock*. | Defaults to `Self`. |
 | **`Ally`**   | Your own Pokémon. | Alakazam’s *Damage Swap*. | Defaults to `Self`. |
-| **`Target`** | Player chooses a Pokémon. | Choose a Benched Pokémon. | Defaults to `Self`. |
+| **`Target`** | Uses the default target defined in the ability. | If the ability specifies a target (e.g., Ally, Self, Defending), `Target` inherits that definition. | Defaults to `Self`. |
 
 ---
 
