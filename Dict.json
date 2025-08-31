@@ -342,6 +342,63 @@
                                 "Multiplier": 2
                             },
                             "Rarity": "Rare"
+                        },
+                        "Bulbasaur": {
+                            "DisplayName": "Bulbasaur",
+                            "Pokemon": "Bulbasaur",
+                            "Type": "Grass",
+                            "HP": 40,
+                            "Attacks": [
+                                {
+                                    "Name": "Leech Seed",
+                                    "Cost": [
+                                        "Grass"
+                                    ],
+                                    "Damage": 10,
+                                    "Description": "The Defending Pokémon is now Paralyzed. Remove 1 damage counter from Bulbasaur (remove 2 if there is a Grass Energy attached to Bulbasaur).",
+                                    "Effects": [
+                                        {
+                                            "Type": "Paralyze",
+                                            "Target": "Defending"
+                                        },
+                                        {
+                                            "Type": "Heal",
+                                            "Target": "Self",
+                                            "Condition": {
+                                                "Attatched": {
+                                                    "Card": "Energy",
+                                                    "Type": "Grass",
+                                                    "Value": 1,
+                                                    "Comparison": "GreaterThan"
+                                                }
+                                            },
+                                            "Damage": 20
+                                        },
+                                        {
+                                            "Type": "Heal",
+                                            "Target": "Self",
+                                            "Condition": {
+                                                "Attatched": {
+                                                    "Card": "Energy",
+                                                    "Type": "Grass",
+                                                    "Value": 0,
+                                                    "Comparison": "Equal"
+                                                }
+                                            },
+                                            "Damage": 10
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Fire",
+                                "Multiplier": 2
+                            },
+                            "Resistance": {
+                                "Type": "Water",
+                                "Difference": 30
+                            },
+                            "Rarity": "Common"
                         }
                     }
                 }

@@ -63,8 +63,8 @@ Cards are grouped by type (`Pokemon` in this example).
 
 | Field         | Type    | Description                              | If omitted                         |
 | ------------- | ------- | ---------------------------------------- | ---------------------------------- |
-| `DisplayName` | string  | Display name of the card.                | Defaults to `Pokemon` field value. |
-| `Pokemon`     | string  | The Pokémon’s name, used for evolutions. | Card is invalid (required).        |
+| `DisplayName` | string  | Display name of the card.                | Card is invalid (required).        |
+| `Pokemon`     | string  | The Pokémon’s name, used for evolutions. | Card won't be checked as evolvable.|
 | `Evolution`   | string  | Pokémon it evolves from.                 | Treated as **Basic Pokémon**.      |
 | `Type`        | enum    | Elemental type.                          | Card has no type (invalid).        |
 | `HP`          | integer | Hit points.                              | Treated as `0` HP (auto-KO).       |
@@ -184,7 +184,6 @@ Cards are grouped by type (`Pokemon` in this example).
 | `Discard`    | `Card`, `Target`, `Amount`                          | Discards cards.                        | Nothing discarded. |
 | `Attach`     | `Card`, `EnergyType`, `From`, `Target`, `Condition` | Attaches Energy cards.                 | No attachment.     |
 | `Draw`       | `Amount`, `Target`, `Condition`                     | Player draws cards.                    | No cards drawn.    |
-| `DamageSwap` | `From`, `To`, `Amount`, `Condition`                 | Moves damage counters between Pokémon. | No movement.       |
 
 ---
 
