@@ -201,15 +201,15 @@
                                 {
                                     "Name": "Scrunch",
                                     "Cost": [
+                                        "Colorless",
                                         "Colorless"
                                     ],
-                                    "Damage": 10,
-                                    "Description": "Flip a coin. If heads, the Defending Pokémon can't attack during your opponent's next turn.",
+                                    "Description": "Flip a coin. If heads, prevent all damage done to Chansey during your opponents next turn. (Any other effects of attacks still happen.)",
                                     "Effects": [
                                         {
-                                            "Type": "Effect",
-                                            "Effect": "CantAttack",
-                                            "Target": "Defending",
+                                            "Type": "MaxDefend",
+                                            "Target": "Self",
+                                            "Length": 1,
                                             "Condition": {
                                                 "CoinFlip": "Heads"
                                             }

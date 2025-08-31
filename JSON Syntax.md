@@ -156,19 +156,19 @@ Cards are grouped by type (`Pokemon` in this example).
 
 ## **Target (Who or what is affected?) – Expanded**
 
-| Value          | Meaning                                         | Example                          | If omitted             |
-| -------------- | ----------------------------------------------- | -------------------------------- | ---------------------- |
-| `Self`         | Refers to this Pokémon.                         | Arcanine’s Take Down.            | Default.               |
-| `Defending`    | Opponent’s Active Pokémon.                      | Abra’s Psyshock.                 | Defaults to Self.      |
-| `Ally`         | One friendly Pokémon.                           | Alakazam’s Damage Swap.          | Defaults to Self.      |
-| `AllAllies`    | All friendly Pokémon.                           | Heal all Benched Pokémon.        | Defaults to Self.      |
-| `Opponent`     | Any opponent Pokémon.                           | Poison or spread damage.         | Defaults to Defending. |
-| `AllOpponents` | All opponent Pokémon.                           | Spread damage attack.            | Defaults to Defending. |
-| `Target`       | Uses the default target defined in the ability. | Inherits ability-defined target. | Defaults to Self.      |
-| `Bench`        | Only friendly Benched Pokémon.                  | Bench heal or buffs.             | Defaults to Self.      |
-| `Discard`      | Pokémon or cards in discard pile.               | Recover Energy or trigger on KO. | No target.             |
-| `Hand`         | Pokémon in hand.                                | Hand-triggered effects.          | No target.             |
-| `Deck`         | Pokémon or cards in deck.                       | Search or reveal cards.          | No target.             |
+| Value          | Meaning                                         | Example                          |
+| -------------- | ----------------------------------------------- | -------------------------------- |
+| `Self`         | Refers to this Pokémon.                         | Arcanine’s Take Down.            |
+| `Defending`    | Opponent’s Active Pokémon.                      | Abra’s Psyshock.                 |
+| `Ally`         | One friendly Pokémon.                           | Alakazam’s Damage Swap.          |
+| `AllAllies`    | All friendly Pokémon.                           | Heal all Benched Pokémon.        |
+| `Opponent`     | Any opponent Pokémon.                           | Poison or spread damage.         |
+| `AllOpponents` | All opponent Pokémon.                           | Spread damage attack.            |
+| `Target`       | Uses the default target defined in the ability. | Inherits ability-defined target. |
+| `Bench`        | Only friendly Benched Pokémon.                  | Bench heal or buffs.             |
+| `Discard`      | Pokémon or cards in discard pile.               | Recover Energy or trigger on KO. |
+| `Hand`         | Pokémon in hand.                                | Hand-triggered effects.          |
+| `Deck`         | Pokémon or cards in deck.                       | Search or reveal cards.          |
 
 ---
 
