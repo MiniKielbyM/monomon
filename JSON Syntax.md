@@ -174,16 +174,19 @@ Cards are grouped by type (`Pokemon` in this example).
 
 ## **Effects – Expanded**
 
-| Type         | Fields                                              | Description                            | If omitted         |
-| ------------ | --------------------------------------------------- | -------------------------------------- | ------------------ |
-| `Damage`     | `Damage`, `Target`, `Condition`                     | Deals damage.                          | 0 damage.          |
-| `Heal`       | `Damage`, `Target`, `Condition`                     | Removes damage counters.               | No healing.        |
-| `Paralyze`   | `Target`, `Condition`                               | Inflicts Paralyzed.                    | No status applied. |
-| `Confuse`    | `Target`, `Condition`                               | Inflicts Confused.                     | Nothing happens.   |
-| `Poison`     | `Target`, `Condition`                               | Inflicts Poisoned.                     | Nothing happens.   |
-| `Discard`    | `Card`, `Target`, `Amount`                          | Discards cards.                        | Nothing discarded. |
-| `Attach`     | `Card`, `EnergyType`, `From`, `Target`, `Condition` | Attaches Energy cards.                 | No attachment.     |
-| `Draw`       | `Amount`, `Target`, `Condition`                     | Player draws cards.                    | No cards drawn.    |
+| Type         | Fields                                              | Description                            | If omitted            |
+| ------------ | --------------------------------------------------- | -------------------------------------- | ----------------------|
+| `Damage`     | `Damage`, `Target`, `Condition`                     | Deals damage.                          | 0 damage.             |
+| `Heal`       | `Damage`, `Target`, `Condition`                     | Removes damage counters.               | No healing.           |
+| `Paralyze`   | `Target`, `Condition`                               | Inflicts Paralyzed.                    | No status applied.    |
+| `Confuse`    | `Target`, `Condition`                               | Inflicts Confused.                     | Nothing happens.      |
+| `Poison`     | `Target`, `Condition`                               | Inflicts Poisoned.                     | Nothing happens.      |
+| `Discard`    | `Card`, `Target`, `Amount`                          | Discards cards.                        | Nothing discarded.    |
+| `Attach`     | `Card`, `EnergyType`, `From`, `Target`, `Condition` | Attaches Energy cards.                 | No attachment.        |
+| `Draw`       | `Amount`, `Target`, `Condition`                     | Player draws cards.                    | No cards drawn.       |
+| `Defend`     | `Target`, `Length`, `Damage`, `Condition`           | Prevents target from taking a certain amount of damage     | Damage taken normally |
+| `MaxDefend`  | `Target`, `Length`, `Condition`                     | Prevents target from taking any damage     | Damage taken normally |
+
 
 ---
 

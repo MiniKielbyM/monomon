@@ -7,36 +7,6 @@
                 },
                 "Cards": {
                     "Pokemon": {
-                        "Abra": {
-                            "DisplayName": "Abra",
-                            "Pokemon": "Abra",
-                            "Type": "Psychic",
-                            "HP": 30,
-                            "Attacks": [
-                                {
-                                    "Name": "Psyshock",
-                                    "Cost": [
-                                        "Psychic"
-                                    ],
-                                    "Damage": 10,
-                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Paralyzed.",
-                                    "Effects": [
-                                        {
-                                            "Type": "Paralyze",
-                                            "Target": "Defending",
-                                            "Condition": {
-                                                "CoinFlip": "Heads"
-                                            }
-                                        }
-                                    ]
-                                }
-                            ],
-                            "Weakness": {
-                                "Type": "Psychic",
-                                "Multiplier": 2
-                            },
-                            "Rarity": "Common"
-                        },
                         "Alakazam": {
                             "DisplayName": "Alakazam",
                             "Pokemon": "Alakazam",
@@ -134,128 +104,7 @@
                             ],
                             "Rarity": "Rare Holo"
                         },
-                        "Arcanine": {
-                            "DisplayName": "Arcanine",
-                            "Pokemon": "Arcanine",
-                            "Evolution": "Growlithe",
-                            "Type": "Fire",
-                            "HP": 100,
-                            "Attacks": [
-                                {
-                                    "Name": "Flamethrower",
-                                    "Cost": [
-                                        "Fire",
-                                        "Fire",
-                                        "Colorless"
-                                    ],
-                                    "Damage": 50,
-                                    "Description": "Discard an Energy card attached to Arcanine in order to use this attack.",
-                                    "Effects": [
-                                        {
-                                            "Type": "Discard",
-                                            "Card": "Energy",
-                                            "Target": "Self",
-                                            "Amount": 1
-                                        }
-                                    ]
-                                },
-                                {
-                                    "Name": "Take Down",
-                                    "Cost": [
-                                        "Colorless",
-                                        "Colorless",
-                                        "Colorless",
-                                        "Colorless"
-                                    ],
-                                    "Damage": 80,
-                                    "Description": "Arcanine does 30 damage to itself.",
-                                    "Effects": [
-                                        {
-                                            "Type": "Damage",
-                                            "Target": "Self",
-                                            "Damage": 30
-                                        }
-                                    ]
-                                }
-                            ],
-                            "Weakness": {
-                                "Type": "Water",
-                                "Multiplier": 2
-                            },
-                            "RetreatCost": [
-                                "Colorless",
-                                "Colorless",
-                                "Colorless"
-                            ],
-                            "Rarity": "Uncommon"
-                        },
-                        "Beedrill": {
-                            "DisplayName": "Beedrill",
-                            "Pokemon": "Beedrill",
-                            "Evolution": "Kakuna",
-                            "Type": "Grass",
-                            "HP": 90,
-                            "Attacks": [
-                                {
-                                    "Name": "Twineedle",
-                                    "Cost": [
-                                        "Colorless",
-                                        "Colorless",
-                                        "Colorless"
-                                    ],
-                                    "Damage": 0,
-                                    "DamageDisplayOverride": "30X",
-                                    "Description": "Flip 2 coins. This attack does 30 damage times the number of heads.",
-                                    "Effects": [
-                                        {
-                                            "Type": "Damage",
-                                            "Damage": 30,
-                                            "Target": "Defending",
-                                            "Condition": {
-                                                "CoinFlip": "Heads"
-                                            }
-                                        },
-                                        {
-                                            "Type": "Damage",
-                                            "Damage": 30,
-                                            "Target": "Defending",
-                                            "Condition": {
-                                                "CoinFlip": "Heads"
-                                            }
-                                        }
-                                    ]
-                                },
-                                {
-                                    "Name": "Poison Sting",
-                                    "Cost": [
-                                        "Grass",
-                                        "Grass",
-                                        "Grass"
-                                    ],
-                                    "Damage": 40,
-                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Poisoned.",
-                                    "Effects": [
-                                        {
-                                            "Type": "Effect",
-                                            "Effect": "Poison",
-                                            "Target": "Defending",
-                                            "Condition": {
-                                                "CoinFlip": "Heads"
-                                            }
-                                        }
-                                    ]
-                                }
-                            ],
-                            "Weakness": {
-                                "Type": "Fire",
-                                "Multiplier": 2
-                            },
-                            "Resistance": {
-                                "Type": "Fighting",
-                                "Difference": 30
-                            },
-                            "Rarity": "Rare"
-                        },
+                        
                         "Blastoise": {
                             "DisplayName": "Blastoise",
                             "Pokemon": "Blastoise",
@@ -343,62 +192,61 @@
                             },
                             "Rarity": "Rare"
                         },
-                        "Bulbasaur": {
-                            "DisplayName": "Bulbasaur",
-                            "Pokemon": "Bulbasaur",
-                            "Type": "Grass",
-                            "HP": 40,
+                        "Chansey": {
+                            "DisplayName": "Chansey",
+                            "Pokemon": "Chansey",
+                            "Type": "Colorless",
+                            "HP": 120,
                             "Attacks": [
                                 {
-                                    "Name": "Leech Seed",
+                                    "Name": "Scrunch",
                                     "Cost": [
-                                        "Grass"
+                                        "Colorless"
                                     ],
                                     "Damage": 10,
-                                    "Description": "The Defending Pokémon is now Paralyzed. Remove 1 damage counter from Bulbasaur (remove 2 if there is a Grass Energy attached to Bulbasaur).",
+                                    "Description": "Flip a coin. If heads, the Defending Pokémon can't attack during your opponent's next turn.",
                                     "Effects": [
                                         {
-                                            "Type": "Paralyze",
-                                            "Target": "Defending"
-                                        },
-                                        {
-                                            "Type": "Heal",
-                                            "Target": "Self",
+                                            "Type": "Effect",
+                                            "Effect": "CantAttack",
+                                            "Target": "Defending",
                                             "Condition": {
-                                                "Attatched": {
-                                                    "Card": "Energy",
-                                                    "Type": "Grass",
-                                                    "Value": 1,
-                                                    "Comparison": "GreaterThan"
-                                                }
-                                            },
-                                            "Damage": 20
-                                        },
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Name": "Double-Edge",
+                                    "Cost": [
+                                        "Colorless",
+                                        "Colorless",
+                                        "Colorless",
+                                        "Colorless"
+                                    ],
+                                    "Damage": 80,
+                                    "Description": "Chansey does 80 damage to itself.",
+                                    "Effects": [
                                         {
-                                            "Type": "Heal",
-                                            "Target": "Self",
-                                            "Condition": {
-                                                "Attatched": {
-                                                    "Card": "Energy",
-                                                    "Type": "Grass",
-                                                    "Value": 0,
-                                                    "Comparison": "Equal"
-                                                }
-                                            },
-                                            "Damage": 10
+                                            "Type": "Damage",
+                                            "Damage": 80,
+                                            "Target": "Self"
                                         }
                                     ]
                                 }
                             ],
                             "Weakness": {
-                                "Type": "Fire",
+                                "Type": "Fighting",
                                 "Multiplier": 2
                             },
                             "Resistance": {
-                                "Type": "Water",
+                                "Type": "Psychic",
                                 "Difference": 30
                             },
-                            "Rarity": "Common"
+                            "RetreatCost": [
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
                         }
                     }
                 }
