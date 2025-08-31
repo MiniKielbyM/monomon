@@ -138,46 +138,66 @@ Cards are grouped by type (`Pokemon` in this example).
 
 ## **PlayableTiming (When can an ability be used?)**
 
-| Value                | Meaning                                           | Example                                                        | If omitted                            |
-| -------------------- | ------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------- |
-| `BeforeAttack`       | During your turn, before declaring an attack.     | Alakazam’s Damage Swap.                                        | Default.                              |
-| `Active`             | Only when the Pokémon is in the Active spot.      | Blastoise’s Rain Dance must be Active.                         | Ability works regardless of position. |
-| `Anytime`            | Can be used any time during your turn.            | Trainer-like abilities.                                        | Not usable.                           |
-| `Bench`              | Only usable while the Pokémon is on your Bench.   | Abilities that heal or modify damage for Benched Pokémon.      | Defaults to Active rules.             |
-| `Discard`            | Usable while the Pokémon is in the discard pile.  | Abilities that trigger when a Pokémon is knocked out.          | Not usable.                           |
-| `Hand`               | Usable while the Pokémon is in your hand.         | Future hand-triggered abilities.                               | Defaults to Active rules.             |
-| `AfterAttack`        | Triggered after the Pokémon attacks.              | Abilities that deal secondary effects after attack resolution. | Not triggered.                        |
-| `OnDamageTaken`      | Triggered when the Pokémon takes damage.          | Abilities that heal or activate in response to damage.         | Not triggered.                        |
-| `OnKnockOut`         | Triggered when the Pokémon is knocked out.        | GX or special knock-out effects.                               | Not triggered.                        |
-| `OnDraw`             | Triggered when the card is drawn from your deck.  | Abilities like Professor Oak’s research (if Pokémon-specific). | Not triggered.                        |
-| `OnEnergyAttachment` | Triggered when Energy is attached to the Pokémon. | Abilities that respond to Energy attachments.                  | Not triggered.                        |
+| Value                | Meaning                                | Example                          | If omitted                    |
+| -------------------- | -------------------------------------- | -------------------------------- | ----------------------------- |
+| `BeforeAttack`       | During your turn, before attacking.    | Alakazam’s Damage Swap.          | Default.                      |
+| `Active`             | Only when Pokémon is Active.           | Blastoise’s Rain Dance.          | Works regardless of position. |
+| `Anytime`            | Can be used any time during your turn. | Misc. abilities.                 | Not usable.                   |
+| `Bench`              | Only usable on the Bench.              | Heal Benched Pokémon.            | Defaults to Active rules.     |
+| `Discard`            | Usable from discard pile.              | Recover Energy from discard.     | Not usable.                   |
+| `Hand`               | Usable from hand.                      | Hand-triggered abilities.        | Defaults to Active rules.     |
+| `AfterAttack`        | Triggered after attack.                | Secondary effects after attack.  | Not triggered.                |
+| `OnDamageTaken`      | Triggered on taking damage.            | Heal or trigger effects.         | Not triggered.                |
+| `OnKnockOut`         | Triggered when knocked out.            | GX or special knock-out effects. | Not triggered.                |
+| `OnDraw`             | Triggered when drawn from deck.        | Effects when card drawn.         | Not triggered.                |
+| `OnEnergyAttachment` | Triggered when Energy is attached.     | Attach-response abilities.       | Not triggered.                |
 
 ---
 
 ## **Target (Who or what is affected?) – Expanded**
 
-| Value          | Meaning                                         | Example                                                  | If omitted             |
-| -------------- | ----------------------------------------------- | -------------------------------------------------------- | ---------------------- |
-| `Self`         | Refers to this Pokémon.                         | Arcanine’s Take Down.                                    | Default.               |
-| `Defending`    | Opponent’s Active Pokémon.                      | Abra’s Psyshock.                                         | Defaults to Self.      |
-| `Ally`         | One friendly Pokémon.                           | Alakazam’s Damage Swap.                                  | Defaults to Self.      |
-| `AllAllies`    | All friendly Pokémon (Bench + Active).          | Heal all Benched Pokémon.                                | Defaults to Self.      |
-| `Opponent`     | Any opponent Pokémon (Active or Benched).       | Poison or spread damage.                                 | Defaults to Defending. |
-| `AllOpponents` | All opponent Pokémon.                           | Spread damage attack.                                    | Defaults to Defending. |
-| `Target`       | Uses the default target defined in the ability. | Inherits ability-defined target (Self, Ally, Defending). | Defaults to Self.      |
-| `Bench`        | Only friendly Benched Pokémon.                  | Bench heal or buffs.                                     | Defaults to Self.      |
-| `Discard`      | Pokémon or cards in discard pile.               | Abilities that recover Energy or trigger on KO.          | No target.             |
-| `Hand`         | Pokémon in player’s hand.                       | Future hand-triggered abilities.                         | No target.             |
-| `Deck`         | Pokémon or cards in deck.                       | Effects that search deck or reveal cards.                | No target.             |
+| Value          | Meaning                                         | Example                          | If omitted             |
+| -------------- | ----------------------------------------------- | -------------------------------- | ---------------------- |
+| `Self`         | Refers to this Pokémon.                         | Arcanine’s Take Down.            | Default.               |
+| `Defending`    | Opponent’s Active Pokémon.                      | Abra’s Psyshock.                 | Defaults to Self.      |
+| `Ally`         | One friendly Pokémon.                           | Alakazam’s Damage Swap.          | Defaults to Self.      |
+| `AllAllies`    | All friendly Pokémon.                           | Heal all Benched Pokémon.        | Defaults to Self.      |
+| `Opponent`     | Any opponent Pokémon.                           | Poison or spread damage.         | Defaults to Defending. |
+| `AllOpponents` | All opponent Pokémon.                           | Spread damage attack.            | Defaults to Defending. |
+| `Target`       | Uses the default target defined in the ability. | Inherits ability-defined target. | Defaults to Self.      |
+| `Bench`        | Only friendly Benched Pokémon.                  | Bench heal or buffs.             | Defaults to Self.      |
+| `Discard`      | Pokémon or cards in discard pile.               | Recover Energy or trigger on KO. | No target.             |
+| `Hand`         | Pokémon in hand.                                | Hand-triggered effects.          | No target.             |
+| `Deck`         | Pokémon or cards in deck.                       | Search or reveal cards.          | No target.             |
 
 ---
 
 ## **Effects – Expanded**
 
-| Type       | Fields                          | Description              | If omitted         |
-| ---------- | ------------------------------- | ------------------------ | ------------------ |
-| `Damage`   | `Damage`, `Target`, `Condition` | Deals damage.            | 0 damage.          |
-| `Heal`     | `Damage`, `Target`, `Condition` | Removes damage counters. | No healing.        |
-| `Paralyze` | `Target`, `Condition`           | Inflicts Paralyzed.      | No status applied. |
-| `Confuse`  | `Target`, `Condition`           | Inflicts Confused.       | No status.         |
-| `Poison`   |                                 |                          |                    |
+| Type         | Fields                                              | Description                            | If omitted         |
+| ------------ | --------------------------------------------------- | -------------------------------------- | ------------------ |
+| `Damage`     | `Damage`, `Target`, `Condition`                     | Deals damage.                          | 0 damage.          |
+| `Heal`       | `Damage`, `Target`, `Condition`                     | Removes damage counters.               | No healing.        |
+| `Paralyze`   | `Target`, `Condition`                               | Inflicts Paralyzed.                    | No status applied. |
+| `Confuse`    | `Target`, `Condition`                               | Inflicts Confused.                     | Nothing happens.   |
+| `Poison`     | `Target`, `Condition`                               | Inflicts Poisoned.                     | Nothing happens.   |
+| `Discard`    | `Card`, `Target`, `Amount`                          | Discards cards.                        | Nothing discarded. |
+| `Attach`     | `Card`, `EnergyType`, `From`, `Target`, `Condition` | Attaches Energy cards.                 | No attachment.     |
+| `Draw`       | `Amount`, `Target`, `Condition`                     | Player draws cards.                    | No cards drawn.    |
+| `DamageSwap` | `From`, `To`, `Amount`, `Condition`                 | Moves damage counters between Pokémon. | No movement.       |
+
+---
+
+## **Conditions – Expanded**
+
+| Type             | Description                                         | Accepted Values                                                                          | If omitted                             |
+| ---------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| `CoinFlip`       | Requires coin flip result.                          | `Heads`, `Tails`                                                                         | Always true.                           |
+| `Status`         | Checks Pokémon status.                              | `Asleep`, `Confused`, `Paralyzed`, `Poisoned`                                            | Status not checked.                    |
+| `Health`         | Compares HP or damage counters.                     | Comparisons: `Equal`, `GreaterThan`, `LessThan`, `GreaterThanOrEqual`, `LessThanOrEqual` | Health not checked.                    |
+| `EnergyAttached` | Checks attached Energy type/amount.                 | `Type`, `Value`, `Comparison`                                                            | Condition not checked.                 |
+| `InPlay`         | Checks if Pokémon is Active or Benched.             | `Active`, `Bench`                                                                        | Condition not checked.                 |
+| `InDiscard`      | Checks if card is in discard pile.                  | true/false                                                                               | Condition not checked.                 |
+| `Not`            | Negates other condition.                            | true                                                                                     | Condition behaves normally if omitted. |
+| `Player`         | Checks player-specific state (hand, deck, discard). | `Hand`, `Deck`, `Discard`                                                                | Condition not checked.                 |
+| `Turn`           | Checks turn state.                                  | `CurrentPlayer`, `Opponent`                                                              | Not checked.                           |
