@@ -264,8 +264,37 @@
                             "HP": 100,
                             "Abilities": [
                                 {
-                                    "Name": "Torrent",
-                                    "Description": "When this Pokémon's HP is below 30%, its Water-type attacks do 50 more damage."
+                                    "Name": "Rain Dance",
+                                    "Description": "As often as you like during your turn (before your attack), you may attach 1 Water Energy card from your hand to 1 of your Water Pokémon. (This doesn't use up your 1 Energy card attachment for the turn.) This power can't be used if Blastoise is Asleep, Confused, or Paralyzed.",
+                                    "PlayableTiming": [
+                                        "Active",
+                                        "BeforeAttack"
+                                    ],
+                                    "Target": "Ally",
+                                    "TargetConditions": [
+                                        {
+                                            "Type": "Water"
+                                        }
+                                    ],
+                                    "Effects": [
+                                        {
+                                            "Type": "Attach",
+                                            "Card": "Energy",
+                                            "EnergyType": "Water",
+                                            "From": "Hand",
+                                            "Target": "Target",
+                                            "Condition": [
+                                                {
+                                                    "Not": true,
+                                                    "Status": [
+                                                        "Asleep",
+                                                        "Confused",
+                                                        "Paralyzed"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
                                 }
                             ],
                             "Attacks": [
@@ -274,54 +303,42 @@
                                     "Cost": [
                                         "Water",
                                         "Water",
-                                        "Colorless"
-                                    ],
-                                    "Damage": 60,
-                                    "Description": "Does 60 damage plus 20 more damage for each Water Energy attached to Blastoise.",
-                                    "Effects": [
-                                        {
-                                            "Type": "Damage",
-                                            "Damage": 60,
-                                            "Target": "Defending"
-                                        },
-                                        {
-                                            "Type": "Damage",
-                                            "Damage": 20,
-                                            "Target": "Defending",
-                                            "Condition": {
-                                                "EnergyAttached": {
-                                                    "Type": "Water",
-                                                    "Count": 2
-                                                }
-                                            }
-                                        }
-                                    ]
-                                },
-                                {
-                                    "Name": "Surf",
-                                    "Cost": [
-                                        "Water",
-                                        "Colorless",
-                                        "Colorless"
+                                        "Water"
                                     ],
                                     "Damage": 40,
-                                    "Description": "Does 40 damage to the Defending Pokémon and 10 damage to each of your Benched Pokémon.",
+                                    "Description": "Does 40 damage plus 10 more damage for each Water energy Energy attached to Blastoise but not used to pay for this attack's Energy cost. Extra Water energy Energy after the 2nd doesn't count.",
                                     "Effects": [
                                         {
                                             "Type": "Damage",
-                                            "Damage": 40,
-                                            "Target": "Defending"
+                                            "Damage": 10,
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "Attatched": {
+                                                    "Card": "Energy",
+                                                    "Type": "Water",
+                                                    "Value": 3,
+                                                    "Comparison": "GreaterThan"
+                                                }
+                                            }
                                         },
                                         {
                                             "Type": "Damage",
                                             "Damage": 10,
-                                            "Target": "Benched"
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "Attatched": {
+                                                    "Card": "Energy",
+                                                    "Type": "Water",
+                                                    "Value": 4,
+                                                    "Comparison": "GreaterThan"
+                                                }
+                                            }
                                         }
                                     ]
                                 }
                             ],
                             "Weakness": {
-                                "Type": "Lightning",
+                                "Type": "Electric",
                                 "Multiplier": 2
                             },
                             "Rarity": "Rare"

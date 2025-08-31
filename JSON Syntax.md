@@ -1,6 +1,6 @@
-# Card Data Framework Syntax
+# Pokémon Card Data Framework Syntax (Expanded)
 
-This document describes the JSON-based data framework for storing card sets, including generations, expansions, cards, and card attributes.  
+This document describes the JSON-based data framework for storing Pokémon card sets, including generations, expansions, and Pokémon card attributes. Only Pokémon cards are covered here; Trainer and Energy cards are not included.
 
 ---
 
@@ -20,11 +20,12 @@ This document describes the JSON-based data framework for storing card sets, inc
 ```
 
 ### **Keys**
-- **`Gens`** → Container for generations.  
-- **`Base`** → Example of a generation (name is arbitrary, one per generation).  
-- **`Base Set`** → Expansion within the generation.  
-- **`Meta`** → Metadata about the expansion.  
-- **`Cards`** → The card list for the expansion.  
+
+* **`Gens`** → Container for generations.
+* **`Base`** → Example generation (name is arbitrary).
+* **`Base Set`** → Expansion within the generation.
+* **`Meta`** → Metadata about the expansion.
+* **`Cards`** → The card list for the expansion.
 
 ---
 
@@ -36,14 +37,14 @@ This document describes the JSON-based data framework for storing card sets, inc
 }
 ```
 
-- **`Name`** *(string)* → Name of the expansion.  
-- **If omitted** → Expansion has no display name.  
+* **`Name`** *(string)* → Name of the expansion.
+* **If omitted** → Expansion has no display name.
 
 ---
 
 ## **Cards**
 
-Cards are grouped by type (`Pokemon` in this example).  
+Cards are grouped by type (`Pokemon` in this example).
 
 ```json
 "Cards": {
@@ -59,195 +60,124 @@ Cards are grouped by type (`Pokemon` in this example).
 ## **Card Schema**
 
 ### **Base Fields**
-| Field          | Type       | Description | If omitted |
-|----------------|-----------|-------------|------------|
-| `DisplayName`  | string    | Display name of the card. | Defaults to `Pokemon` field value. |
-| `Pokemon`      | string    | The Pokémon’s name, used for evolutions. | Card is invalid (required). |
-| `Evolution`    | string    | Pokémon it evolves from. | Card is treated as a **Basic Pokémon**. |
-| `Type`         | enum      | The Pokémon’s elemental type. | Card has no type (invalid for play). |
-| `HP`           | integer   | Hit points. | Treated as `0` HP (auto-KO). |
-| `Rarity`       | enum      | Rarity classification. | Defaults to `"Common"`. |
+
+| Field         | Type    | Description                              | If omitted                         |
+| ------------- | ------- | ---------------------------------------- | ---------------------------------- |
+| `DisplayName` | string  | Display name of the card.                | Defaults to `Pokemon` field value. |
+| `Pokemon`     | string  | The Pokémon’s name, used for evolutions. | Card is invalid (required).        |
+| `Evolution`   | string  | Pokémon it evolves from.                 | Treated as **Basic Pokémon**.      |
+| `Type`        | enum    | Elemental type.                          | Card has no type (invalid).        |
+| `HP`          | integer | Hit points.                              | Treated as `0` HP (auto-KO).       |
+| `Rarity`      | enum    | Rarity classification.                   | Defaults to `"Common"`.            |
 
 ---
 
 ## **Accepted Values**
 
 ### **Type**
-Elemental types follow TCG conventions:  
 
-- `Colorless`, `Fire`, `Water`, `Grass`, `Electric`, `Psychic`, `Fighting`, `Darkness`, `Metal`, `Dragon`, `Fairy`  
-
-**If omitted** → Pokémon has no type; considered invalid.  
-
----
+* `Colorless`, `Fire`, `Water`, `Grass`, `Electric`, `Psychic`, `Fighting`, `Darkness`, `Metal`, `Dragon`, `Fairy`
+* **If omitted** → Pokémon has no type; considered invalid.
 
 ### **Rarity**
-- `Common`, `Uncommon`, `Rare`, `Rare Holo`, `Promo`  
 
-**If omitted** → Defaults to `Common`.  
+* `Common`, `Uncommon`, `Rare`, `Rare Holo`, `Promo`
+* **If omitted** → Defaults to `Common`.
 
 ---
 
 ### **Weakness / Resistance**
 
 ```json
-"Weakness": {
-  "Type": "Psychic",
-  "Multiplier": 2
-},
-"Resistance": {
-  "Type": "Fighting",
-  "Difference": 30
-}
+"Weakness": { "Type": "Psychic", "Multiplier": 2 },
+"Resistance": { "Type": "Fighting", "Difference": 30 }
 ```
 
-- **Weakness**
-  - `Type`: *(enum, same as Pokémon type list)*  
-  - `Multiplier`: integer (usually `2`)  
-  - **If omitted** → Pokémon has **no weakness**.  
-
-- **Resistance**
-  - `Type`: *(enum, same as Pokémon type list)*  
-  - `Difference`: integer (e.g., `30`)  
-  - **If omitted** → Pokémon has **no resistance**.  
+* **Weakness** → Type and multiplier; **If omitted** → no weakness.
+* **Resistance** → Type and difference; **If omitted** → no resistance.
 
 ---
 
 ### **RetreatCost**
 
-```json
-"RetreatCost": [
-  "Colorless",
-  "Colorless"
-]
-```
-
-- List of **Energy types** required to retreat the Pokémon.  
-- Allowed values: *(same as Type list above)*  
-- **If omitted** → Retreat is free.  
+* List of **Energy types** required to retreat.
+* Allowed values: same as Type list.
+* **If omitted** → Retreat is free.
 
 ---
 
 ## **Attacks**
 
-```json
-"Attacks": [
-  {
-    "Name": "Psyshock",
-    "Cost": ["Psychic"],
-    "Damage": 10,
-    "Description": "...",
-    "DamageDisplayOverride": "30X", 
-    "Effects": [  ]
-  }
-]
-```
-
 ### **Attack Fields**
-| Field                   | Type        | Description | If omitted |
-|--------------------------|------------|-------------|------------|
-| `Name`                  | string     | Attack name. | Attack is invalid. |
-| `Cost`                  | list[enum] | Required energies. | Attack costs nothing. |
-| `Damage`                | integer    | Base damage. | Attack does 0 damage. |
-| `DamageDisplayOverride` | string     | Display override (e.g., `"30X"`). | Base `Damage` shown instead. |
-| `Description`           | string     | Attack rules text. | No description displayed. |
-| `Effects`               | list       | Extra mechanics. | Attack has no effects. |
+
+| Field                   | Type        | Description                       | If omitted         |
+| ----------------------- | ----------- | --------------------------------- | ------------------ |
+| `Name`                  | string      | Attack name.                      | Attack invalid.    |
+| `Cost`                  | list\[enum] | Required energies.                | Costs nothing.     |
+| `Damage`                | integer     | Base damage.                      | 0 damage.          |
+| `DamageDisplayOverride` | string      | Display override (e.g., `"30X"`). | Base damage shown. |
+| `Description`           | string      | Attack rules text.                | Empty.             |
+| `Effects`               | list        | Extra mechanics.                  | No effects.        |
 
 ---
 
 ## **Abilities**
 
-```json
-"Abilities": [
-  {
-    "Name": "Damage Swap",
-    "Description": "...",
-    "PlayableTiming": ["BeforeAttack", "Active"],
-    "Target": "Ally",
-    "Effects": [  ]
-  }
-]
-```
-
 ### **Ability Fields**
-| Field           | Type        | Description | If omitted |
-|-----------------|------------|-------------|------------|
-| `Name`          | string     | Ability name. | Ability is invalid. |
-| `Description`   | string     | Ability effect text. | Defaults to empty string. |
-| `PlayableTiming`| list[enum] | When ability can be used. | Defaults to `BeforeAttack`. |
-| `Target`        | enum       | Who is affected. | Defaults to `Self`. |
-| `Effects`       | list       | Effects triggered. | Ability does nothing. |
+
+| Field              | Type        | Description                                                  | If omitted                  |
+| ------------------ | ----------- | ------------------------------------------------------------ | --------------------------- |
+| `Name`             | string      | Ability name.                                                | Invalid.                    |
+| `Description`      | string      | Ability effect text.                                         | Empty string.               |
+| `PlayableTiming`   | list\[enum] | When ability can be used.                                    | Defaults to `BeforeAttack`. |
+| `Target`           | enum        | Who is affected; uses default target defined in the ability. | Defaults to `Self`.         |
+| `Effects`          | list        | Effects triggered.                                           | Nothing happens.            |
+| `TargetConditions` | list        | Conditions to filter eligible targets.                       | No filtering applied.       |
 
 ---
 
 ## **PlayableTiming (When can an ability be used?)**
 
-| Value         | Meaning | Example | If omitted |
-|---------------|---------|---------|------------|
-| **`BeforeAttack`** | During your turn, before attacking. | Alakazam’s *Damage Swap*. | Becomes the default. |
-| **`Active`** | Only when Pokémon is Active. | Alakazam must be Active. | Ability works regardless of position. |
+| Value                | Meaning                                           | Example                                                        | If omitted                            |
+| -------------------- | ------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------- |
+| `BeforeAttack`       | During your turn, before declaring an attack.     | Alakazam’s Damage Swap.                                        | Default.                              |
+| `Active`             | Only when the Pokémon is in the Active spot.      | Blastoise’s Rain Dance must be Active.                         | Ability works regardless of position. |
+| `Anytime`            | Can be used any time during your turn.            | Trainer-like abilities.                                        | Not usable.                           |
+| `Bench`              | Only usable while the Pokémon is on your Bench.   | Abilities that heal or modify damage for Benched Pokémon.      | Defaults to Active rules.             |
+| `Discard`            | Usable while the Pokémon is in the discard pile.  | Abilities that trigger when a Pokémon is knocked out.          | Not usable.                           |
+| `Hand`               | Usable while the Pokémon is in your hand.         | Future hand-triggered abilities.                               | Defaults to Active rules.             |
+| `AfterAttack`        | Triggered after the Pokémon attacks.              | Abilities that deal secondary effects after attack resolution. | Not triggered.                        |
+| `OnDamageTaken`      | Triggered when the Pokémon takes damage.          | Abilities that heal or activate in response to damage.         | Not triggered.                        |
+| `OnKnockOut`         | Triggered when the Pokémon is knocked out.        | GX or special knock-out effects.                               | Not triggered.                        |
+| `OnDraw`             | Triggered when the card is drawn from your deck.  | Abilities like Professor Oak’s research (if Pokémon-specific). | Not triggered.                        |
+| `OnEnergyAttachment` | Triggered when Energy is attached to the Pokémon. | Abilities that respond to Energy attachments.                  | Not triggered.                        |
 
 ---
 
-## **Target (Who or what is affected?)**
+## **Target (Who or what is affected?) – Expanded**
 
-| Value        | Meaning | Example | If omitted |
-|--------------|---------|---------|------------|
-| **`Self`**   | Refers to this Pokémon. | Arcanine’s *Take Down*. | Becomes the default. |
-| **`Defending`** | Opponent’s Active Pokémon. | Abra’s *Psyshock*. | Defaults to `Self`. |
-| **`Ally`**   | Your own Pokémon. | Alakazam’s *Damage Swap*. | Defaults to `Self`. |
-| **`Target`** | Uses the default target defined in the ability. | If the ability specifies a target (e.g., Ally, Self, Defending), `Target` inherits that definition. | Defaults to `Self`. |
-
----
-
-## **Effects**
-
-```json
-{
-  "Type": "Damage",
-  "Target": "Defending",
-  "Condition": { "CoinFlip": "Heads" },
-  "Damage": 30
-}
-```
-
-### **Effect Types**
-| Type      | Fields | Description | If omitted |
-|-----------|--------|-------------|------------|
-| `Damage`  | `Damage`, `Target`, `Condition` | Deals damage. | No damage dealt. |
-| `Heal`    | `Damage`, `Target`, `Condition` | Removes damage counters. | No healing occurs. |
-| `Paralyze`| `Target`, `Condition` | Inflicts Paralyzed. | No status applied. |
-| `Effect`  | `Effect`, `Target`, `Condition` | Inflicts Confuse/Poison/etc. | Nothing happens. |
-| `Discard` | `Card`, `Target`, `Amount` | Discards card(s). | Nothing discarded. |
+| Value          | Meaning                                         | Example                                                  | If omitted             |
+| -------------- | ----------------------------------------------- | -------------------------------------------------------- | ---------------------- |
+| `Self`         | Refers to this Pokémon.                         | Arcanine’s Take Down.                                    | Default.               |
+| `Defending`    | Opponent’s Active Pokémon.                      | Abra’s Psyshock.                                         | Defaults to Self.      |
+| `Ally`         | One friendly Pokémon.                           | Alakazam’s Damage Swap.                                  | Defaults to Self.      |
+| `AllAllies`    | All friendly Pokémon (Bench + Active).          | Heal all Benched Pokémon.                                | Defaults to Self.      |
+| `Opponent`     | Any opponent Pokémon (Active or Benched).       | Poison or spread damage.                                 | Defaults to Defending. |
+| `AllOpponents` | All opponent Pokémon.                           | Spread damage attack.                                    | Defaults to Defending. |
+| `Target`       | Uses the default target defined in the ability. | Inherits ability-defined target (Self, Ally, Defending). | Defaults to Self.      |
+| `Bench`        | Only friendly Benched Pokémon.                  | Bench heal or buffs.                                     | Defaults to Self.      |
+| `Discard`      | Pokémon or cards in discard pile.               | Abilities that recover Energy or trigger on KO.          | No target.             |
+| `Hand`         | Pokémon in player’s hand.                       | Future hand-triggered abilities.                         | No target.             |
+| `Deck`         | Pokémon or cards in deck.                       | Effects that search deck or reveal cards.                | No target.             |
 
 ---
 
-## **Conditions**
+## **Effects – Expanded**
 
-### **Coin Flip**
-```json
-"Condition": { "CoinFlip": "Heads" }
-```
-- Accepted: `"Heads"`, `"Tails"`  
-- **If omitted** → Condition always succeeds.  
-
-### **Status**
-```json
-"Status": ["Asleep", "Confused", "Paralyzed"]
-```
-- Accepted: `Asleep`, `Confused`, `Paralyzed`, `Poisoned`  
-- **If omitted** → Status not checked.  
-
-### **Health**
-```json
-"Health": { "Value": 10, "Comparison": "GreaterThan" }
-```
-- Accepted comparisons: `Equal`, `GreaterThan`, `LessThan`, `GreaterThanOrEqual`, `LessThanOrEqual`  
-- **If omitted** → Health not checked.  
-
-### **Negation**
-```json
-{ "Not": true, "Status": ["Paralyzed"] }
-```
-- Inverts the condition.  
-- **If omitted** → Condition behaves normally.  
+| Type       | Fields                          | Description              | If omitted         |
+| ---------- | ------------------------------- | ------------------------ | ------------------ |
+| `Damage`   | `Damage`, `Target`, `Condition` | Deals damage.            | 0 damage.          |
+| `Heal`     | `Damage`, `Target`, `Condition` | Removes damage counters. | No healing.        |
+| `Paralyze` | `Target`, `Condition`           | Inflicts Paralyzed.      | No status applied. |
+| `Confuse`  | `Target`, `Condition`           | Inflicts Confused.       | No status.         |
+| `Poison`   |                                 |                          |                    |
