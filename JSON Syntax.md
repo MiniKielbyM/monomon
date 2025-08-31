@@ -178,9 +178,7 @@ Cards are grouped by type (`Pokemon` in this example).
 | ------------ | --------------------------------------------------- | -------------------------------------- | ----------------------|
 | `Damage`     | `Damage`, `Target`, `Condition`                     | Deals damage.                          | 0 damage.             |
 | `Heal`       | `Damage`, `Target`, `Condition`                     | Removes damage counters.               | No healing.           |
-| `Paralyze`   | `Target`, `Condition`                               | Inflicts Paralyzed.                    | No status applied.    |
-| `Confuse`    | `Target`, `Condition`                               | Inflicts Confused.                     | Nothing happens.      |
-| `Poison`     | `Target`, `Condition`                               | Inflicts Poisoned.                     | Nothing happens.      |
+| `Affect`     | `Target`, `Status`, `Condition`                     | Inflicts a status.                     | No status applied.    |
 | `Discard`    | `Card`, `Target`, `Amount`                          | Discards cards.                        | Nothing discarded.    |
 | `Attach`     | `Card`, `EnergyType`, `From`, `Target`, `Condition` | Attaches Energy cards.                 | No attachment.        |
 | `Draw`       | `Amount`, `Target`, `Condition`                     | Player draws cards.                    | No cards drawn.       |
