@@ -247,6 +247,48 @@
                                 "Colorless"
                             ],
                             "Rarity": "Rare Holo"
+                        },
+                        "Charizard": {
+                            "DisplayName": "Charizard",
+                            "Pokemon": "Charizard",
+                            "Evolution": "Charmeleon",
+                            "Type": "Fire",
+                            "HP": 120,
+                            "Attacks": [
+                                {
+                                    "Name": "Fire Spin",
+                                    "Cost": [
+                                        "Fire",
+                                        "Fire",
+                                        "Fire",
+                                        "Fire"
+                                    ],
+                                    "Damage": 100,
+                                    "Description": "Discard 2 Energy cards attached to Charizard in order to use this attack.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Discard",
+                                            "Card": "Energy",
+                                            "Amount": 2,
+                                            "Target": "Self"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Water",
+                                "Multiplier": 2
+                            },
+                            "Resistance": {
+                                "Type": "Fighting",
+                                "Difference": 30
+                            },
+                            "RetreatCost": [
+                                "Colorless",
+                                "Colorless",
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
                         }
                     }
                 }
