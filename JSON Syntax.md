@@ -69,7 +69,7 @@ Cards are grouped by type (`Pokemon` in this example).
 | `Type`        | enum    | Elemental type.                          | Card has no type (invalid).        |
 | `HP`          | integer | Hit points.                              | Treated as `0` HP (auto-KO).       |
 | `Rarity`      | enum    | Rarity classification.                   | Defaults to `"Common"`.            |
-
+| `PrizeCards`  | integer | Prize cards drawn on defeat              | Defaults to 1                      |
 ---
 
 ## **Accepted Values**
@@ -118,6 +118,7 @@ Cards are grouped by type (`Pokemon` in this example).
 | `DamageDisplayOverride` | string      | Display override (e.g., `"30X"`). | Base damage shown. |
 | `Description`           | string      | Attack rules text.                | Empty.             |
 | `Effects`               | list        | Extra mechanics.                  | No effects.        |
+
 
 ---
 

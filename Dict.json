@@ -254,6 +254,12 @@
                             "Evolution": "Charmeleon",
                             "Type": "Fire",
                             "HP": 120,
+                            "Abilities": [
+                                {
+                                    "Name": "Blaze",
+                                    "Description": "When your opponent's Active Pokémon is Knocked Out by damage from this Pokémon's attacks, take 1 more Prize card."
+                                }
+                            ],
                             "Attacks": [
                                 {
                                     "Name": "Fire Spin",
