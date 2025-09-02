@@ -341,10 +341,8 @@
                                     "Effects": [
                                         {
                                             "Type": "Copy",
-                                            "Target": "Opponent",
-                                            "Condition": {
-                                                "Active": true
-                                            }
+                                            "Target": "Defending",
+                                            "RequireEnergy": false
                                         }
                                     ]
                                 }
@@ -362,6 +360,7 @@
                             ],
                             "Rarity": "Rare Holo"
                         }
+                        
                     }
                 }
             }
