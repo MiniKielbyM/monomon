@@ -104,7 +104,6 @@
                             ],
                             "Rarity": "Rare Holo"
                         },
-                        
                         "Blastoise": {
                             "DisplayName": "Blastoise",
                             "Pokemon": "Blastoise",
@@ -132,16 +131,14 @@
                                             "EnergyType": "Water",
                                             "From": "Hand",
                                             "Target": "Target",
-                                            "Condition": [
-                                                {
-                                                    "Not": true,
-                                                    "Status": [
-                                                        "Asleep",
-                                                        "Confused",
-                                                        "Paralyzed"
-                                                    ]
-                                                }
-                                            ]
+                                            "Condition": {
+                                                "Not": true,
+                                                "Status": [
+                                                    "Asleep",
+                                                    "Confused",
+                                                    "Paralyzed"
+                                                ]
+                                            }
                                         }
                                     ]
                                 }
@@ -256,8 +253,20 @@
                             "HP": 120,
                             "Abilities": [
                                 {
-                                    "Name": "Blaze",
-                                    "Description": "When your opponent's Active Pokémon is Knocked Out by damage from this Pokémon's attacks, take 1 more Prize card."
+                                    "Name": "Energy Burn",
+                                    "Description": "As often as you like during your turn (before your attack), you may turn all Energy attached to Charizard into Fire energy Energy for the rest of the turn. This power can't be used if Charizard is Asleep, Confused, or Paralyzed.",
+                                    "Effects": [
+                                        {
+                                            "Type": "FullEnergyConversion",
+                                            "Target": "Self",
+                                            "Length": 1,
+                                            "Conversion": "Fire",
+                                            "Condition": {
+                                                "Not": true,
+                                                "Status": "Asleep"
+                                            }
+                                        }
+                                    ]
                                 }
                             ],
                             "Attacks": [
@@ -292,6 +301,63 @@
                             "RetreatCost": [
                                 "Colorless",
                                 "Colorless",
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
+                        },
+                        "Clefairy": {
+                            "DisplayName": "Clefairy",
+                            "Pokemon": "Clefairy",
+                            "Type": "Colorless",
+                            "HP": 40,
+                            "Attacks": [
+                                {
+                                    "Name": "Sing",
+                                    "Cost": [
+                                        "Colorless"
+                                    ],
+                                    "Damage": 20,
+                                    "Description": "Flip a coin, If heads, the Defending Pokemon is now Asleep.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Affect",
+                                            "Status": "Asleep",
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Name": "Metronome",
+                                    "Cost": [
+                                        "Colorless",
+                                        "Colorless",
+                                        "Colorless"
+                                    ],
+                                    "Damage": 0,
+                                    "Description": "Choose 1 of your opponent's Active Pokémon's attacks and use it as this attack.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Copy",
+                                            "Target": "Opponent",
+                                            "Condition": {
+                                                "Active": true
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Fighting",
+                                "Multiplier": 2
+                            },
+                            "Resistance": {
+                                "Type": "Psychic",
+                                "Difference": 30
+                            },
+                            "RetreatCost": [
                                 "Colorless"
                             ],
                             "Rarity": "Rare Holo"

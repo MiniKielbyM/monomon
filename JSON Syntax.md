@@ -186,6 +186,7 @@ Cards are grouped by type (`Pokemon` in this example).
 | `Defend`     | `Target`, `Length`, `Damage`, `Condition`           | Prevents target from taking a certain amount of damage     | Damage taken normally |
 | `MaxDefend`  | `Target`, `Length`, `Condition`                     | Prevents target from taking any damage     | Damage taken normally |
 | `EnergyConvert` | `Target`, `Length`, `Conversion`, `Amount`, `Condition` | Allows the user to convert a certain number of energy to a different type | No energy converted |
+| `FullEnergyConvert` | `Target`, `Length`, `Conversion`, `Condition` | Allows the user to convert all energy to a different type | No energy converted |
 
 
 ---
