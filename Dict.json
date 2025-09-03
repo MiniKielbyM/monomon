@@ -25,8 +25,8 @@
                                     "Description": "Flip a coin. If heads, the Defending Pokémon is now Confused.",
                                     "Effects": [
                                         {
-                                            "Type": "Effect",
-                                            "Effect": "Confuse",
+                                            "Type": "Affect",
+                                            "Status": "Confuse",
                                             "Target": "Defending",
                                             "Condition": {
                                                 "CoinFlip": "Heads"
@@ -356,6 +356,215 @@
                             "Resistance": {
                                 "Type": "Psychic",
                                 "Difference": 30
+                            },
+                            "RetreatCost": [
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
+                        },
+                        "Gyarados":{
+                            "DisplayName": "Gyarados",
+                            "Pokemon": "Gyarados",
+                            "Evolution": "Magikarp",
+                            "Type": "Water",
+                            "HP": 100,
+                            "Attacks": [
+                                {
+                                    "Name": "Dragon Rage",
+                                    "Cost": [
+                                        "Water",
+                                        "Water",
+                                        "Water"
+                                    ],
+                                    "Damage": 50,
+                                    "Description": ""
+                                },
+                                {
+                                    "Name": "Bubblebeam",
+                                    "Cost": [
+                                        "Water",
+                                        "Water",
+                                        "Water",
+                                        "Water"
+                                    ],
+                                    "Damage": 40,
+                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Paralyzed.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Affect",
+                                            "Status": "Paralyzed",
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "Coinflip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Grass",
+                                "Multiplier": 2
+                            },
+                            "Resistance": {
+                                "Type": "Fighting",
+                                "Difference": 30
+                            },
+                            "RetreatCost": [
+                                "Colorless",
+                                "Colorless",
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
+                        },
+                        "Hitmonchan": {
+                            "DisplayName": "Hitmonchan",
+                            "Pokemon": "Hitmonchan",
+                            "Type": "Fighting",
+                            "HP": 70,
+                            "Attacks": [
+                                {
+                                    "Name": "Jab",
+                                    "Cost": [
+                                        "Fighting"
+                                    ],
+                                    "Damage": 10,
+                                    "Description": ""
+                                },
+                                {
+                                    "Name": "Special Punch",
+                                    "Cost": [
+                                        "Fighting",
+                                        "Fighting",
+                                        "Colorless"
+                                    ],
+                                    "Damage": 40,
+                                    "Description": ""
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Psychic",
+                                "Multiplier": 2
+                            },
+                            "RetreatCost": [
+                                "Colorless",
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
+                        },
+                        "Machamp": {
+                            "DisplayName": "Machamp",
+                            "Pokemon": "Machamp",
+                            "Evolution": "Machoke",
+                            "Type": "Fighting",
+                            "HP": 100,
+                            "Abilities": [
+                                {
+                                    "Name": "Fight Back",
+                                    "Description": "Whenever your opponent's attack damages Machamp (even if Machamp is Knocked Out), this power does 10 damage to the attacking Pokémon. (Don't apply Weakness and Resistance.) This power can't be used if Machamp is Asleep, Confused, or Paralyzed when your opponent attacks.",
+                                    "PlayableTiming": [
+                                        "OnDamageTaken"
+                                    ],
+                                    "Target": "Defending",
+                                    "Effects": [
+                                        {
+                                            "Type": "Damage",
+                                            "Target": "Target",
+                                            "Damage": 10,
+                                            "Condition": {
+                                                "Not": true,
+                                                "Status": [
+                                                    "Asleep",
+                                                    "Confused",
+                                                    "Paralyzed"
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Attacks": [
+                                {
+                                    "Name": "Seismic Toss",
+                                    "Cost": [
+                                        "Fighting",
+                                        "Fighting",
+                                        "Fighting",
+                                        "Colorless"
+                                    ],
+                                    "Damage": 60,
+                                    "Description": ""
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Psychic",
+                                "Multiplier": 2
+                            },
+                            "RetreatCost": [
+                                "Colorless",
+                                "Colorless",
+                                "Colorless"
+                            ],
+                            "Rarity": "Rare Holo"
+                        },
+                        "Magneton": {
+                            "DisplayName": "Magneton",
+                            "Pokemon": "Magneton",
+                            "Evolution": "Magnemite",
+                            "Type": "Electric",
+                            "HP": 60,
+                            "Attacks": [
+                                {
+                                    "Name": "Thunder Wave",
+                                    "Cost": [
+                                        "Electric",
+                                        "Electric",
+                                        "Colorless"
+                                    ],
+                                    "Damage": 30,
+                                    "Description": "Flip a coin. If heads, the Defending Pokémon is now Paralyzed.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Affect",
+                                            "Status": "Paralyzed",
+                                            "Target": "Defending",
+                                            "Condition": {
+                                                "CoinFlip": "Heads"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Name": "Selfdestruct",
+                                    "Cost": [
+                                        "Electric",
+                                        "Electric",
+                                        "Colorless",
+                                        "Colorless"
+                                    ],
+                                    "Damage": 80,
+                                    "Description": "Does 20 damage to each Pokémon on each player's Bench. (Don't apply Weakness and Resistance for Benched Pokémon.) Magneton does 80 damage to itself.",
+                                    "Effects": [
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 20,
+                                            "Target": "Bench"
+                                        },
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 20,
+                                            "Target": "OpponentBench"
+                                        },
+                                        {
+                                            "Type": "Damage",
+                                            "Damage": 80,
+                                            "Target": "Self"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "Weakness": {
+                                "Type": "Fighting",
+                                "Multiplier": 2
                             },
                             "RetreatCost": [
                                 "Colorless"

@@ -1,0 +1,82 @@
+<html>
+<head>
+    <!-- Load Blockly core -->
+    <script src="https://unpkg.com/blockly/blockly_compressed.js"></script>
+    <!-- Load the default blocks -->
+    <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
+    <!-- Load the JavaScript generator -->
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <!-- Load messages -->
+    <script src="https://unpkg.com/blockly/msg/en.js"></script>
+</head>
+
+<body style="margin:0;">
+
+    <!-- Blockly workspace -->
+    <div id="blocklyDiv" style="height: 80vh; width: 100%;"></div>
+
+    <!-- Button -->
+    <button onclick="runCode()" style="width:100%; height:40px; font-size:16px;">
+        Run Code
+    </button>
+
+    <script>
+        // Define custom block
+        const definitions = Blockly.common.createBlockDefinitionsFromJsonArray([
+            {
+                type: 'my_custom_block',
+                message0: 'move forward %1',
+                args0: [
+                    {
+                        type: 'field_number',
+                        name: 'FIELD_NAME',
+                        value: 10
+                    }
+                ],
+                previousStatement: null,
+                nextStatement: null,
+            }
+        ]);
+
+        // Register block definition
+        Blockly.common.defineBlocks(definitions);
+
+        // Get JavaScript generator
+        const javascriptGenerator = Blockly.JavaScript;
+
+        // Define code generator for the block
+        javascriptGenerator.forBlock['my_custom_block'] = function (block, generator) {
+            var steps = block.getFieldValue('FIELD_NAME');
+            return 'moveForward(' + steps + ');\n';
+        };
+
+        // Inject Blockly
+        const workspace = Blockly.inject('blocklyDiv', {
+            toolbox: `<xml xmlns="https://developers.google.com/blockly/xml">
+                <block type="controls_if"></block>
+                <block type="logic_compare"></block>
+                <block type="math_number"></block>
+                <block type="my_custom_block"></block>
+            </xml>`,
+            trashcan: true
+        });
+
+        // Function called when button is clicked
+        function runCode() {
+            const code = javascriptGenerator.workspaceToCode(workspace);
+            console.log("Generated code:\n" + code);
+
+            // Example function so the code can actually run
+            function moveForward(steps) {
+                alert("Moving forward " + steps + " steps!");
+            }
+
+            try {
+                eval(code); // Run the generated code
+            } catch (e) {
+                console.error("Error executing code:", e);
+            }
+        }
+    </script>
+</body>
+</html>

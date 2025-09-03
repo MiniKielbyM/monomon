@@ -167,6 +167,7 @@ Cards are grouped by type (`Pokemon` in this example).
 | `AllOpponents` | All opponent Pokémon.                           | Spread damage attack.            |
 | `Target`       | Uses the default target defined in the ability. | Inherits ability-defined target. |
 | `Bench`        | Only friendly Benched Pokémon.                  | Bench heal or buffs.             |
+| `OpponentBench`| Only opponent Benched Pokémon.                  | Bench damage.                    |
 | `Discard`      | Pokémon or cards in discard pile.               | Recover Energy or trigger on KO. |
 | `Hand`         | Pokémon in hand.                                | Hand-triggered effects.          |
 | `Deck`         | Pokémon or cards in deck.                       | Search or reveal cards.          |
