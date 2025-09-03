@@ -1,4 +1,5 @@
 <html>
+
 <head>
     <!-- Load Blockly core -->
     <script src="https://unpkg.com/blockly/blockly_compressed.js"></script>
@@ -8,32 +9,39 @@
     <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
     <!-- Load messages -->
     <script src="https://unpkg.com/blockly/msg/en.js"></script>
+    <style>
+        body {
+            overflow: hidden;
+        }
+    </style>
 </head>
 
 <body style="margin:0;">
 
     <!-- Blockly workspace -->
-    <div id="blocklyDiv" style="height: 80vh; width: 100%;"></div>
+    <div id="blocklyDiv" style="height: 60vh; width: 75vw;"></div>
+    <div id="output" style="height: 40vh; width: 75vw; border-top: 1px solid #ccc;"></div>
 
-    <!-- Button -->
-    <button onclick="runCode()" style="width:100%; height:40px; font-size:16px;">
-        Run Code
-    </button>
 
     <script>
         // Define custom block
         const definitions = Blockly.common.createBlockDefinitionsFromJsonArray([
             {
-                type: 'my_custom_block',
-                message0: 'move forward %1',
+                type: 'meta_header',
+                message0: 'METADATA',
+                message1: 'FIELD_NAME: %1',
                 args0: [
                     {
-                        type: 'field_number',
+                        type: 'input_value',
                         name: 'FIELD_NAME',
+                        value: 10
+                    },
+                    {
+                        type: 'input_value',
+                        name: 'qweqwe',
                         value: 10
                     }
                 ],
-                previousStatement: null,
                 nextStatement: null,
             }
         ]);
@@ -47,21 +55,30 @@
         // Define code generator for the block
         javascriptGenerator.forBlock['my_custom_block'] = function (block, generator) {
             var steps = block.getFieldValue('FIELD_NAME');
+            var qweqwe = block.getFieldValue('qweqwe');
             return 'moveForward(' + steps + ');\n';
         };
 
         // Inject Blockly
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: `<xml xmlns="https://developers.google.com/blockly/xml">
-                <block type="controls_if"></block>
-                <block type="logic_compare"></block>
-                <block type="math_number"></block>
-                <block type="my_custom_block"></block>
+                <category name="MetaData" colour="#ff6a00">
+                    <block type="meta_header"></block>
+                </category>
             </xml>`,
-            trashcan: true
+            theme: Blockly.Themes.Dark,
+            trashcan: true,
+            move: {
+                scrollbars: {
+                    horizontal: false,
+                    vertical: false
+                },
+                drag: false,
+                wheel: false
+            },
+            renderer: 'Thrasos'
         });
-
-        // Function called when button is clicked
+                // Function called when button is clicked
         function runCode() {
             const code = javascriptGenerator.workspaceToCode(workspace);
             console.log("Generated code:\n" + code);
@@ -77,6 +94,16 @@
                 console.error("Error executing code:", e);
             }
         }
+        workspace.addChangeListener(function (event) {
+            // Example: log block additions
+            if (!event.isUiEvent) {
+                console.log('Block created:', event);
+            }
+
+            // Other types: BLOCK_DELETE, BLOCK_MOVE, BLOCK_CHANGE, UI, etc.
+        });
+
     </script>
 </body>
+
 </html>
