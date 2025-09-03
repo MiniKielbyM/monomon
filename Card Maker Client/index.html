@@ -29,20 +29,28 @@
             {
                 type: 'meta_header',
                 message0: 'METADATA',
-                message1: 'FIELD_NAME: %1',
-                args0: [
+                message1: ': %1',
+                args1: [
                     {
                         type: 'input_value',
                         name: 'FIELD_NAME',
-                        value: 10
+                        check: 'String',
                     },
-                    {
-                        type: 'input_value',
-                        name: 'qweqwe',
-                        value: 10
-                    }
                 ],
+                colour: "#ff6a00",
                 nextStatement: null,
+            },
+            {
+                type: "inset_data_test",
+                message0: 'INSERT DATA TEST %1',
+                args0: [
+                    {
+                        type: 'field_input',
+                        name: 'FIELD_NAME',
+                    },
+                ],
+                colour: "#ff6a00",
+                output: "String",
             }
         ]);
 
@@ -55,7 +63,6 @@
         // Define code generator for the block
         javascriptGenerator.forBlock['my_custom_block'] = function (block, generator) {
             var steps = block.getFieldValue('FIELD_NAME');
-            var qweqwe = block.getFieldValue('qweqwe');
             return 'moveForward(' + steps + ');\n';
         };
 
@@ -63,7 +70,15 @@
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: `<xml xmlns="https://developers.google.com/blockly/xml">
                 <category name="MetaData" colour="#ff6a00">
-                    <block type="meta_header"></block>
+                    <block type="meta_header" >
+                        <value name="FIELD_NAME">
+                            <shadow type="text">
+                                <field name="TEXT">Author: John Doe</field>
+                            </shadow>
+                        </value>
+                    </block>
+                    <block type="inset_data_test">
+                    </block>
                 </category>
             </xml>`,
             theme: Blockly.Themes.Dark,
@@ -76,9 +91,17 @@
                 drag: false,
                 wheel: false
             },
-            renderer: 'Thrasos'
+            zoom: {
+                controls: false,
+                wheel: false,
+                startScale: 0.75, // Adjust this value to your desired scale
+                maxScale: 0.75,
+                minScale: 0.75,
+                scaleSpeed: 0
+            },
+            renderer: 'Zelos'
         });
-                // Function called when button is clicked
+        // Function called when button is clicked
         function runCode() {
             const code = javascriptGenerator.workspaceToCode(workspace);
             console.log("Generated code:\n" + code);
@@ -99,8 +122,6 @@
             if (!event.isUiEvent) {
                 console.log('Block created:', event);
             }
-
-            // Other types: BLOCK_DELETE, BLOCK_MOVE, BLOCK_CHANGE, UI, etc.
         });
 
     </script>
