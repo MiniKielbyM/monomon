@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -9,18 +10,31 @@
     <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
     <!-- Load messages -->
     <script src="https://unpkg.com/blockly/msg/en.js"></script>
+    <!-- Prism CSS -->
+    <link href="https://unpkg.com/prismjs/themes/prism-tomorrow.css" rel="stylesheet" />
+    <!-- Prism JS -->
+    <script src="https://unpkg.com/prismjs/prism.js"></script>
+    <script src="https://unpkg.com/prismjs/components/prism-javascript.js"></script>
+
     <style>
         body {
             overflow: hidden;
         }
     </style>
+    <script src="../Lib/PokemonList.js"></script>
 </head>
 
 <body style="margin:0;">
 
     <!-- Blockly workspace -->
-    <div id="blocklyDiv" style="height: 60vh; width: 75vw;"></div>
-    <div id="output" style="height: 40vh; width: 75vw; border-top: 1px solid #ccc;"></div>
+    <div id="blocklyDiv" style="height: 60vh; width: 75vw; padding: 0px; margin: 0px;"></div>
+    <div
+        style="height: 31.5vh; width: 100vw; overflow:auto; padding: 0px; margin: 0px; position: absolute; bottom: 0; left: 0; background-color: #2d2d2d; ">
+        <pre style="margin:0;padding:0;height:90%;width:100%;">
+            <code class="language-javascript" id="output" style="margin:0;padding: 0; padding-left:1vw;display:block;height: 80%;width:99%;"></code>
+        </pre>
+    </div>
+
 
 
     <script>
@@ -28,29 +42,152 @@
         const definitions = Blockly.common.createBlockDefinitionsFromJsonArray([
             {
                 type: 'meta_header',
-                message0: 'METADATA',
-                message1: ': %1',
+                message0: 'METADATA\n\n',
+                message1: `Display Name: %1\n`,
                 args1: [
                     {
-                        type: 'input_value',
-                        name: 'FIELD_NAME',
-                        check: 'String',
+                        type: 'field_input',
+                        name: 'DISPLAY_NAME',
+                        text: 'New Card'
+                    },
+                ],
+                message2: 'Pokemon: %1',
+                args2: [
+                    {
+                        "type": "field_dropdown",
+                        "name": "POKEMON",
+                        "options": [
+                            ...pokemon.map(name => [name, name])
+                        ]
+                    },
+                ],
+                message3: 'Type: %1',
+                args3: [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [
+                            ["Grass", "grass"],
+                            ["Fire", "fire"],
+                            ["Water", "water"],
+                            ["Lightning", "lightning"],
+                            ["Fighting", "fighting"],
+                            ["Psychic", "psychic"],
+                            ["Dark", "dark"],
+                            ["Metal", "metal"],
+                            ["Fairy", "fairy"],
+                            ["Colorless", "colorless"]
+                        ]
+                    }
+                ],
+                message4: 'HP: %1',
+                args4: [
+                    {
+                        type: 'field_number',
+                        name: 'HP',
+                        value: 60,
+                        min: 0,
+                        precision: 10
                     },
                 ],
                 colour: "#ff6a00",
-                nextStatement: null,
+                nextStatement: "metadata",
             },
             {
-                type: "inset_data_test",
-                message0: 'INSERT DATA TEST %1',
+                type: 'meta_weakness',
+                message0: 'Weakness %1',
                 args0: [
                     {
-                        type: 'field_input',
-                        name: 'FIELD_NAME',
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [
+                            ["Grass", "grass"],
+                            ["Fire", "fire"],
+                            ["Water", "water"],
+                            ["Lightning", "lightning"],
+                            ["Fighting", "fighting"],
+                            ["Psychic", "psychic"],
+                            ["Dark", "dark"],
+                            ["Metal", "metal"],
+                            ["Fairy", "fairy"],
+                            ["Colorless", "colorless"]
+                        ]
+                    }
+                ],
+                colour: "#ff6a00",
+                previousStatement: "metadata",
+                nextStatement: "metadata",
+            },
+            {
+                type: 'meta_resistance',
+                message0: 'Resistance %1',
+                args0: [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [
+                            ["Grass", "grass"],
+                            ["Fire", "fire"],
+                            ["Water", "water"],
+                            ["Lightning", "lightning"],
+                            ["Fighting", "fighting"],
+                            ["Psychic", "psychic"],
+                            ["Dark", "dark"],
+                            ["Metal", "metal"],
+                            ["Fairy", "fairy"],
+                            ["Colorless", "colorless"]
+                        ]
+                    }
+                ],
+                colour: "#ff6a00",
+                previousStatement: "metadata",
+                nextStatement: "metadata",
+            },
+            {
+                type: `meta_evolution`,
+                message0: 'Evolves from: %1',
+                args0: [
+                    {
+                        "type": "field_dropdown",
+                        "name": "POKEMON",
+                        "options": [
+                            ...pokemon.map(name => [name, name])
+                        ]
+                    }
+                ],
+                colour: "#ff6a00",
+                previousStatement: "metadata",
+                nextStatement: "metadata",
+            },
+            {
+                type: `meta_can_evolve`,
+                message0: 'Can evolve? %1',
+                args0: [
+                    {
+                        "type": "field_checkbox",
+                        "name": "CAN_EVOLVE",
+                        "checked": true
+                    }
+                ],
+                colour: "#ff6a00",
+                previousStatement: "metadata",
+                nextStatement: "metadata",
+            },
+            {
+                type: `meta_prize_cards`,
+                message0: 'Prize cards: %1',
+                args0: [
+                    {
+                        type: 'field_number',
+                        name: 'PRIZE_CARDS',
+                        value: 1,
+                        min: 0,
+                        precision: 1
                     },
                 ],
                 colour: "#ff6a00",
-                output: "String",
+                previousStatement: "metadata",
+                nextStatement: "metadata",
             }
         ]);
 
@@ -60,70 +197,187 @@
         // Get JavaScript generator
         const javascriptGenerator = Blockly.JavaScript;
 
-        // Define code generator for the block
-        javascriptGenerator.forBlock['my_custom_block'] = function (block, generator) {
-            var steps = block.getFieldValue('FIELD_NAME');
-            return 'moveForward(' + steps + ');\n';
+        // Define code generator for the blocks (do NOT chain next blocks here)
+        javascriptGenerator.forBlock['meta_header'] = function (block, generator) {
+            return ''; // handled manually in runCode
         };
-
+        javascriptGenerator.forBlock['meta_weakness'] = function (block, generator) {
+            var type = block.getFieldValue('TYPE');
+            return `this.weakness = PokemonType.${type.toUpperCase()};`;
+        };
+        javascriptGenerator.forBlock['meta_resistance'] = function (block, generator) {
+            var type = block.getFieldValue('TYPE');
+            return `this.resistance = PokemonType.${type.toUpperCase()};`;
+        };
+        javascriptGenerator.forBlock['meta_evolution'] = function (block, generator) {
+            var pokemon = block.getFieldValue('POKEMON');
+            return `this.evolvesFrom = '${pokemon}';`;
+        };
+        javascriptGenerator.forBlock['meta_can_evolve'] = function (block, generator) {
+            var canEvolve = block.getFieldValue('CAN_EVOLVE');
+            if (canEvolve === 'TRUE') canEvolve = true;
+            else canEvolve = false;
+            return `this.canEvolve = ${canEvolve};`;
+        };
+        javascriptGenerator.forBlock['meta_prize_cards'] = function (block, generator) {
+            var prizeCards = block.getFieldValue('PRIZE_CARDS');
+            return `this.prizeCards = ${prizeCards};`;
+        };
         // Inject Blockly
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: `<xml xmlns="https://developers.google.com/blockly/xml">
                 <category name="MetaData" colour="#ff6a00">
-                    <block type="meta_header" >
-                        <value name="FIELD_NAME">
-                            <shadow type="text">
-                                <field name="TEXT">Author: John Doe</field>
-                            </shadow>
-                        </value>
-                    </block>
-                    <block type="inset_data_test">
-                    </block>
+                    <block type="meta_header"></block>
+                    <block type="meta_weakness"></block>
+                    <block type="meta_resistance"></block>
+                    <block type="meta_evolution"></block>
+                    <block type="meta_can_evolve"></block>
+                    <block type="meta_prize_cards"></block>
                 </category>
             </xml>`,
             theme: Blockly.Themes.Dark,
             trashcan: true,
             move: {
-                scrollbars: {
-                    horizontal: false,
-                    vertical: false
-                },
+                scrollbars: { horizontal: false, vertical: false },
                 drag: false,
                 wheel: false
             },
             zoom: {
                 controls: false,
                 wheel: false,
-                startScale: 0.75, // Adjust this value to your desired scale
+                startScale: 0.75,
                 maxScale: 0.75,
                 minScale: 0.75,
                 scaleSpeed: 0
             },
             renderer: 'Zelos'
         });
-        // Function called when button is clicked
-        function runCode() {
-            const code = javascriptGenerator.workspaceToCode(workspace);
-            console.log("Generated code:\n" + code);
 
-            // Example function so the code can actually run
-            function moveForward(steps) {
-                alert("Moving forward " + steps + " steps!");
-            }
-
-            try {
-                eval(code); // Run the generated code
-            } catch (e) {
-                console.error("Error executing code:", e);
-            }
+        function toClassName(str) {
+            if (!str) return "UnnamedCard";
+            str = str.trim().replace(/[^a-zA-Z0-9]+/g, " ");
+            str = str.split(" ").filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join("");
+            if (!/^[A-Za-z_]/.test(str)) str = "_" + str;
+            return str || "UnnamedClass";
         }
+
+        // --- NEW HELPERS ---
+        function indentCode(code, spaces = 8) {
+            return code
+                .split("\n")
+                .filter(line => line.trim() !== "")
+                .map(line => " ".repeat(spaces) + line)
+                .join("\n");
+        }
+
+        /**
+         * Collects code for each metadata block after startBlock.
+         * Important: calls the block-specific generator function directly to avoid Blockly's
+         * default chaining (which uses scrub_ and appends subsequent blocks).
+         * Falls back to a safe extraction from blockToCode() if no direct generator exists.
+         */
+        function collectMetadataCode(startBlock, generator) {
+            let code = "";
+            let current = startBlock.nextConnection ? startBlock.nextConnection.targetBlock() : null;
+            while (current) {
+                let blockCode = "";
+
+                // Prefer direct per-block generator (this returns only this block's code)
+                const genFunc = generator.forBlock && generator.forBlock[current.type];
+                if (typeof genFunc === "function") {
+                    try {
+                        blockCode = genFunc(current, generator);
+                    } catch (e) {
+                        // If direct call fails, fallback to blockToCode below
+                        blockCode = "";
+                    }
+                }
+
+                // Fallback: try to use blockToCode but isolate just this block's contribution.
+                if (!blockCode) {
+                    let full = generator.blockToCode(current) || "";
+                    // blockToCode often includes code for next blocks via scrub_. To avoid dupes,
+                    // take only the first meaningful line if full contains multiple lines.
+                    if (typeof full === "string" && full.indexOf("\n") !== -1) {
+                        const lines = full.split("\n").map(l => l.trim()).filter(Boolean);
+                        // If the block produces a single-line statement, use that; otherwise use the first non-empty line.
+                        blockCode = lines.length ? lines[0] : "";
+                    } else {
+                        blockCode = (Array.isArray(full) ? full[0] : full) || "";
+                    }
+                }
+
+                // If generator returned array like [code, order], get first element
+                if (Array.isArray(blockCode)) blockCode = blockCode[0];
+
+                blockCode = (blockCode || "").toString().trim();
+                if (blockCode !== "") {
+                    code += blockCode + "\n"; // ensure exactly one newline per block
+                }
+
+                // Move to next connected block in the chain
+                current = current.nextConnection ? current.nextConnection.targetBlock() : null;
+            }
+            return code;
+        }
+
+        // Function called when workspace changes
+        function runCode() {
+            javascriptGenerator.init(workspace);
+
+            const metaHeaderBlock = workspace.getAllBlocks(false).find(b => b.type === 'meta_header');
+            if (!metaHeaderBlock) return;
+
+            // collect and indent metadata code
+            let metaCode = collectMetadataCode(metaHeaderBlock, javascriptGenerator);
+            metaCode = indentCode(metaCode, 8);
+
+            let code = `import Card from "./card.js";
+import PokemonType from "./enums.js";
+class ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))} extends Card {
+    constructor() {
+        super(
+            '${metaHeaderBlock.getFieldValue("DISPLAY_NAME")}',
+            PokemonType.${metaHeaderBlock.getFieldValue("TYPE").toUpperCase()},
+            ${metaHeaderBlock.getFieldValue("HP")},
+            '${metaHeaderBlock.getFieldValue("POKEMON")}'
+        );
+${metaCode}
+    }
+}
+export default ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))};`;
+
+            javascriptGenerator.finish(code);
+
+            const codeEl = document.getElementById('output');
+            codeEl.textContent = code;
+            Prism.highlightElement(codeEl);
+        }
+
         workspace.addChangeListener(function (event) {
-            // Example: log block additions
+            if (event.type === Blockly.Events.BLOCK_CREATE) {
+                const blocks = workspace.getAllBlocks(false);
+                const metaTypes = ['meta_header', 'meta_weakness', 'meta_resistance', 'meta_evolution'];
+                for (const type of metaTypes) {
+                    const metaBlocks = blocks.filter(b => b.type === type);
+                    const maxAllowed = 1;
+                    if (metaBlocks.length > maxAllowed) {
+                        // Dispose the newest block of this type
+                        const newBlockId = event.ids.find(id => {
+                            const block = workspace.getBlockById(id);
+                            return block && block.type === type;
+                        });
+                        const newBlock = newBlockId ? workspace.getBlockById(newBlockId) : null;
+                        if (newBlock) newBlock.dispose(false, true);
+                    }
+                }
+            }
             if (!event.isUiEvent) {
-                console.log('Block created:', event);
+                runCode();
             }
         });
-
     </script>
 </body>
 
