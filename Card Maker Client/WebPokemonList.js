@@ -1025,4 +1025,3 @@ const Pokemon = [
     "Zweilous",
     "Zygarde"
 ]
-export default Pokemon;

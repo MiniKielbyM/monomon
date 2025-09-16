@@ -1,8 +1,23 @@
 import Card from "./card.js";
-import PokemonType from "./enums.js";
+import enums from "./enums.js";
+const { PokemonType, CardModifiers } = enums;
 class Pikachu extends Card {
     constructor() {
-        super('Pikachu', PokemonType.LIGHTNING, 60, PokemonType.FIGHTING, null, [PokemonType.COLORLESS, PokemonType.COLORLESS]);
+        super(
+            'New Card',
+            PokemonType.GRASS,
+            60,
+            'Abomasnow',
+            null,
+            true,
+            null,
+            null,
+            0,
+            1,
+            CardModifiers.BASE
+        );
+
     }
+    
 }
 export default Pikachu;

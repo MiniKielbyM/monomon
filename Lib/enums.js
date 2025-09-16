@@ -11,7 +11,7 @@ const PokemonType = {
     DRAGON: 'dragon',
     COLORLESS: 'colorless'
 };
-const CardModifier = {
+const CardModifiers = {
     BASE: 'base',
     BREAK: 'break',
     EX: 'ex',
@@ -21,4 +21,4 @@ const CardModifier = {
     V: 'v',
     VMAX: 'vmax'
 }
-export default { PokemonType, CardModifier };
+export default { PokemonType, CardModifiers };

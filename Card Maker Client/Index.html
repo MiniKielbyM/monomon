@@ -15,50 +15,90 @@
     <!-- Prism JS -->
     <script src="https://unpkg.com/prismjs/prism.js"></script>
     <script src="https://unpkg.com/prismjs/components/prism-javascript.js"></script>
-
+    <!-- Bootstrap CSS for icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+    <!-- Pokemon List -->
+    <script src="./WebPokemonList.js"></script>
+    <!-- Custom CSS -->
     <style>
-        body {
-            overflow: hidden;
+        /* copy button */
+        pre:has(code) svg {
+            position: sticky;
+            float: right;
+            cursor: pointer;
+            z-index: 10;
+            right: 1rem;
+            top: 1rem;
+        }
+
+        /* code block */
+        pre:has(code) {
+            position: relative;
+            overflow-y: auto;
+            width: 200px;
+            background-color: black;
+            color: white;
+            padding-inline: 0.25rem;
+            padding-block-end: 1rem;
         }
     </style>
-    <script src="../Lib/PokemonList.js"></script>
+    <title>Card Maker</title>
 </head>
 
-<body style="margin:0;">
-
+<body style="margin:0; overflow: hidden;">
     <!-- Blockly workspace -->
     <div id="blocklyDiv" style="height: 60vh; width: 75vw; padding: 0px; margin: 0px;"></div>
-    <div
-        style="height: 31.5vh; width: 100vw; overflow:auto; padding: 0px; margin: 0px; position: absolute; bottom: 0; left: 0; background-color: #2d2d2d; ">
-        <pre style="margin:0;padding:0;height:90%;width:100%;">
-            <code class="language-javascript" id="output" style="margin:0;padding: 0; padding-left:1vw;display:block;height: 80%;width:99%;"></code>
+    <div style="height: 31.5vh; width: 100vw; overflow:auto; padding: 0px; margin: 0px; position: absolute; bottom: 0; left: 0; background-color: #2d2d2d; ">
+        <pre style="margin:0;padding:0;height:100%;width:100%;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="1.5rem" height="1.5rem" fill="white" class="bi bi-clipboard" viewBox="0 0 16 16" onclick="
+                const codeEl = document.getElementById('output');
+                if (!codeEl) return;
+                const text = codeEl.textContent || '';
+                navigator.clipboard.writeText(text).then(() => {
+                    // Show tooltip on success
+                    const tooltip = bootstrap.Tooltip.getOrCreateInstance(this, {
+                        title: 'Copied!',
+                        placement: 'top',
+                        trigger: 'manual'
+                    });
+                    tooltip.show();
+                    setTimeout(() => tooltip.hide(), 1000);
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+            ">
+                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/>
+                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z"/>
+            </svg>
+            <code class="language-javascript" id="output" style="margin:0;padding: 0; padding-left:1vw;display:block;height: 100%;width:99%;">
+            
+            </code>
+
         </pre>
     </div>
 
 
 
     <script>
-        // Define custom block
+        // Define custom metadata blocks in JSON
         const definitions = Blockly.common.createBlockDefinitionsFromJsonArray([
             {
                 type: 'meta_header',
                 message0: 'METADATA\n\n',
                 message1: `Display Name: %1\n`,
                 args1: [
-                    {
-                        type: 'field_input',
-                        name: 'DISPLAY_NAME',
-                        text: 'New Card'
-                    },
+                    { type: 'field_input', name: 'DISPLAY_NAME', text: 'New Card' },
                 ],
                 message2: 'Pokemon: %1',
                 args2: [
                     {
                         "type": "field_dropdown",
                         "name": "POKEMON",
-                        "options": [
-                            ...pokemon.map(name => [name, name])
-                        ]
+                        "options": [...Pokemon.map(name => [name, name])]
                     },
                 ],
                 message3: 'Type: %1',
@@ -67,28 +107,16 @@
                         "type": "field_dropdown",
                         "name": "TYPE",
                         "options": [
-                            ["Grass", "grass"],
-                            ["Fire", "fire"],
-                            ["Water", "water"],
-                            ["Lightning", "lightning"],
-                            ["Fighting", "fighting"],
-                            ["Psychic", "psychic"],
-                            ["Dark", "dark"],
-                            ["Metal", "metal"],
-                            ["Fairy", "fairy"],
-                            ["Colorless", "colorless"]
+                            ["Grass", "grass"], ["Fire", "fire"], ["Water", "water"],
+                            ["Lightning", "lightning"], ["Fighting", "fighting"],
+                            ["Psychic", "psychic"], ["Dark", "dark"], ["Metal", "metal"],
+                            ["Fairy", "fairy"], ["Colorless", "colorless"]
                         ]
                     }
                 ],
                 message4: 'HP: %1',
                 args4: [
-                    {
-                        type: 'field_number',
-                        name: 'HP',
-                        value: 60,
-                        min: 0,
-                        precision: 10
-                    },
+                    { type: 'field_number', name: 'HP', value: 60, min: 0, precision: 10 },
                 ],
                 colour: "#ff6a00",
                 nextStatement: "metadata",
@@ -101,16 +129,10 @@
                         "type": "field_dropdown",
                         "name": "TYPE",
                         "options": [
-                            ["Grass", "grass"],
-                            ["Fire", "fire"],
-                            ["Water", "water"],
-                            ["Lightning", "lightning"],
-                            ["Fighting", "fighting"],
-                            ["Psychic", "psychic"],
-                            ["Dark", "dark"],
-                            ["Metal", "metal"],
-                            ["Fairy", "fairy"],
-                            ["Colorless", "colorless"]
+                            ["Grass", "grass"], ["Fire", "fire"], ["Water", "water"],
+                            ["Lightning", "lightning"], ["Fighting", "fighting"],
+                            ["Psychic", "psychic"], ["Dark", "dark"], ["Metal", "metal"],
+                            ["Fairy", "fairy"], ["Colorless", "colorless"]
                         ]
                     }
                 ],
@@ -126,16 +148,10 @@
                         "type": "field_dropdown",
                         "name": "TYPE",
                         "options": [
-                            ["Grass", "grass"],
-                            ["Fire", "fire"],
-                            ["Water", "water"],
-                            ["Lightning", "lightning"],
-                            ["Fighting", "fighting"],
-                            ["Psychic", "psychic"],
-                            ["Dark", "dark"],
-                            ["Metal", "metal"],
-                            ["Fairy", "fairy"],
-                            ["Colorless", "colorless"]
+                            ["Grass", "grass"], ["Fire", "fire"], ["Water", "water"],
+                            ["Lightning", "lightning"], ["Fighting", "fighting"],
+                            ["Psychic", "psychic"], ["Dark", "dark"], ["Metal", "metal"],
+                            ["Fairy", "fairy"], ["Colorless", "colorless"]
                         ]
                     }
                 ],
@@ -150,9 +166,7 @@
                     {
                         "type": "field_dropdown",
                         "name": "POKEMON",
-                        "options": [
-                            ...pokemon.map(name => [name, name])
-                        ]
+                        "options": [...Pokemon.map(name => [name, name])]
                     }
                 ],
                 colour: "#ff6a00",
@@ -163,11 +177,7 @@
                 type: `meta_can_evolve`,
                 message0: 'Can evolve? %1',
                 args0: [
-                    {
-                        "type": "field_checkbox",
-                        "name": "CAN_EVOLVE",
-                        "checked": true
-                    }
+                    { "type": "field_checkbox", "name": "CAN_EVOLVE", "checked": true }
                 ],
                 colour: "#ff6a00",
                 previousStatement: "metadata",
@@ -177,79 +187,85 @@
                 type: `meta_prize_cards`,
                 message0: 'Prize cards: %1',
                 args0: [
-                    {
-                        type: 'field_number',
-                        name: 'PRIZE_CARDS',
-                        value: 1,
-                        min: 0,
-                        precision: 1
-                    },
+                    { type: 'field_number', name: 'PRIZE_CARDS', value: 1, min: 0, precision: 1 },
                 ],
                 colour: "#ff6a00",
                 previousStatement: "metadata",
                 nextStatement: "metadata",
+            },
+            // JSON mutator blocks
+            {
+                type: "metadata_resistance",
+                message0: "Retreat Cost: %1",
+                args0: [
+                    { type: 'field_number', name: 'RETREAT_COST', value: 1, min: 0, precision: 1 },
+                ],
+                colour: "#ff6a00",
+                nextStatement: "metadata",
+                previousStatement: "metadata",
+            },
+            {
+                type: "metadata_card_modifier",
+                message0: "Card Modifier: %1",
+                args0: [
+                    {
+                        "type": "field_dropdown",
+                        "name": "CARD_MOD",
+                        "options": [
+                            ["none", "base"], ["Break", "break"], ["EX", "ex"], ["MEGA EX", "megaex"],
+                            ["GX", "gx"], ["Tag-Team GX", "gxtagteam"], ["V", "v"], ["VMAX", "vmax"]
+                        ]
+                    }
+                ],
+                colour: "#ff6a00",
+                previousStatement: "metadata",
+                nextStatement: "metadata"
             }
         ]);
 
-        // Register block definition
+        // Register block definitions
         Blockly.common.defineBlocks(definitions);
 
-        // Get JavaScript generator
+        // Generators
         const javascriptGenerator = Blockly.JavaScript;
 
-        // Define code generator for the blocks (do NOT chain next blocks here)
-        javascriptGenerator.forBlock['meta_header'] = function (block, generator) {
-            return ''; // handled manually in runCode
+        javascriptGenerator.forBlock['meta_header'] = () => '';
+        javascriptGenerator.forBlock['meta_weakness'] = b =>
+            `this.weakness = PokemonType.${b.getFieldValue('TYPE').toUpperCase()};`;
+        javascriptGenerator.forBlock['meta_resistance'] = b =>
+            `this.resistance = PokemonType.${b.getFieldValue('TYPE').toUpperCase()};`;
+        javascriptGenerator.forBlock['meta_evolution'] = b =>
+            `this.evolvesFrom = '${b.getFieldValue('POKEMON')}';`;
+        javascriptGenerator.forBlock['meta_can_evolve'] = b =>
+            `this.canEvolve = ${b.getFieldValue('CAN_EVOLVE') === 'TRUE'};`;
+        javascriptGenerator.forBlock['meta_prize_cards'] = b =>
+            `this.prizeCards = ${b.getFieldValue('PRIZE_CARDS')};`;
+        javascriptGenerator.forBlock['metadata_resistance'] = function (block) {
+
+            return `this.retreatCost = ${block.getFieldValue('RETREAT_COST')};`;
         };
-        javascriptGenerator.forBlock['meta_weakness'] = function (block, generator) {
-            var type = block.getFieldValue('TYPE');
-            return `this.weakness = PokemonType.${type.toUpperCase()};`;
-        };
-        javascriptGenerator.forBlock['meta_resistance'] = function (block, generator) {
-            var type = block.getFieldValue('TYPE');
-            return `this.resistance = PokemonType.${type.toUpperCase()};`;
-        };
-        javascriptGenerator.forBlock['meta_evolution'] = function (block, generator) {
-            var pokemon = block.getFieldValue('POKEMON');
-            return `this.evolvesFrom = '${pokemon}';`;
-        };
-        javascriptGenerator.forBlock['meta_can_evolve'] = function (block, generator) {
-            var canEvolve = block.getFieldValue('CAN_EVOLVE');
-            if (canEvolve === 'TRUE') canEvolve = true;
-            else canEvolve = false;
-            return `this.canEvolve = ${canEvolve};`;
-        };
-        javascriptGenerator.forBlock['meta_prize_cards'] = function (block, generator) {
-            var prizeCards = block.getFieldValue('PRIZE_CARDS');
-            return `this.prizeCards = ${prizeCards};`;
-        };
+        javascriptGenerator.forBlock['metadata_card_modifier'] = b =>
+            `this.cardMod = CardModifiers.${b.getFieldValue('CARD_MOD').toUpperCase()};`;
         // Inject Blockly
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: `<xml xmlns="https://developers.google.com/blockly/xml">
-                <category name="MetaData" colour="#ff6a00">
-                    <block type="meta_header"></block>
-                    <block type="meta_weakness"></block>
-                    <block type="meta_resistance"></block>
-                    <block type="meta_evolution"></block>
-                    <block type="meta_can_evolve"></block>
-                    <block type="meta_prize_cards"></block>
-                </category>
-            </xml>`,
+            <category name="MetaData" colour="#ff6a00">
+                <block type="meta_header"></block>
+                <block type="meta_weakness"></block>
+                <block type="meta_resistance"></block>
+                <block type="meta_evolution"></block>
+                <block type="meta_can_evolve"></block>
+                <block type="meta_prize_cards"></block>
+                <block type="metadata_resistance"></block>
+                <block type="metadata_card_modifier"></block>
+            </category>
+            <category name="Abilities" colour="#5b80a5">
+            </category>
+        </xml>`,
             theme: Blockly.Themes.Dark,
             trashcan: true,
-            move: {
-                scrollbars: { horizontal: false, vertical: false },
-                drag: false,
-                wheel: false
-            },
-            zoom: {
-                controls: false,
-                wheel: false,
-                startScale: 0.75,
-                maxScale: 0.75,
-                minScale: 0.75,
-                scaleSpeed: 0
-            },
+            move: { scrollbars: false, drag: false, wheel: false },
+            zoom: { controls: false, wheel: false, startScale: 0.75, maxScale: 0.75, minScale: 0.75, scaleSpeed: 0 },
             renderer: 'Zelos'
         });
 
@@ -263,7 +279,6 @@
             return str || "UnnamedClass";
         }
 
-        // --- NEW HELPERS ---
         function indentCode(code, spaces = 8) {
             return code
                 .split("\n")
@@ -335,17 +350,26 @@
             metaCode = indentCode(metaCode, 8);
 
             let code = `import Card from "./card.js";
-import PokemonType from "./enums.js";
+import enums from "./enums.js";
+const { PokemonType, CardModifiers } = enums;
 class ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))} extends Card {
     constructor() {
         super(
             '${metaHeaderBlock.getFieldValue("DISPLAY_NAME")}',
             PokemonType.${metaHeaderBlock.getFieldValue("TYPE").toUpperCase()},
             ${metaHeaderBlock.getFieldValue("HP")},
-            '${metaHeaderBlock.getFieldValue("POKEMON")}'
+            '${metaHeaderBlock.getFieldValue("POKEMON")}',
+            null,
+            true,
+            null,
+            null,
+            0,
+            1,
+            CardModifiers.BASE
         );
 ${metaCode}
     }
+    
 }
 export default ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))};`;
 

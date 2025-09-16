@@ -1,7 +1,12 @@
-import PokemonType from "./enums.js";
+import enums from "./enums.js";
+const { PokemonType, CardModifiers } = enums;
 import Pokemon from "./PokemonList.js";
 class Card {
-    constructor(cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance= null, retreatCost = [], prizeCards = 1) {
+    //Global card properties
+    static energy = [];
+    static attachments = [];
+    //Constructor
+    constructor(cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance= null, retreatCost = 0, prizeCards = 1, cardMod = CardModifiers.Base) {
         this.cardName = cardName;
         if (!Object.values(PokemonType).includes(type)) {
             throw new Error(`Invalid Pokemon type: ${type}`);
@@ -33,8 +38,8 @@ class Card {
         if (!Object.values(PokemonType).includes(resistance) && resistance !== null) {
             throw new Error(`Invalid Pokemon resistance: ${resistance}`);
         }
-        this.resistance = resistance;
-        if (!Array.isArray(retreatCost) || !retreatCost.every(cost => Object.values(PokemonType).includes(cost))) {
+        this.resistance = parseInt(resistance);
+        if (typeof retreatCost !== 'number' || retreatCost < 0) {
             throw new Error(`Invalid Pokemon retreat cost: ${retreatCost}`);
         }
         this.retreatCost = retreatCost;
@@ -42,6 +47,10 @@ class Card {
             throw new Error(`Invalid number of prize cards: ${prizeCards}`);
         }
         this.prizeCards = prizeCards;
+        if (!Object.values(CardModifiers).includes(cardMod)) {
+            throw new Error(`Invalid card modifier: ${cardMod}`);
+        }
+        this.cardMod = cardMod;
     }
     // Utility functions, dont edit these on children classes
     damage(amount) {
@@ -66,4 +75,40 @@ class Card {
 }
 Object.freeze(Card.damage);
 Object.freeze(Card.heal);
+class Attachment {
+    constructor() {}
+    attach(pokemon) {
+        if (!(pokemon instanceof Card)) {
+            throw new Error(`Can only attach to a Card instance`);
+        }
+        // Add attachment logic in child classes
+    }
+    detach() {
+        // Add detach logic in child classes
+    }
+    
+}
+class Energy extends Attachment {
+    constructor(energyType) {
+        super();
+        if (!Object.values(PokemonType).includes(energyType)) {
+            throw new Error(`Invalid energy type: ${energyType}`);
+        }
+        this.energyType = energyType;
+    }
+    attach(pokemon) {
+        super.attach(pokemon);
+        this.attachedTo = pokemon;
+        pokemon.energy.push(this.energyType);
+    }
+    detach() {
+        if (this.attached && Array.isArray(this.attachedTo.energy)) {
+            const idx = this.attachedTo.energy.indexOf(this.energyType);
+            if (idx !== -1) {
+                this.attachedTo.energy.splice(idx, 1);
+            }
+            this.attachedTo = null;
+        }
+    }
+}
 export default Card;
