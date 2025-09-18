@@ -1,3 +1,4 @@
+import Client from "./client.js";
 import enums from "./enums.js";
 const { PokemonType, CardModifiers } = enums;
 import Pokemon from "./PokemonList.js";
@@ -5,8 +6,14 @@ class Card {
     //Global card properties
     static energy = [];
     static attachments = [];
+    attacks = {};
+    abilities = {};
     //Constructor
-    constructor(cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance= null, retreatCost = 0, prizeCards = 1, cardMod = CardModifiers.Base) {
+    constructor(owner, cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance= null, retreatCost = 0, prizeCards = 1, cardMod = CardModifiers.Base) {
+        this.owner = owner;
+        if (!(owner instanceof Client)) {
+            throw new TypeError('owner must be an instance of Client');
+        }
         this.cardName = cardName;
         if (!Object.values(PokemonType).includes(type)) {
             throw new Error(`Invalid Pokemon type: ${type}`);
@@ -16,6 +23,7 @@ class Card {
             throw new Error(`Invalid Pokemon HP: ${hp}`);
         }
         this.hp = hp;
+        this.health = hp;
         if (typeof pokemon !== 'string' || !Pokemon.includes(pokemon)) {
             throw new Error(`Invalid Pokemon: ${pokemon}`);
         }
@@ -38,7 +46,7 @@ class Card {
         if (!Object.values(PokemonType).includes(resistance) && resistance !== null) {
             throw new Error(`Invalid Pokemon resistance: ${resistance}`);
         }
-        this.resistance = parseInt(resistance);
+        this.resistance = resistance;
         if (typeof retreatCost !== 'number' || retreatCost < 0) {
             throw new Error(`Invalid Pokemon retreat cost: ${retreatCost}`);
         }
@@ -71,7 +79,12 @@ class Card {
             this.health = this.hp;
         }
     }
-    
+    listAttacks() {
+        return Object.keys(this.attacks);
+    }
+    listAbilities() {
+        return Object.keys(this.abilities);
+    }
 }
 Object.freeze(Card.damage);
 Object.freeze(Card.heal);

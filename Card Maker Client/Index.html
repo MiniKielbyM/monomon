@@ -75,7 +75,7 @@
                 <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z"/>
             </svg>
             <code class="language-javascript" id="output" style="margin:0;padding: 0; padding-left:1vw;display:block;height: 100%;width:99%;">
-            
+                
             </code>
 
         </pre>
@@ -355,10 +355,10 @@ const { PokemonType, CardModifiers } = enums;
 class ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))} extends Card {
     constructor() {
         super(
-            '${metaHeaderBlock.getFieldValue("DISPLAY_NAME")}',
-            PokemonType.${metaHeaderBlock.getFieldValue("TYPE").toUpperCase()},
-            ${metaHeaderBlock.getFieldValue("HP")},
-            '${metaHeaderBlock.getFieldValue("POKEMON")}',
+            '${metaHeaderBlock.getFieldValue("DISPLAY_NAME") || "New Card"}',
+            PokemonType.${metaHeaderBlock.getFieldValue("TYPE").toUpperCase() || "COLORLESS"},
+            ${metaHeaderBlock.getFieldValue("HP") || 0},
+            '${metaHeaderBlock.getFieldValue("POKEMON") || "Unknown"}',
             null,
             true,
             null,
@@ -369,7 +369,6 @@ class ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))} extends Card
         );
 ${metaCode}
     }
-    
 }
 export default ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))};`;
 
@@ -402,6 +401,7 @@ export default ${toClassName(metaHeaderBlock.getFieldValue("DISPLAY_NAME"))};`;
                 runCode();
             }
         });
+
     </script>
 </body>
 

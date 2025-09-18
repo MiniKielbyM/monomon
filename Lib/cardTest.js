@@ -2,12 +2,13 @@ import Card from "./card.js";
 import enums from "./enums.js";
 const { PokemonType, CardModifiers } = enums;
 class Pikachu extends Card {
-    constructor() {
+    constructor(owner) {
         super(
+            owner,
             'New Card',
-            PokemonType.GRASS,
+            PokemonType.LIGHTNING,
             60,
-            'Abomasnow',
+            'Pikachu',
             null,
             true,
             null,
@@ -16,8 +17,6 @@ class Pikachu extends Card {
             1,
             CardModifiers.BASE
         );
-
     }
-    
 }
 export default Pikachu;

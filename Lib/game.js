@@ -8,7 +8,11 @@ class Game {
             throw new TypeError('client2 must be an instance of Client or null');
         }
         this.client1 = client1;
+        this.client1.game = this;
+        this.client1.opponent = client2;
         this.client2 = client2;
+        this.client2.game = this;
+        this.client2.opponent = client1;
         this.isRunning = false;
     }
 }
