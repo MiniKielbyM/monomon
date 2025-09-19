@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Home</title>
+</head>
+<body>
+  <% if (isAuthenticated) { %>
+    <h1>Welcome <%= userInfo.email %></h1>
+    <p>You are logged in.</p>
+    <a href="/logout">Logout</a>
+  <% } else { %>
+    <h1>You are not logged in</h1>
+    <a href="/login">Login</a>
+  <% } %>
+</body>
+</html>
