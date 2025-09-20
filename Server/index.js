@@ -33,8 +33,6 @@ const sessionMiddleware = session({
 });
 
 app.use(sessionMiddleware);
-
-// VERY IMPORTANT: share with Socket.IO
 io.engine.use(sessionMiddleware);
 
 
@@ -110,13 +108,17 @@ app.get('/logout', (req, res) => {
 });
 
 // ==================== Socket.IO ====================
-
+var connectedUsers = [];
 // Require authentication for all sockets
 io.use((socket, next) => {
   const session = socket.request.session;
 
   if (session && session.userInfo) {
     socket.user = session.userInfo; // attach user info to socket
+    if (!connectedUsers.find(user => user.email === socket.user.email)) {
+      connectedUsers.push({email: socket.user.email, name: socket.user.username || socket.user.email });
+    }
+    socket.broadcast.emit('userList', connectedUsers);
     return next();
   }
 
@@ -134,6 +136,10 @@ io.on('connection', (socket) => {
     socket.emit('message', `Echo: ${msg}`);
   });
 
+  socket.on('getUserInfo', () => {
+    socket.emit('userList', connectedUsers);
+  });
+
   socket.on('createRoom', (room) => {
     socket.join(room);
     socket.emit('message', `Room "${room}" created`);
@@ -146,7 +152,19 @@ io.on('connection', (socket) => {
       }
     });
   });
+  socket.on('disconnect', () => {
+    console.log(`Client disconnected: ${socket.user.email}`);
+    const stillConnected = Array.from(io.sockets.sockets.values()).some(s => s.user && s.user.email === socket.user.email && s.id !== socket.id);
+    if (stillConnected) {
+      console.log(`User ${socket.user.email} still has active connections.`);
+    }
+    else{
+      connectedUsers = connectedUsers.filter(user => user.email !== socket.user.email);
+    }
+    socket.broadcast.emit('userList', connectedUsers);
+  });
 });
+
 
 // ==================== Start ====================
 const PORT = process.env.PORT || 3000;

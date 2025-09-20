@@ -7,9 +7,11 @@
 
 <body>
   <% if (isAuthenticated) { %>
-    <h1>Welcome <%= userInfo.email %>
+    <h1>Welcome <%= userInfo.username %>
     </h1>
     <p>You are logged in.</p>
+    <p><%= JSON.stringify(userInfo, null, 2) %></p>
+    <div id="userList"></div>
     <a href="/logout">Logout</a>
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
@@ -18,16 +20,23 @@
       const socket = io({ transports: ['polling', 'websocket'] });
 
       socket.on('connect', () => {
-        console.log('✅ Connected to server via Socket.IO');
+        console.log('Connected to server via Socket.IO');
       });
 
       socket.on('connect_error', (err) => {
-        console.error('❌ Socket connection failed:', err.message);
+        console.error('Socket connection failed:', err.message);
       });
 
       socket.on('message', (data) => {
-        console.log('📩 Received message:', data);
+        console.log('Received message:', data);
       });
+      socket.on('userList', (users) => {
+        console.log('Connected users:', users);
+        const userListDiv = document.getElementById('userList');
+        userListDiv.innerHTML = `<h3>Connected Users:</h3><ul>` + users.map(user => `<li><a  href="mailto:${user.email}">${user.name}</a></li>`).join('') + '</ul>';
+      });
+      // Request user info on connection
+      socket.emit('getUserInfo');
     </script>
     <% } else { %>
       <h1>You are not logged in</h1>
