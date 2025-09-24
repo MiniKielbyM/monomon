@@ -21,4 +21,26 @@ const CardModifiers = {
     V: 'v',
     VMAX: 'vmax'
 }
-export default { PokemonType, CardModifiers };
+const AbilityEventListeners= {
+    ONPLAY: 'onPlay',
+    ONATTACK: 'onAttack',
+    ONDAMAGE: 'onDamage',
+    ONHEAL: 'onHeal',
+    ONKNOCKOUT: 'onKnockout',
+    ONTURNSTART: 'onTurnStart',
+    ONTURNAFTERDRAW: 'onTurnAfterDraw',
+    ONTURNEND: 'onTurnEnd',
+    ONENERGYATTACH: 'onEnergyAttach',
+    ONEVOLVE: 'onEvolve',
+    ONSWITCH: 'onSwitch',
+    ONDISCARD: 'onDiscard',
+    ONPRIZECARDTAKE: 'onPrizeCardTake',
+    ONABILITYUSE: 'onAbilityUse',
+    ONATTACKUSE: 'onAttackUse',
+    ONBENCHPOKEMONADDED: 'onBenchPokemonAdded',
+    FROMDISCARD: 'fromDiscard',
+    FROMDECK: 'fromDeck',
+    FROMHAND: 'fromHand',
+    FROMPRIZECARDS: 'fromPrizeCards'
+}
+export default { PokemonType, CardModifiers, AbilityEventListeners };

@@ -11,8 +11,15 @@ class Client {
         this.game = null;
         this.opponent = null;
         this.activePokemon = null;
-        this.bench = [];
         this.uuid = crypto.randomUUID();
+        this.bench = [];
+        this.hand = [];
+        this.prizeCards = [];
+        this.discardPile = [];
+        this.lost = false;
+        this.attachedEnergyThisTurn = false;
+        this.hasPlayedSupporterThisTurn = false;
+        this.hasPlayedStadiumThisTurn = false;
     }
 }
 export default Client;
