@@ -47,6 +47,7 @@
             height: 100%;
             box-sizing: border-box;
             visibility: hidden;
+
         }
 
         #sixteenbynine #player-zone {
@@ -94,16 +95,15 @@
             transform: scale(1.25);
             transition: transform 0.2s;
             cursor: pointer;
+            z-index: 10;
         }
 
         #sixteenbynine #player-zone .card.active {
             bottom: calc((100% - (28.35% * 3)) / 3 + 28.35% + (100% - (28.35% * 3)) / 3 + 28.35% + (100% - (28.35% * 3)) / 3);
-
             z-index: 10;
         }
 
-        #sixteenbynine .bench,
-        #sixteenbynine .hand {
+        #sixteenbynine .bench {
             position: absolute;
             bottom: calc((100% - (28.35% * 3)) / 3 + 28.35% + (100% - (28.35% * 3)) / 3);
             height: 28.35%;
@@ -115,15 +115,61 @@
             left: 0;
         }
 
-        #sixteenbynine .bench .card,
-        #sixteenbynine .hand .card {
+        #sixteenbynine .bench .card {
             position: relative;
             height: 100%;
-        }
-        #sixteenbynine .hand {
-            bottom: calc((100% - (28.35% * 3)) / 3);
+            z-index: 2;
         }
 
+        #sixteenbynine .hand-outer {
+            position: absolute;
+            bottom: calc((100% - (28.35% * 3)) / 3);
+            height: 28.35%;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow: visible;
+        }
+
+        #sixteenbynine .hand-inner {
+            position: relative;
+            height: 100%;
+            width: 60%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow: visible;
+        }
+
+        #sixteenbynine .hand {
+            position: relative;
+            height: 125%;
+            width: 100%;
+            bottom: -12.5%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow-x: auto;
+            scrollbar-gutter: stable;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-left: 2%;
+            padding-right: 2%;
+            gap: 3.2%;
+            box-sizing: border-box;
+        }
+
+        #sixteenbynine .hand::-webkit-scrollbar {
+            display: none;
+        }
+
+        #sixteenbynine .hand .card {
+            height: 80%;
+            z-index: 2;
+            bottom: 10%;
+            position: relative;
+        }
     </style>
 </head>
 
@@ -140,15 +186,28 @@
                     <div class="card player benched"></div>
                     <div class="card player benched"></div>
                 </div>
-                <div class="hand">
-                    <div class="card player in-hand"></div>
-                    <div class="card player in-hand"></div>
-                    <div class="card player in-hand"></div>
-                    <div class="card player in-hand"></div>
-                    <div class="card player in-hand"></div>
-                    <div class="card player in-hand"></div>
-
+                <div class="hand-outer">
+                    <div class="hand-inner">
+                        <div class="hand">
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                        </div>
+                    </div>
                 </div>
+
             </div>
 
         </div>
@@ -158,7 +217,7 @@
         // Standard aspect ratios
         const ratios = [
             { name: "16:9", value: 16 / 9 },
-            { name: "4:3", value: 4 / 3 }
+            //            { name: "4:3", value: 4 / 3 }
         ];
         function getNearestRatio(width, height) {
             const actual = width / height;
@@ -197,6 +256,23 @@
         }
         window.addEventListener('resize', setAspectBox);
         setAspectBox();
+
+        const container = document.getElementsByClassName('hand')[0];
+        function dynamicHandSize() {
+            const handCards = container.getElementsByClassName('card');
+            const cardCount = handCards.length;
+            if (cardCount > 8) {
+                container.style.justifyContent = 'flex-start';
+                container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+            } else {
+                container.style.justifyContent = 'center';
+            }
+        }
+        const observer = new MutationObserver((mutationsList, observer) => {
+            dynamicHandSize();
+        });
+        observer.observe(container, { childList: true });
+        dynamicHandSize();
     </script>
 </body>
 
