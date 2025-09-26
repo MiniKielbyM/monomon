@@ -136,6 +136,7 @@
             position: relative;
             height: 100%;
             width: 60%;
+            bottom: -12.5%;
             display: flex;
             justify-content: center;
             align-items: flex-end;
@@ -146,28 +147,26 @@
             position: relative;
             height: 125%;
             width: 100%;
-            bottom: -12.5%;
+            bottom: 0;
             display: flex;
             justify-content: center;
             align-items: flex-end;
             overflow-x: auto;
             scrollbar-gutter: stable;
             scrollbar-width: none;
-            -ms-overflow-style: none;
             padding-left: 2%;
             padding-right: 2%;
             gap: 3.2%;
             box-sizing: border-box;
         }
 
-        #sixteenbynine .hand::-webkit-scrollbar {
-            display: none;
-        }
-
         #sixteenbynine .hand .card {
             height: 80%;
             z-index: 2;
             bottom: 10%;
+            padding: 0;
+            margin: 0;
+            flex-shrink: 0;
             position: relative;
         }
     </style>
@@ -258,6 +257,7 @@
         setAspectBox();
 
         const container = document.getElementsByClassName('hand')[0];
+
         function dynamicHandSize() {
             const handCards = container.getElementsByClassName('card');
             const cardCount = handCards.length;
@@ -268,11 +268,21 @@
                 container.style.justifyContent = 'center';
             }
         }
-        const observer = new MutationObserver((mutationsList, observer) => {
+
+        const observer = new MutationObserver(() => {
             dynamicHandSize();
         });
         observer.observe(container, { childList: true });
         dynamicHandSize();
+
+        // Firefox sideways scroll fix
+        container.addEventListener('wheel', e => {
+            if (e.deltaY !== 0) {
+                e.preventDefault();
+                container.scrollLeft += e.deltaY;
+            }
+        }, { passive: false });
+
     </script>
 </body>
 
