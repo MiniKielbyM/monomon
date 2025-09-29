@@ -169,6 +169,38 @@
             flex-shrink: 0;
             position: relative;
         }
+
+        #sixteenbynine .prize-zone.one {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 28.35%;
+            width: 100%;
+            display: flex;
+            gap: 2%;
+        }
+
+        #sixteenbynine .prize-zone.two {
+            position: absolute;
+            top: 15%;
+            left: 0;
+            height: 28.35%;
+            width: 100%;
+            display: flex;
+            gap: 2%;
+        }
+
+        #sixteenbynine .prize-zone .card {
+            height: 100%;
+            z-index: 2;
+            position: relative;
+            left: 5%;
+        }
+        #sixteenbynine .prize-zone .card:hover {
+            
+            cursor: default;
+            z-index: 10;
+        }
     </style>
 </head>
 
@@ -203,20 +235,35 @@
                             <div class="card player in-hand"></div>
                             <div class="card player in-hand"></div>
                             <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
+                            <div class="card player in-hand"></div>
                         </div>
                     </div>
                 </div>
-
+                <div class="prize-zone one">
+                    <div class="card player prize"></div>
+                    <div class="card player prize"></div>
+                </div>
+                <div class="prize-zone two">
+                    <div class="card player prize"></div>
+                    <div class="card player prize"></div>
+                </div>
+                <div class="prize-zone">
+                    <div class="card player prize"></div>
+                    <div class="card player prize"></div>
+                </div>
             </div>
-
         </div>
     </div>
     <script>
-
         // Standard aspect ratios
         const ratios = [
             { name: "16:9", value: 16 / 9 },
-            //            { name: "4:3", value: 4 / 3 }
+            //{ name: "4:3", value: 4 / 3 }
         ];
         function getNearestRatio(width, height) {
             const actual = width / height;
@@ -274,15 +321,66 @@
         });
         observer.observe(container, { childList: true });
         dynamicHandSize();
+        const hand = document.querySelector('#sixteenbynine .hand');
 
-        // Firefox sideways scroll fix
-        container.addEventListener('wheel', e => {
-            if (e.deltaY !== 0) {
-                e.preventDefault();
-                container.scrollLeft += e.deltaY;
+        let targetScrollX = 0;
+        let currentScrollX = 0;
+        let isAnimating = false;
+        const smoothFactor = 0.1; // smaller = smoother
+
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        function animate() {
+            currentScrollX = lerp(currentScrollX, targetScrollX, smoothFactor);
+            hand.scrollLeft = currentScrollX;
+
+            if (Math.abs(targetScrollX - currentScrollX) > 0.5) {
+                requestAnimationFrame(animate);
+            } else {
+                isAnimating = false;
+            }
+        }
+
+        // wheel → horizontal
+        hand.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            targetScrollX += e.deltaY; // map vertical to horizontal
+            if (targetScrollX < 0) targetScrollX = 0;
+            if (targetScrollX > hand.scrollWidth - hand.clientWidth) targetScrollX = hand.scrollWidth - hand.clientWidth;
+            if (!isAnimating) {
+                isAnimating = true;
+                requestAnimationFrame(animate);
             }
         }, { passive: false });
 
+        // optional drag
+        let isDown = false;
+        let startX = 0;
+
+        hand.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startX = e.pageX;
+        });
+        document.addEventListener('mouseup', () => { isDown = false; });
+        document.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const dx = startX - e.pageX;
+            targetScrollX += dx * 0.5;
+            startX = e.pageX;
+            if (!isAnimating) {
+                isAnimating = true;
+                requestAnimationFrame(animate);
+            }
+            if (targetScrollX < 0) targetScrollX = 0;
+            if (targetScrollX > hand.scrollWidth - hand.clientWidth) targetScrollX = hand.scrollWidth - hand.clientWidth;
+        });
+
+        if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+  //          document.getElementById('sixteenbynine').style.visibility = 'hidden';
+            alert("This page does not support Firefox due to its handling of certain CSS properties.");
+            //window.close();
+        }
     </script>
 </body>
 
