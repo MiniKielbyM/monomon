@@ -58,6 +58,7 @@ class GUIHookUtils {
             return null;
         }
         const overlay = document.createElement('div');
+        overlay.classList.add('Overlay', 'SelectOverlay');
         overlay.style.position = 'fixed';
         overlay.style.top = '0';
         overlay.style.left = '0';

@@ -2,386 +2,535 @@
 <html>
 
 <head>
-    <title>Aspect Ratio Box Demo</title>
+    <title>Board Layout</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
-    <style>
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            height: 100%;
-            width: 100%;
-            touch-action: none;
-            user-select: none;
-            -ms-touch-action: none;
-            -webkit-user-select: none;
-        }
-
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #f0f0f0;
-            scrollbar-gutter: stable;
-        }
-
-        #aspect-box {
-            background: #fff;
-            border: 2px solid #333;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            position: relative;
-            font-size: 1.2em;
-            color: #333;
-            max-width: 100%;
-            max-height: 100%;
-            box-sizing: border-box;
-        }
-
-        #sixteenbynine {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            box-sizing: border-box;
-            visibility: hidden;
-
-        }
-
-        #sixteenbynine #player-zone {
-            box-sizing: border-box;
-            border: 2px dashed #666;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.5em;
-            color: #666;
-            height: 65%;
-            width: 100%;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-        }
-
-        #sixteenbynine #opponent-zone {
-            width: 100%;
-            height: 35%;
-            box-sizing: border-box;
-            border: 2px dashed #ff0000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.5em;
-            color: #666;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        #sixteenbynine .player.card {
-            aspect-ratio: 1 / 1.4;
-            width: auto;
-            height: 28.35%;
-            background-image: url('https://images.pokemontcg.io/sm35/28_hires.png');
-            background-size: cover;
-            background-position: center;
-            transition: transform 0.2s;
-            position: absolute;
-        }
-
-        #sixteenbynine .card:hover {
-            transform: scale(1.25);
-            transition: transform 0.2s;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        #sixteenbynine #player-zone .card.active {
-            bottom: calc((100% - (28.35% * 3)) / 3 + 28.35% + (100% - (28.35% * 3)) / 3 + 28.35% + (100% - (28.35% * 3)) / 3);
-            z-index: 10;
-        }
-
-        #sixteenbynine .bench {
-            position: absolute;
-            bottom: calc((100% - (28.35% * 3)) / 3 + 28.35% + (100% - (28.35% * 3)) / 3);
-            height: 28.35%;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            gap: 2%;
-            width: 100%;
-            left: 0;
-        }
-
-        #sixteenbynine .bench .card {
-            position: relative;
-            height: 100%;
-            z-index: 2;
-        }
-
-        #sixteenbynine .hand-outer {
-            position: absolute;
-            bottom: calc((100% - (28.35% * 3)) / 3);
-            height: 28.35%;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            overflow: visible;
-        }
-
-        #sixteenbynine .hand-inner {
-            position: relative;
-            height: 100%;
-            width: 60%;
-            bottom: -12.5%;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            overflow: visible;
-        }
-
-        #sixteenbynine .hand {
-            position: relative;
-            height: 125%;
-            width: 100%;
-            bottom: 0;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            overflow-x: auto;
-            scrollbar-gutter: stable;
-            scrollbar-width: none;
-            padding-left: 2%;
-            padding-right: 2%;
-            gap: 3.2%;
-            box-sizing: border-box;
-        }
-
-        #sixteenbynine .hand .card {
-            height: 80%;
-            z-index: 2;
-            bottom: 10%;
-            padding: 0;
-            margin: 0;
-            flex-shrink: 0;
-            position: relative;
-        }
-
-        #sixteenbynine .prize-zone.one {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 28.35%;
-            width: 100%;
-            display: flex;
-            gap: 2%;
-        }
-
-        #sixteenbynine .prize-zone.two {
-            position: absolute;
-            top: 15%;
-            left: 0;
-            height: 28.35%;
-            width: 100%;
-            display: flex;
-            gap: 2%;
-        }
-
-        #sixteenbynine .prize-zone .card {
-            height: 100%;
-            z-index: 2;
-            position: relative;
-            left: 5%;
-        }
-        #sixteenbynine .prize-zone .card:hover {
-            
-            cursor: default;
-            z-index: 10;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="BoardLayout.css">
 </head>
 
 <body>
     <div id="aspect-box">
         <div id="sixteenbynine">
-            <div id="opponent-zone"></div>
-            <div id="player-zone">
-                <div class="card active player"></div>
+            <div id="opponent-zone">
                 <div class="bench">
-                    <div class="card player benched"></div>
-                    <div class="card player benched"></div>
-                    <div class="card player benched"></div>
-                    <div class="card player benched"></div>
-                    <div class="card player benched"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                </div>
+                <div class="card active opp empty"></div>
+                <div class="card lost-zone opp empty"></div>
+                <div class="card discard opp empty"></div>
+                <div class="deck opp"></div>
+                <div class="prize-zone one">
+                    <div class="card opp prize faceDown"></div>
+                    <div class="card opp prize faceDown"></div>
+                </div>
+                <div class="prize-zone two">
+                    <div class="card opp prize faceDown"></div>
+                    <div class="card opp prize faceDown"></div>
+                </div>
+                <div class="prize-zone three">
+                    <div class="card opp prize faceDown"></div>
+                    <div class="card opp prize faceDown"></div>
+                </div>
+            </div>
+            <div id="player-zone">
+                <div id="ActivePokemon" class="card active player empty"></div>
+                <div class="bench">
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
                 </div>
                 <div class="hand-outer">
                     <div class="hand-inner">
-                        <div class="hand">
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
-                            <div class="card player in-hand"></div>
+                        <div id="PlayerHand" class="hand">
+
                         </div>
                     </div>
                 </div>
                 <div class="prize-zone one">
-                    <div class="card player prize"></div>
-                    <div class="card player prize"></div>
+                    <div class="card player prize faceDown"></div>
+                    <div class="card player prize faceDown"></div>
                 </div>
                 <div class="prize-zone two">
-                    <div class="card player prize"></div>
-                    <div class="card player prize"></div>
+                    <div class="card player prize faceDown"></div>
+                    <div class="card player prize faceDown"></div>
                 </div>
-                <div class="prize-zone">
-                    <div class="card player prize"></div>
-                    <div class="card player prize"></div>
+                <div class="prize-zone three">
+                    <div class="card player prize faceDown"></div>
+                    <div class="card player prize faceDown"></div>
                 </div>
+                <div class="deck player"></div>
+                <div class="card discard player empty"></div>
+                <div class="card lost-zone player empty"></div>
             </div>
+
         </div>
     </div>
-    <script>
-        // Standard aspect ratios
-        const ratios = [
-            { name: "16:9", value: 16 / 9 },
-            //{ name: "4:3", value: 4 / 3 }
+    <script type="module">
+        import Client from '../client.js';
+        import Game from '../game.js';
+        import Deck from '../deck.js';
+        import Pikachu from '../cardTest.js';
+        import GUIHookUtils from '../guiHookUtils.js';
+        import enums from '../enums.js';
+        import { Card } from '../card.js';
+        import BaseCards from '../Cards/Base/Base1/Cards.js';
+        
+        const { PokemonType, CardModifiers } = enums;
+        const { Alakazam, Blastoise } = BaseCards;
+        
+        // Initialize GUI Hook
+        const guiHook = new GUIHookUtils();
+        
+        // Create players with decks
+        const player1Deck = new Deck('Player 1 Test Deck');
+        const player2Deck = new Deck('Player 2 Test Deck');
+        
+        const player1 = new Client('Player 1', player1Deck);
+        const player2 = new Client('Player 2', player2Deck);
+        
+        // Create the game
+        const game = new Game(player1, player2, guiHook);
+        
+        // Create test cards for both players using Cards.js
+        const p1Cards = [
+            new Pikachu(player1),
+            new Alakazam(player1),
+            new Blastoise(player1),
+            new Pikachu(player1),
+            new Blastoise(player1),
+            new Pikachu(player1)
         ];
-        function getNearestRatio(width, height) {
-            const actual = width / height;
-            let nearest = ratios[0];
-            let minDiff = Math.abs(actual - nearest.value);
-            for (const r of ratios) {
-                const diff = Math.abs(actual - r.value);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    nearest = r;
+        
+        const p2Cards = [
+            new Blastoise(player2),
+            new Pikachu(player2),
+            new Alakazam(player2),
+            new Blastoise(player2)
+        ];
+        
+        // Add cards to decks
+        p1Cards.forEach(card => player1.deck.addCard(card));
+        p2Cards.forEach(card => player2.deck.addCard(card));
+        
+        // Set up initial game state
+        try {
+            // Set Player 1's hand with diverse cards
+            player1.setHand([p1Cards[1], p1Cards[1], p1Cards[2], p1Cards[3], p1Cards[4], p1Cards[5]]);
+
+            // Add some Pokemon to Player 1's bench (simulate placing cards)
+            const benchCards = [p1Cards[2], p1Cards[4]]; // Blastoise cards
+            benchCards.forEach((card, index) => {
+                if (index < 5) { // Max 5 bench slots
+                    const benchSlot = document.querySelectorAll('.bench .card.player.benched')[index];
+                    if (benchSlot) {
+                        benchSlot.style.backgroundImage = `url(${card.imgUrl})`;
+                        benchSlot.classList.remove('empty');
+                        player1.bench.push(card);
+                    }
+                }
+            });
+
+            // Set up opponent's active Pokemon
+            const oppActiveSlot = document.querySelector('.card.active.opp');
+            if (oppActiveSlot && p2Cards[0]) {
+                oppActiveSlot.style.backgroundImage = `url(${p2Cards[0].imgUrl})`;
+                oppActiveSlot.classList.remove('empty');
+                player2.activePokemon = p2Cards[0];
+            }
+
+            // Add opponent bench Pokemon
+            const oppBenchCards = [p2Cards[1], p2Cards[2]];
+            oppBenchCards.forEach((card, index) => {
+                const oppBenchSlot = document.querySelectorAll('.bench .card.opp')[index];
+                if (oppBenchSlot) {
+                    oppBenchSlot.style.backgroundImage = `url(${card.imgUrl})`;
+                    oppBenchSlot.classList.remove('empty');
+                    player2.bench.push(card);
+                }
+            });
+
+            // Set Player 1's active Pokemon (from hand)
+            // Only set if not already set
+            if (!player1.activePokemon) {
+                // Simulate click on first card in hand
+                const handCardEls = document.querySelectorAll('#PlayerHand .card');
+                if (handCardEls.length > 0) {
+                    handCardEls[0].click();
                 }
             }
-            return nearest;
+
+            // Add GUI interactions
+            // 1. Click hand card to set as active (if no active)
+            document.getElementById('PlayerHand').addEventListener('click', function (e) {
+                const cardEls = Array.from(document.querySelectorAll('#PlayerHand .card'));
+                const idx = cardEls.indexOf(e.target);
+                if (idx !== -1 && !player1.activePokemon) {
+                    player1.setActivePokemon(player1.hand[idx]);
+                }
+            });
+
+            // 2. Click active to show details
+            document.getElementById('ActivePokemon').addEventListener('click', () => {
+                if (player1.activePokemon) {
+                    alert(`Active: ${player1.activePokemon.cardName}\nHP: ${player1.activePokemon.hp}\nType: ${player1.activePokemon.type}`);
+                }
+            });
+
+            // Start the game
+            game.start();
+
+            // --- DRAG AND DROP FUNCTIONALITY ---
+            // Helper to get bounding rects of all drop zones
+            function getDropZones() {
+                // Only allow player bench and active for now
+                const benchEls = Array.from(document.querySelectorAll('.bench .card.player.benched'));
+                const activeEl = document.getElementById('ActivePokemon');
+                return [activeEl, ...benchEls];
+            }
+
+            // Make hand cards draggable
+            function makeHandCardsDraggable() {
+                const hand = document.getElementById('PlayerHand');
+                if (!hand) return;
+                
+                // Remove old listeners if any
+                hand.querySelectorAll('.card').forEach(cardEl => {
+                    cardEl.draggable = false;
+                });
+                
+                // Add new listeners for hand cards
+                hand.querySelectorAll('.card').forEach((cardEl, idx) => {
+                    makeCardDraggable(cardEl, 'hand', idx);
+                });
+            }
+
+            // Make bench and active cards draggable
+            function makeBenchAndActiveDraggable() {
+                // Make active Pokemon draggable
+                const activeEl = document.getElementById('ActivePokemon');
+                if (activeEl && player1.activePokemon) {
+                    makeCardDraggable(activeEl, 'active', 0);
+                }
+
+                // Make bench Pokemon draggable
+                document.querySelectorAll('.bench .card.player.benched').forEach((benchEl, idx) => {
+                    if (player1.bench[idx]) {
+                        makeCardDraggable(benchEl, 'bench', idx);
+                    }
+                });
+            }
+
+            // Generic function to make any card draggable
+            function makeCardDraggable(cardEl, sourceType, sourceIndex) {
+                cardEl.style.cursor = 'grab';
+                cardEl.draggable = false;
+                let startX, startY, origX, origY, dragging = false, origZ;
+                let origRect;
+                let lastDropTarget = null;
+
+                function onPointerDown(e) {
+                    e.preventDefault();
+                    dragging = true;
+                    origRect = cardEl.getBoundingClientRect();
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    origX = cardEl.offsetLeft;
+                    origY = cardEl.offsetTop;
+                    origZ = cardEl.style.zIndex;
+                    cardEl.style.zIndex = 1000;
+                    cardEl.style.position = 'absolute';
+                    cardEl.style.pointerEvents = 'none';
+                    cardEl.style.left = origRect.left + 'px';
+                    cardEl.style.top = origRect.top + 'px';
+                    cardEl.style.width = origRect.width + 'px';
+                    cardEl.style.height = origRect.height + 'px';
+                    // Fix background size to match element size
+                    cardEl.style.backgroundSize = '100% 100%';
+                    document.body.appendChild(cardEl);
+                    document.addEventListener('pointermove', onPointerMove);
+                    document.addEventListener('pointerup', onPointerUp);
+                }
+
+                function onPointerMove(e) {
+                    if (!dragging) return;
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    cardEl.style.left = (origRect.left + dx) + 'px';
+                    cardEl.style.top = (origRect.top + dy) + 'px';
+
+                    // Highlight drop zones if overlapping
+                    let found = false;
+                    getDropZones().forEach(zone => {
+                        // Don't allow dropping on the same slot
+                        if (zone === cardEl.originalParent) return;
+                        
+                        const zRect = zone.getBoundingClientRect();
+                        const cRect = cardEl.getBoundingClientRect();
+                        const overlap = !(cRect.right < zRect.left || cRect.left > zRect.right || cRect.bottom < zRect.top || cRect.top > zRect.bottom);
+                        if (overlap) {
+                            zone.classList.add('drag-over');
+                            lastDropTarget = zone;
+                            found = true;
+                        } else {
+                            zone.classList.remove('drag-over');
+                            if (lastDropTarget === zone) lastDropTarget = null;
+                        }
+                    });
+                    if (!found) lastDropTarget = null;
+                }
+
+                function onPointerUp(e) {
+                    dragging = false;
+                    document.removeEventListener('pointermove', onPointerMove);
+                    document.removeEventListener('pointerup', onPointerUp);
+                    
+                    // Remove highlight
+                    getDropZones().forEach(zone => zone.classList.remove('drag-over'));
+
+                    // Handle drop if overlapping with a valid target
+                    if (lastDropTarget) {
+                        handleCardDrop(cardEl, sourceType, sourceIndex, lastDropTarget);
+                    } else {
+                        // No valid drop target - return to original position
+                        console.log('No valid drop target, returning card to original position');
+                    }
+                    
+                    // Always return card to original position (for visual consistency)
+                    restoreCardPosition(cardEl, sourceType);
+                }
+
+                // Store original parent for reference
+                cardEl.originalParent = cardEl.parentElement;
+                cardEl.addEventListener('pointerdown', onPointerDown);
+            }
+
+            // Handle the actual card drop logic
+            function handleCardDrop(cardEl, sourceType, sourceIndex, targetEl) {
+                const draggedCardBg = cardEl.style.backgroundImage;
+                let draggedCard, sourceContainer;
+
+                // Get the dragged card data
+                if (sourceType === 'hand') {
+                    draggedCard = player1.hand[sourceIndex];
+                    sourceContainer = player1.hand;
+                } else if (sourceType === 'active') {
+                    draggedCard = player1.activePokemon;
+                } else if (sourceType === 'bench') {
+                    draggedCard = player1.bench[sourceIndex];
+                    sourceContainer = player1.bench;
+                }
+
+                // Determine target type
+                if (targetEl.id === 'ActivePokemon') {
+                    // Dropping on active Pokemon slot
+                    if (sourceType === 'active') return; // Can't drop active on itself
+                    
+                    if (player1.activePokemon) {
+                        // Swap with current active
+                        const currentActiveBg = targetEl.style.backgroundImage;
+                        const currentActive = player1.activePokemon;
+                        
+                        // Update backgrounds instantly
+                        targetEl.style.backgroundImage = draggedCardBg;
+                        cardEl.style.backgroundImage = currentActiveBg;
+                        
+                        // Update game state
+                        player1.activePokemon = draggedCard;
+                        if (sourceType === 'hand') {
+                            player1.hand[sourceIndex] = currentActive;
+                        } else if (sourceType === 'bench') {
+                            player1.bench[sourceIndex] = currentActive;
+                        }
+                        
+                        console.log(`Swapped ${draggedCard.cardName} with active ${currentActive.cardName}`);
+                    } else {
+                        // Empty active slot
+                        targetEl.style.backgroundImage = draggedCardBg;
+                        targetEl.classList.remove('empty');
+                        player1.activePokemon = draggedCard;
+                        
+                        // Clear source and leave empty slot where appropriate
+                        if (sourceType === 'hand') {
+                            player1.hand.splice(sourceIndex, 1);
+                            // Hand card will be removed during restore
+                        } else if (sourceType === 'bench') {
+                            player1.bench[sourceIndex] = null;
+                            // Leave empty bench slot - don't modify cardEl here since it will be restored
+                        }
+                        
+                        console.log(`Placed ${draggedCard.cardName} as active Pokemon`);
+                    }
+                } else {
+                    // Dropping on bench slot
+                    const benchIndex = Array.from(document.querySelectorAll('.bench .card.player.benched')).indexOf(targetEl);
+                    if (benchIndex !== -1) {
+                        if (sourceType === 'bench' && sourceIndex === benchIndex) return; // Can't drop on itself
+                        
+                        if (player1.bench[benchIndex]) {
+                            // Swap with bench Pokemon
+                            const currentBenchBg = targetEl.style.backgroundImage;
+                            const currentBench = player1.bench[benchIndex];
+                            
+                            // Update backgrounds instantly
+                            targetEl.style.backgroundImage = draggedCardBg;
+                            cardEl.style.backgroundImage = currentBenchBg;
+                            
+                            // Update game state
+                            player1.bench[benchIndex] = draggedCard;
+                            if (sourceType === 'hand') {
+                                player1.hand[sourceIndex] = currentBench;
+                            } else if (sourceType === 'active') {
+                                player1.activePokemon = currentBench;
+                            } else if (sourceType === 'bench') {
+                                player1.bench[sourceIndex] = currentBench;
+                            }
+                            
+                            console.log(`Swapped ${draggedCard.cardName} with bench ${currentBench.cardName}`);
+                        } else {
+                            // Empty bench slot
+                            targetEl.style.backgroundImage = draggedCardBg;
+                            targetEl.classList.remove('empty');
+                            player1.bench[benchIndex] = draggedCard;
+                            
+                            // Clear source and leave empty slot where appropriate
+                            if (sourceType === 'hand') {
+                                player1.hand.splice(sourceIndex, 1);
+                                // Hand card will be removed during restore
+                            } else if (sourceType === 'active') {
+                                player1.activePokemon = null;
+                                // Don't modify cardEl here since it will be restored
+                            } else if (sourceType === 'bench') {
+                                player1.bench[sourceIndex] = null;
+                                // Don't modify cardEl here since it will be restored
+                            }
+                            
+                            console.log(`Placed ${draggedCard.cardName} on bench`);
+                        }
+                    }
+                }
+
+                // Refresh draggable functionality
+                setTimeout(() => {
+                    makeHandCardsDraggable();
+                    makeBenchAndActiveDraggable();
+                }, 100);
+            }
+
+            // Restore card to original position
+            function restoreCardPosition(cardEl, sourceType) {
+                cardEl.style.position = '';
+                cardEl.style.left = '';
+                cardEl.style.top = '';
+                cardEl.style.width = '';
+                cardEl.style.height = '';
+                cardEl.style.zIndex = '';
+                cardEl.style.pointerEvents = '';
+                cardEl.style.backgroundSize = ''; // Reset background size
+                
+                if (sourceType === 'hand') {
+                    // For hand cards, check if they were removed from the hand
+                    const handEl = document.getElementById('PlayerHand');
+                    if (handEl.contains(cardEl) || cardEl.parentElement === document.body) {
+                        handEl.appendChild(cardEl);
+                    }
+                } else {
+                    // For bench/active cards, restore to original parent and check if slot should be empty
+                    if (cardEl.originalParent) {
+                        cardEl.originalParent.appendChild(cardEl);
+                        
+                        // Check if this slot should now be empty based on game state
+                        if (sourceType === 'active' && !player1.activePokemon) {
+                            cardEl.style.backgroundImage = '';
+                            cardEl.classList.add('empty');
+                        } else if (sourceType === 'bench') {
+                            // Find which bench index this is
+                            const benchElements = Array.from(document.querySelectorAll('.bench .card.player.benched'));
+                            const benchIndex = benchElements.indexOf(cardEl);
+                            if (benchIndex !== -1 && !player1.bench[benchIndex]) {
+                                cardEl.style.backgroundImage = '';
+                                cardEl.classList.add('empty');
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Call after hand is rendered
+            setTimeout(() => {
+                makeHandCardsDraggable();
+                makeBenchAndActiveDraggable();
+            }, 500);
+
+            // Add some CSS for drag-over highlight
+            const style = document.createElement('style');
+            style.innerHTML = `.drag-over { outline: 3px solid #ff0; box-shadow: 0 0 10px #ff0; }`;
+            document.head.appendChild(style);
+
+            // --- END DRAG AND DROP ---
+
+            // Start the game
+            game.start();
+
+            // Log test results
+            console.log('=== TEST SETUP COMPLETE ===');
+            console.log('Game instance:', game);
+            console.log('Player 1:', player1);
+            console.log('Player 1 hand:', player1.hand);
+            console.log('Player 1 active Pokemon:', player1.activePokemon);
+            console.log('Player 1 bench:', player1.bench);
+            console.log('Player 2:', player2);
+            console.log('Player 2 active Pokemon:', player2.activePokemon);
+            console.log('Player 2 bench:', player2.bench);
+        } catch (error) {
+            console.error('Error setting up test:', error);
         }
-        function setAspectBox() {
-            const vw = window.innerWidth;
-            const vh = window.innerHeight;
-            const nearest = getNearestRatio(vw, vh);
-            // Calculate max box size that fits in viewport while maintaining aspect ratio
-            let boxW = vw;
-            let boxH = boxW / nearest.value;
-            if (boxH > vh) {
-                boxH = vh;
-                boxW = boxH * nearest.value;
+        
+        // Global test functions for manual testing
+        window.testFunctions = {
+            damageActiveOpponent: (amount = 20) => {
+                if (player2.activePokemon) {
+                    player2.activePokemon.damage(amount);
+                    guiHook.damageCardElement(player2.activePokemon, amount);
+                    console.log(`Dealt ${amount} damage to opponent's active Pokemon`);
+                }
+            },
+            
+            switchActive: (handIndex) => {
+                if (player1.hand[handIndex]) {
+                    player1.activePokemon = player1.hand[handIndex];
+                    document.getElementById('ActivePokemon').style.backgroundImage = `url(${player1.hand[handIndex].imgUrl})`;
+                    console.log('Switched active Pokemon to:', player1.hand[handIndex].cardName);
+                }
+            },
+            
+            showGameState: () => {
+                console.log('Current game state:', {
+                    player1Active: player1.activePokemon?.cardName,
+                    player1Hand: player1.hand.map(c => c.cardName),
+                    player1Bench: player1.bench.map(c => c.cardName),
+                    player2Active: player2.activePokemon?.cardName,
+                    player2Bench: player2.bench.map(c => c.cardName),
+                    gameRunning: game.isRunning
+                });
             }
-
-            const box = document.getElementById('aspect-box');
-            box.style.width = boxW + 'px';
-            box.style.height = boxH + 'px';
-            console.log(`Aspect Ratio: ${nearest.name} (${nearest.value.toFixed(2)})`);
-            if (nearest.name === "16:9") {
-                document.getElementById('sixteenbynine').style.visibility = 'visible';
-            } else {
-                document.getElementById('sixteenbynine').style.visibility = 'hidden';
-            }
-        }
-        window.addEventListener('resize', setAspectBox);
-        setAspectBox();
-
-        const container = document.getElementsByClassName('hand')[0];
-
-        function dynamicHandSize() {
-            const handCards = container.getElementsByClassName('card');
-            const cardCount = handCards.length;
-            if (cardCount > 8) {
-                container.style.justifyContent = 'flex-start';
-                container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
-            } else {
-                container.style.justifyContent = 'center';
-            }
-        }
-
-        const observer = new MutationObserver(() => {
-            dynamicHandSize();
-        });
-        observer.observe(container, { childList: true });
-        dynamicHandSize();
-        const hand = document.querySelector('#sixteenbynine .hand');
-
-        let targetScrollX = 0;
-        let currentScrollX = 0;
-        let isAnimating = false;
-        const smoothFactor = 0.1; // smaller = smoother
-
-        const lerp = (a, b, t) => a + (b - a) * t;
-
-        function animate() {
-            currentScrollX = lerp(currentScrollX, targetScrollX, smoothFactor);
-            hand.scrollLeft = currentScrollX;
-
-            if (Math.abs(targetScrollX - currentScrollX) > 0.5) {
-                requestAnimationFrame(animate);
-            } else {
-                isAnimating = false;
-            }
-        }
-
-        // wheel → horizontal
-        hand.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            targetScrollX += e.deltaY; // map vertical to horizontal
-            if (targetScrollX < 0) targetScrollX = 0;
-            if (targetScrollX > hand.scrollWidth - hand.clientWidth) targetScrollX = hand.scrollWidth - hand.clientWidth;
-            if (!isAnimating) {
-                isAnimating = true;
-                requestAnimationFrame(animate);
-            }
-        }, { passive: false });
-
-        // optional drag
-        let isDown = false;
-        let startX = 0;
-
-        hand.addEventListener('mousedown', (e) => {
-            isDown = true;
-            startX = e.pageX;
-        });
-        document.addEventListener('mouseup', () => { isDown = false; });
-        document.addEventListener('mousemove', (e) => {
-            if (!isDown) return;
-            e.preventDefault();
-            const dx = startX - e.pageX;
-            targetScrollX += dx * 0.5;
-            startX = e.pageX;
-            if (!isAnimating) {
-                isAnimating = true;
-                requestAnimationFrame(animate);
-            }
-            if (targetScrollX < 0) targetScrollX = 0;
-            if (targetScrollX > hand.scrollWidth - hand.clientWidth) targetScrollX = hand.scrollWidth - hand.clientWidth;
-        });
-
-        if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
-  //          document.getElementById('sixteenbynine').style.visibility = 'hidden';
-            alert("This page does not support Firefox due to its handling of certain CSS properties.");
-            //window.close();
-        }
+        };
+        
+        console.log('\n=== TEST FUNCTIONS AVAILABLE ===');
+        console.log('Use window.testFunctions to access test utilities:');
+        console.log('- testFunctions.damageActiveOpponent(amount)');
+        console.log('- testFunctions.switchActive(handIndex)');
+        console.log('- testFunctions.showGameState()');
     </script>
 </body>
+<script src="BoardDynamicSizing.js"></script>
 
 </html>

@@ -129,6 +129,15 @@ class Card {
             this.statusConditions.push(status);
         }
     }
+    removeStatusCondition(status) {
+        if (typeof status !== 'string') {
+            throw new Error(`Invalid status condition: ${status}`);
+        }
+        const index = this.statusConditions.indexOf(status);
+        if (index !== -1) {
+            this.statusConditions.splice(index, 1);
+        }
+    }
 }
 Object.freeze(Card.damage);
 Object.freeze(Card.heal);
@@ -175,4 +184,4 @@ class Energy extends Attachment {
         }
     }
 }
-export default { Card, Attachment, Energy };
+export { Card, Attachment, Energy };

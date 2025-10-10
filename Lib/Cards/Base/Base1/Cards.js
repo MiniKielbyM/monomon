@@ -1,4 +1,4 @@
-import Card from "../../../card.js";
+import { Card } from "../../../card.js";
 import enums from "../../../enums.js";
 import Client from "../../../client.js";
 import GUIHookUtils from "../../../guiHookUtils.js";

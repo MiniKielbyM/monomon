@@ -21,6 +21,12 @@ class Game {
         this.client2.guiHook = this.guiHook;
         this.client2.opponent = client1;
         this.isRunning = false;
+        this.turn = 0;
+
+    }
+    start() {
+        this.isRunning = true;
+        document.body.style.backgroundColor = '#4CAF50';
     }
 }
 

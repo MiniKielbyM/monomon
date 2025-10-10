@@ -1,12 +1,11 @@
-import Cards from "./card.js";
+import { Card } from "./card.js";
 import enums from "./enums.js";
-const { Card } = Cards;
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
 class Pikachu extends Card {
     constructor(owner) {
         super(
             owner,
-            'https://storage.googleapis.com/pokecards-database/cards/a2a/a2a-25_large.png',
+            'https://images.pokemontcg.io/base1/2_hires.png',
             'Pikachu',
             PokemonType.LIGHTNING,
             60,

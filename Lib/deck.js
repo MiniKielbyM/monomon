@@ -1,4 +1,4 @@
-import Card from './card.js';
+import { Card } from './card.js';
 class Deck {
     constructor(name) {
         this.name = name;
