@@ -1,12 +1,30 @@
 /* Card shake animation for damage */
 .card.shake {
-    animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
 }
+
 @keyframes shake {
-    10%, 90% { transform: translateX(-2px); }
-    20%, 80% { transform: translateX(4px); }
-    30%, 50%, 70% { transform: translateX(-8px); }
-    40%, 60% { transform: translateX(8px); }
+
+    10%,
+    90% {
+        transform: translateX(-2px);
+    }
+
+    20%,
+    80% {
+        transform: translateX(4px);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translateX(-8px);
+    }
+
+    40%,
+    60% {
+        transform: translateX(8px);
+    }
 }
 
 /* Card glow for selectable state */
@@ -18,482 +36,490 @@
     transition: box-shadow 0.2s, border 0.2s;
 }
 
-/* Card fade for swap animation */
-.card.fade-swap {
-    animation: fadeSwap 0.4s;
-}
-@keyframes fadeSwap {
-    0% { opacity: 1; }
-    50% { opacity: 0.2; }
-    100% { opacity: 1; }
-}
 
 /* Card heal animation */
 .card.heal {
     animation: healFlash 0.7s;
 }
+
 @keyframes healFlash {
-    0% { box-shadow: 0 0 0 0 #7fff7f; }
-    30% { box-shadow: 0 0 24px 8px #7fff7f; }
-    100% { box-shadow: 0 0 0 0 #7fff7f; }
+    0% {
+        box-shadow: 0 0 0 0 #7fff7f;
+    }
+
+    30% {
+        box-shadow: 0 0 24px 8px #7fff7f;
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 #7fff7f;
+    }
 }
-        :root {
-            --card-size: 24.77%;
-        }
 
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            height: 100%;
-            width: 100%;
-            touch-action: none;
-            user-select: none;
-            -ms-touch-action: none;
-            -webkit-user-select: none;
-            font-family: 'Nunito', sans-serif;
-        }
+:root {
+    --card-size: 24.77%;
+}
 
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            scrollbar-gutter: stable;
-        }
+html,
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    touch-action: none;
+    user-select: none;
+    -ms-touch-action: none;
+    -webkit-user-select: none;
+    font-family: 'Nunito', sans-serif;
+}
 
-
-        #aspect-box {
-            height: 100%;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #ffffff00;
-            position: relative;
-            font-size: 1.2em;
-            color: #333;
-            max-width: 100%;
-            max-height: 100%;
-            box-sizing: border-box;
-            border: 5px solid #666;
-        }
-
-        #sixteenbynine {
-            width: 100%;
-            height: 100%;
-            box-sizing: border-box;
-            visibility: hidden;
-            aspect-ratio: 16 / 9;
-        }
-
-        #sixteenbynine #player-zone {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.5em;
-            color: #666;
-            height: 65%;
-            width: 100%;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-        }
-
-        #sixteenbynine #opponent-zone {
-            width: 100%;
-            height: 65%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.5em;
-            color: #666;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        #sixteenbynine .card {
-            aspect-ratio: 8 / 11;
-            height: var(--card-size);
-            width: auto;
-            background-image: url('../blank_card.png');
-            background-size: 100% 100%;
-            background-repeat: no-repeat;
-            background-position: center;
-            border-radius: 3%;
-            transition: transform 0.2s;
-            position: absolute;
-            text-align: center;
-            display: flex;
-            color: transparent;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #sixteenbynine .card:hover {
-            transform: scale(1.25);
-            transition: transform 0.2s;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        #sixteenbynine #player-zone .card.active {
-            bottom: calc((var(--card-size) * 2) + 15%);
-            z-index: 10;
-            text-overflow: clip;
-        }
-
-        #sixteenbynine #player-zone .bench {
-            position: absolute;
-            bottom: calc(var(--card-size) + 10%);
-            height: var(--card-size);
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            gap: 2%;
-            width: 100%;
-            left: 0;
-        }
-
-        #sixteenbynine .bench .card {
-            position: relative;
-            height: 100%;
-            z-index: 2;
-        }
-
-        #sixteenbynine .hand-outer {
-            position: absolute;
-            bottom: 5%;
-            height: var(--card-size);
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            overflow: visible;
-        }
-
-        #sixteenbynine .hand-inner {
-            position: relative;
-            height: 100%;
-            width: 59%;
-            bottom: -12.5%;
-            display: flex;
-            overflow-y: visible;
-            justify-content: center;
-            align-items: flex-end;
-            overflow: visible;
-        }
-
-        #sixteenbynine .hand {
-            position: relative;
-            height: 125%;
-            width: 100%;
-            bottom: 0;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            overflow-x: auto;
-            overflow-y: visible;
-            scrollbar-gutter: stable;
-            scrollbar-width: none;
-            padding-left: 2%;
-            padding-right: 2%;
-            gap: 3.418%;
-            box-sizing: border-box;
-        }
-
-        #sixteenbynine .hand .card {
-            height: 80%;
-            z-index: 2;
-            bottom: 10%;
-            padding: 0;
-            margin: 0;
-            flex-shrink: 0;
-            position: relative;
-        }
-
-        #sixteenbynine .prize-zone.one {
-            position: absolute;
-            top: 25%;
-            left: 0;
-            height: var(--card-size);
-            width: 100%;
-            display: flex;
-            gap: 0%;
-        }
-
-        #sixteenbynine .prize-zone.two {
-            position: absolute;
-            top: 40%;
-            left: 0;
-            height: var(--card-size);
-            width: 100%;
-            display: flex;
-            gap: 0%;
-        }
-
-        #sixteenbynine .prize-zone.three {
-            position: absolute;
-            top: 55%;
-            left: 0;
-            height: var(--card-size);
-            width: 100%;
-            display: flex;
-            gap: 0%;
-        }
-
-        #sixteenbynine .prize-zone .card {
-            background-image: url('../cardBack.png');
-            height: 100%;
-            z-index: 2;
-            position: relative;
-            left: 5%;
-
-        }
-
-        #sixteenbynine .prize-zone .card:hover {
-            transform: none;
-            cursor: default;
-        }
-
-        #sixteenbynine .deck.player {
-            position: absolute;
-            bottom: calc(var(--card-size) + 10%);
-            right: 6%;
-            height: var(--card-size);
-            width: auto;
-            aspect-ratio: 8 / 11;
-            background-image: url('../cardBack.png');
-            background-size: cover;
-            background-position: center;
-            font-size: 50%;
-            color: #666;
-            z-index: 1;
-
-        }
-
-        #sixteenbynine .discard.player {
-            position: absolute;
-            bottom: 5%;
-            right: 10.5%;
-            height: var(--card-size);
-            width: auto;
-            aspect-ratio: 8 / 11;
-            border-color: #666;
-            box-sizing: border-box;
-            font-size: 50%;
-            color: #666;
-            z-index: 1;
-        }
-
-        #sixteenbynine .lost-zone.player {
-            position: absolute;
-            bottom: 5%;
-            background-image: url('../blank_card.png');
-            right: 1.5%;
-            height: var(--card-size);
-            width: auto;
-            aspect-ratio: 8 / 11;
-            border-color: #666;
-            box-sizing: border-box;
-            font-size: 50%;
-            color: #666;
-            z-index: 1;
-        }
-
-        #sixteenbynine .card.empty {
-            font-size: 50%;
-            color: #666;
-            background-image: url('../blank_card.png');
-            opacity: 0.75;
-        }
-
-        #sixteenbynine .card.faceDown {
-            background-image: url('../cardBack.png');
-            opacity: 1;
-        }
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    scrollbar-gutter: stable;
+}
 
 
-        #sixteenbynine #opponent-zone .card {
-            transform: rotate(180deg);
-        }
+#aspect-box {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #ffffff00;
+    position: relative;
+    font-size: 1.2em;
+    color: #333;
+    max-width: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
+    border: 5px solid #666;
+}
 
-        #sixteenbynine .opp.active {
-            position: absolute;
-            top: calc(var(--card-size) + 10%);
-            transform: rotate(180deg);
-            z-index: 10;
-            text-overflow: clip;
-        }
+#sixteenbynine {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    visibility: hidden;
+    aspect-ratio: 16 / 9;
+}
 
-        #sixteenbynine #opponent-zone .bench {
-            position: absolute;
-            top: 5%;
-            height: var(--card-size);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            gap: 2%;
-            width: 100%;
-            left: 0;
-            background-color: rgba(255, 255, 255, 0);
-        }
+#sixteenbynine #player-zone {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5em;
+    color: #666;
+    height: 65%;
+    width: 100%;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+}
 
-        #sixteenbynine #opponent-zone .card:hover {
-            transform: scale(1.25) rotate(180deg);
-            transition: transform 0.2s;
-            cursor: pointer;
-        }
+#sixteenbynine #opponent-zone {
+    width: 100%;
+    height: 65%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5em;
+    color: #666;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
 
-        #sixteenbynine .card.empty:hover {
-            transform: none;
-            cursor: default;
-        }
+#sixteenbynine .card {
+    aspect-ratio: 8 / 11;
+    height: var(--card-size);
+    width: auto;
+    background-image: url('../blank_card.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    border-radius: 3%;
+    transition: transform 0.2s;
+    position: absolute;
+    text-align: center;
+    display: flex;
+    color: transparent;
+    justify-content: center;
+    align-items: center;
+}
 
-        #sixteenbynine #opponent-zone .card.empty:hover {
-            transform: rotate(180deg);
-            cursor: default;
-        }
+#sixteenbynine .card:hover {
+    transform: scale(1.25);
+    transition: transform 0.2s;
+    cursor: pointer;
+    z-index: 10;
+}
 
-        #sixteenbynine .deck.opp {
-            position: absolute;
-            top: calc(var(--card-size) + 10%);
-            left: 6%;
-            height: var(--card-size);
-            width: auto;
-            aspect-ratio: 8 / 11;
-            background-image: url('../cardBack.png');
-            background-size: cover;
-            background-position: center;
-            font-size: 0.5em;
-            color: #666;
-            z-index: 1;
-            transform: rotate(180deg);
-        }
+#sixteenbynine #player-zone .card.active {
+    bottom: calc((var(--card-size) * 2) + 15%);
+    z-index: 10;
+    text-overflow: clip;
+}
 
-        #sixteenbynine .discard.opp {
-            position: absolute;
-            top: 5%;
-            left: 10.5%;
-            height: var(--card-size);
-            width: auto;
-            aspect-ratio: 8 / 11;
-            border-color: #666;
-            box-sizing: border-box;
-            font-size: 50%;
-            color: #666;
-            z-index: 1;
-        }
+#sixteenbynine #player-zone .bench {
+    position: absolute;
+    bottom: calc(var(--card-size) + 10%);
+    height: var(--card-size);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 2%;
+    width: 100%;
+    left: 0;
+}
 
-        #sixteenbynine .lost-zone.opp {
-            position: absolute;
-            top: 5%;
-            background-image: url('../blank_card.png');
-            left: 1.5%;
-            height: var(--card-size);
-            width: auto;
-            aspect-ratio: 8 / 11;
-            border-color: #666;
-            box-sizing: border-box;
-            font-size: 50%;
-            color: #666;
-            z-index: 1;
-        }
+#sixteenbynine .bench .card {
+    position: relative;
+    height: 100%;
+    z-index: 2;
+}
 
-        #sixteenbynine #opponent-zone .prize-zone {
-            display: flex;
-            justify-content: flex-end;
-            /* align row to right */
-            gap: 0;
-        }
+#sixteenbynine .hand-outer {
+    position: absolute;
+    bottom: 5%;
+    height: var(--card-size);
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    overflow: visible;
+}
 
-        #sixteenbynine #opponent-zone .prize-zone .card {
-            position: relative;
-            right: 5%;
-            /* mirror of player’s left: 5% */
-            left: auto;
-        }
+#sixteenbynine .hand-inner {
+    position: relative;
+    height: 100%;
+    width: 59%;
+    bottom: -12.5%;
+    display: flex;
+    overflow-y: visible;
+    justify-content: center;
+    align-items: flex-end;
+    overflow: visible;
+}
 
-        #sixteenbynine #opponent-zone .prize-zone .card:hover {
-            transform: rotate(180deg);
-            cursor: default;
+#sixteenbynine .hand {
+    position: relative;
+    height: 125%;
+    width: 100%;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-gutter: stable;
+    scrollbar-width: none;
+    padding-left: 2%;
+    padding-right: 2%;
+    gap: 3.418%;
+    box-sizing: border-box;
+}
 
-        }
+#sixteenbynine .hand .card {
+    height: 80%;
+    z-index: 2;
+    bottom: 10%;
+    padding: 0;
+    margin: 0;
+    flex-shrink: 0;
+    position: relative;
+}
 
-        #sixteenbynine .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 20;
-            display: none;
-        }
-        #sixteenbynine .overlay{
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 2em;
-            text-align: center;
-            padding: 20px;
-            box-sizing: border-box;
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0);
-            z-index: 20;
-            gap: 1%;
-        }
-        #sixteenbynine .overlay::after {
-            content: "";
-            position: absolute;
-            top: -100vh;
-            left: -100vw;
-            width: 1000vw;
-            height: 1000vh;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: -1;
-        }
-        #sixteenbynine .overlay .card {
-            position: relative;
-            height: 50%;
-            width: auto;
-            aspect-ratio: 8 / 11;
-            background-image: url('../blank_card.png');
-            background-size: 100% 100%;
-            background-repeat: no-repeat;
-            background-position: center;
-            border-radius: 3%;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-        }
-        #sixteenbynine .overlay .card:hover {
-            transform: none;
-            cursor: default;
-        }
-        #sixteenbynine .overlay .options {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1%;
-        }
-        #sixteenbynine .overlay .options .option {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid white;
-            border-radius: 10px;
-            padding: 10px;
-            box-sizing: border-box;
-            cursor: pointer;
-            transition: background 0.3s, transform 0.3s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        #sixteenbynine .overlay .options .option:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.05);
-        }
+#sixteenbynine .prize-zone.one {
+    position: absolute;
+    top: 25%;
+    left: 0;
+    height: var(--card-size);
+    width: 100%;
+    display: flex;
+    gap: 0%;
+}
+
+#sixteenbynine .prize-zone.two {
+    position: absolute;
+    top: 40%;
+    left: 0;
+    height: var(--card-size);
+    width: 100%;
+    display: flex;
+    gap: 0%;
+}
+
+#sixteenbynine .prize-zone.three {
+    position: absolute;
+    top: 55%;
+    left: 0;
+    height: var(--card-size);
+    width: 100%;
+    display: flex;
+    gap: 0%;
+}
+
+#sixteenbynine .prize-zone .card {
+    background-image: url('../cardBack.png');
+    height: 100%;
+    z-index: 2;
+    position: relative;
+    left: 5%;
+
+}
+
+#sixteenbynine .prize-zone .card:hover {
+    transform: none;
+    cursor: default;
+}
+
+#sixteenbynine .deck.player {
+    position: absolute;
+    bottom: calc(var(--card-size) + 10%);
+    right: 6%;
+    height: var(--card-size);
+    width: auto;
+    aspect-ratio: 8 / 11;
+    background-image: url('../cardBack.png');
+    background-size: cover;
+    background-position: center;
+    font-size: 50%;
+    color: #666;
+    z-index: 1;
+
+}
+
+#sixteenbynine .discard.player {
+    position: absolute;
+    bottom: 5%;
+    right: 10.5%;
+    height: var(--card-size);
+    width: auto;
+    aspect-ratio: 8 / 11;
+    border-color: #666;
+    box-sizing: border-box;
+    font-size: 50%;
+    color: #666;
+    z-index: 1;
+}
+
+#sixteenbynine .lost-zone.player {
+    position: absolute;
+    bottom: 5%;
+    background-image: url('../blank_card.png');
+    right: 1.5%;
+    height: var(--card-size);
+    width: auto;
+    aspect-ratio: 8 / 11;
+    border-color: #666;
+    box-sizing: border-box;
+    font-size: 50%;
+    color: #666;
+    z-index: 1;
+}
+
+#sixteenbynine .card.empty {
+    font-size: 50%;
+    color: #666;
+    background-image: url('../blank_card.png');
+    opacity: 0.75;
+}
+
+#sixteenbynine .card.faceDown {
+    background-image: url('../cardBack.png');
+    opacity: 1;
+}
+
+
+#sixteenbynine #opponent-zone .card {
+    transform: rotate(180deg);
+}
+
+#sixteenbynine .opp.active {
+    position: absolute;
+    top: calc(var(--card-size) + 10%);
+    transform: rotate(180deg);
+    z-index: 10;
+    text-overflow: clip;
+}
+
+#sixteenbynine #opponent-zone .bench {
+    position: absolute;
+    top: 5%;
+    height: var(--card-size);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2%;
+    width: 100%;
+    left: 0;
+    background-color: rgba(255, 255, 255, 0);
+}
+
+#sixteenbynine #opponent-zone .card:hover {
+    transform: scale(1.25) rotate(180deg);
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+
+#sixteenbynine .card.empty:hover {
+    transform: none;
+    cursor: default;
+}
+
+#sixteenbynine #opponent-zone .card.empty:hover {
+    transform: rotate(180deg);
+    cursor: default;
+}
+
+#sixteenbynine .deck.opp {
+    position: absolute;
+    top: calc(var(--card-size) + 10%);
+    left: 6%;
+    height: var(--card-size);
+    width: auto;
+    aspect-ratio: 8 / 11;
+    background-image: url('../cardBack.png');
+    background-size: cover;
+    background-position: center;
+    font-size: 0.5em;
+    color: #666;
+    z-index: 1;
+    transform: rotate(180deg);
+}
+
+#sixteenbynine .discard.opp {
+    position: absolute;
+    top: 5%;
+    left: 10.5%;
+    height: var(--card-size);
+    width: auto;
+    aspect-ratio: 8 / 11;
+    border-color: #666;
+    box-sizing: border-box;
+    font-size: 50%;
+    color: #666;
+    z-index: 1;
+}
+
+#sixteenbynine .lost-zone.opp {
+    position: absolute;
+    top: 5%;
+    background-image: url('../blank_card.png');
+    left: 1.5%;
+    height: var(--card-size);
+    width: auto;
+    aspect-ratio: 8 / 11;
+    border-color: #666;
+    box-sizing: border-box;
+    font-size: 50%;
+    color: #666;
+    z-index: 1;
+}
+
+#sixteenbynine #opponent-zone .prize-zone {
+    display: flex;
+    justify-content: flex-end;
+    /* align row to right */
+    gap: 0;
+}
+
+#sixteenbynine #opponent-zone .prize-zone .card {
+    position: relative;
+    right: 5%;
+    /* mirror of player’s left: 5% */
+    left: auto;
+}
+
+#sixteenbynine #opponent-zone .prize-zone .card:hover {
+    transform: rotate(180deg);
+    cursor: default;
+
+}
+
+#sixteenbynine .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 20;
+    display: none;
+}
+
+#sixteenbynine .overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 2em;
+    text-align: center;
+    padding: 20px;
+    box-sizing: border-box;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0);
+    z-index: 20;
+    gap: 1%;
+}
+
+#sixteenbynine .overlay::after {
+    content: "";
+    position: absolute;
+    top: -100vh;
+    left: -100vw;
+    width: 1000vw;
+    height: 1000vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+}
+
+#sixteenbynine .overlay .card {
+    position: relative;
+    height: 50%;
+    width: auto;
+    aspect-ratio: 8 / 11;
+    background-image: url('../blank_card.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    border-radius: 3%;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+#sixteenbynine .overlay .card:hover {
+    transform: none;
+    cursor: default;
+}
+
+#sixteenbynine .overlay .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1%;
+}
+
+#sixteenbynine .overlay .options .option {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid white;
+    border-radius: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#sixteenbynine .overlay .options .option:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}

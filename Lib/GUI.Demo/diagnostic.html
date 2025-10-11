@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnostic Test</title>
+</head>
+<body>
+    <h1>File Loading Test</h1>
+    <div id="status"></div>
+    
+    <script type="module">
+        const status = document.getElementById('status');
+        
+        async function testImports() {
+            try {
+                status.innerHTML += '<p>Testing imports...</p>';
+                
+                const enums = await import('/Lib/enums.js');
+                status.innerHTML += '<p>✅ enums.js loaded</p>';
+                
+                const client = await import('/Lib/client.js');
+                status.innerHTML += '<p>✅ client.js loaded</p>';
+                
+                const card = await import('/Lib/card.js');
+                status.innerHTML += '<p>✅ card.js loaded</p>';
+                
+                const guiHook = await import('/Lib/guiHookUtils.js');
+                status.innerHTML += '<p>✅ guiHookUtils.js loaded</p>';
+                
+                const wsClient = await import('/Lib/webSocketClient.js');
+                status.innerHTML += '<p>✅ webSocketClient.js loaded</p>';
+                
+                status.innerHTML += '<p><strong>All imports successful!</strong></p>';
+                
+            } catch (error) {
+                status.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+                console.error('Import error:', error);
+            }
+        }
+        
+        testImports();
+    </script>
+</body>
+</html>

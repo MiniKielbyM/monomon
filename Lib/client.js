@@ -49,6 +49,7 @@ class Client {
         console.log(document.getElementById('ActivePokemon'));
         document.getElementById('ActivePokemon').style.backgroundImage = `url(${card.imgUrl})`;
         document.getElementById('ActivePokemon').classList.remove('empty');
+        document.getElementById('ActivePokemon').card = card;
         const index = this.hand.indexOf(card);
         if (index !== -1) {
             this.hand.splice(index, 1);

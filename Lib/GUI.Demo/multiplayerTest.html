@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Pokemon TCG - Multiplayer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/Lib/GUI.Demo/BoardLayout.css">
+    <style>
+        /* Connection status styles */
+        #connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        
+        .status-connected { background-color: #4CAF50; }
+        .status-connecting { background-color: #FF9800; }
+        .status-disconnected { background-color: #f44336; }
+        .status-waiting { background-color: #2196F3; }
+        
+        /* Game messages */
+        #game-messages {
+            position: fixed;
+            top: 60px;
+            left: 10px;
+            right: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        /* Player info */
+        #player-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        
+        /* Username input */
+        #username-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        #username-form {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        #username-input {
+            padding: 10px;
+            margin: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        #join-button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        #join-button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Username Modal -->
+    <div id="username-modal">
+        <div id="username-form">
+            <h2>Join Pokemon TCG Game</h2>
+            <input type="text" id="username-input" placeholder="Enter your username" maxlength="20">
+            <br>
+            <button id="join-button">Join Game</button>
+        </div>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="connection-status" class="status-disconnected">
+        Disconnected
+    </div>
+    
+    <!-- Game Messages -->
+    <div id="game-messages"></div>
+    
+    <!-- Player Info -->
+    <div id="player-info">
+        <div>Player: <span id="current-username">-</span></div>
+        <div>Player Number: <span id="player-number">-</span></div>
+        <div>Opponent: <span id="opponent-name">-</span></div>
+    </div>
+
+    <div id="aspect-box">
+        <div id="sixteenbynine">
+
+            <div id="opponent-zone">
+                <div class="bench">
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                    <div class="card benched opp empty"></div>
+                </div>
+                <div class="card active opp empty"></div>
+                <div class="card lost-zone opp empty"></div>
+                <div class="card discard opp empty"></div>
+                <div class="deck opp"></div>
+                <div class="prize-zone one">
+                    <div class="card opp prize faceDown"></div>
+                    <div class="card opp prize faceDown"></div>
+                </div>
+                <div class="prize-zone two">
+                    <div class="card opp prize faceDown"></div>
+                    <div class="card opp prize faceDown"></div>
+                </div>
+                <div class="prize-zone three">
+                    <div class="card opp prize faceDown"></div>
+                    <div class="card opp prize faceDown"></div>
+                </div>
+            </div>
+            <div id="player-zone">
+                <div id="ActivePokemon" class="card active player empty"></div>
+                <div class="bench">
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                    <div class="card player benched empty"></div>
+                </div>
+                <div class="hand-outer">
+                    <div class="hand-inner">
+                        <div id="PlayerHand" class="hand">
+
+                        </div>
+                    </div>
+                </div>
+                <div class="prize-zone one">
+                    <div class="card player prize faceDown"></div>
+                    <div class="card player prize faceDown"></div>
+                </div>
+                <div class="prize-zone two">
+                    <div class="card player prize faceDown"></div>
+                    <div class="card player prize faceDown"></div>
+                </div>
+                <div class="prize-zone three">
+                    <div class="card player prize faceDown"></div>
+                    <div class="card player prize faceDown"></div>
+                </div>
+                <div class="deck player"></div>
+                <div class="card discard player empty"></div>
+                <div class="card lost-zone player empty"></div>
+            </div>
+
+        </div>
+    </div>
+    
+    <script type="module">
+        import Client from '/Lib/client.js';
+        import Game from '/Lib/game.js';
+        import Deck from '/Lib/deck.js';
+        import Pikachu from '/Lib/cardTest.js';
+        import GUIHookUtils from '/Lib/guiHookUtils.js';
+        import WebSocketClient from '/Lib/webSocketClient.js';
+        import enums from '/Lib/enums.js';
+        import { Card } from '/Lib/card.js';
+        import BaseCards from '/Lib/Cards/Base/Base1/Cards.js';
+
+        const { PokemonType, CardModifiers } = enums;
+        const { Alakazam, Blastoise } = BaseCards;
+
+        // Initialize WebSocket client and GUI
+        const wsClient = new WebSocketClient();
+        const guiHook = new GUIHookUtils(document.body, wsClient);
+        
+        // UI Elements
+        const usernameModal = document.getElementById('username-modal');
+        const usernameInput = document.getElementById('username-input');
+        const joinButton = document.getElementById('join-button');
+        const connectionStatus = document.getElementById('connection-status');
+        const gameMessages = document.getElementById('game-messages');
+        const currentUsernameSpan = document.getElementById('current-username');
+        const playerNumberSpan = document.getElementById('player-number');
+        const opponentNameSpan = document.getElementById('opponent-name');
+        
+        let currentUsername = '';
+        let player1, player2, game;
+        
+        // Update connection status
+        function updateConnectionStatus(status, message) {
+            connectionStatus.className = `status-${status}`;
+            connectionStatus.textContent = message;
+        }
+        
+        // Show game message
+        function showGameMessage(message, duration = 3000) {
+            gameMessages.textContent = message;
+            gameMessages.style.display = 'block';
+            setTimeout(() => {
+                gameMessages.style.display = 'none';
+            }, duration);
+        }
+        
+        // Set up WebSocket event listeners
+        wsClient.on('waiting_for_opponent', (data) => {
+            updateConnectionStatus('waiting', 'Waiting for opponent...');
+            showGameMessage('Waiting for another player to join...', 5000);
+        });
+        
+        wsClient.on('game_found', (data) => {
+            updateConnectionStatus('connected', 'Game found!');
+            playerNumberSpan.textContent = data.playerNumber;
+            opponentNameSpan.textContent = data.opponent;
+            showGameMessage(`Game found! You are Player ${data.playerNumber}. Opponent: ${data.opponent}`);
+            
+            // Set up the game
+            setupGame(data.playerNumber);
+            
+            // Send ready signal
+            setTimeout(() => {
+                wsClient.sendPlayerReady();
+            }, 1000);
+        });
+        
+        wsClient.on('game_start', (data) => {
+            showGameMessage('Game started! You can now move your cards.');
+            // Initialize drag and drop
+            const container = document.getElementById('sixteenbynine');
+            guiHook.initializeDragAndDrop(container, player1);
+        });
+        
+        wsClient.on('opponent_disconnected', (data) => {
+            updateConnectionStatus('disconnected', 'Opponent disconnected');
+            showGameMessage(data.message, 10000);
+        });
+        
+        wsClient.on('connection_lost', (data) => {
+            updateConnectionStatus('disconnected', 'Connection lost');
+            showGameMessage('Lost connection to server. Please refresh to reconnect.', 10000);
+        });
+        
+        // Join game button handler
+        joinButton.addEventListener('click', async () => {
+            const username = usernameInput.value.trim();
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+            
+            currentUsername = username;
+            currentUsernameSpan.textContent = username;
+            
+            try {
+                updateConnectionStatus('connecting', 'Connecting...');
+                // Let WebSocketClient auto-detect the correct URL for Codespaces
+                await wsClient.connect();
+                wsClient.joinGame(username);
+                usernameModal.style.display = 'none';
+            } catch (error) {
+                console.error('Failed to connect:', error);
+                updateConnectionStatus('disconnected', 'Connection failed');
+                alert('Failed to connect to server. Please try again.');
+            }
+        });
+        
+        // Enter key handler for username input
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                joinButton.click();
+            }
+        });
+        
+        // Set up game based on player number
+        function setupGame(playerNumber) {
+            // Create players with decks
+            const player1Deck = new Deck(`${currentUsername}'s Deck`);
+            const player2Deck = new Deck('Opponent Deck');
+
+            player1 = new Client(currentUsername, player1Deck);
+            player2 = new Client('Opponent', player2Deck);
+
+            // Create the game
+            game = new Game(player1, player2, guiHook);
+
+            // Create test cards
+            const p1Cards = [
+                new Pikachu(player1),
+                new Alakazam(player1),
+                new Blastoise(player1),
+                new Pikachu(player1),
+                new Blastoise(player1),
+                new Pikachu(player1)
+            ];
+
+            // Add cards to deck
+            p1Cards.forEach(card => player1.deck.addCard(card));
+
+            try {
+                // Set Player 1's hand
+                player1.setHand([p1Cards[0], p1Cards[1], p1Cards[2], p1Cards[3], p1Cards[4], p1Cards[5]]);
+
+                // Add Pokemon to Player 1's bench
+                const benchCards = [p1Cards[2], p1Cards[4]];
+                benchCards.forEach((card, index) => {
+                    if (index < 5) {
+                        const benchSlot = document.querySelectorAll('.bench .card.player.benched')[index];
+                        if (benchSlot) {
+                            benchSlot.style.backgroundImage = `url(${card.imgUrl})`;
+                            benchSlot.classList.remove('empty');
+                            player1.bench.push(card);
+                        }
+                    }
+                });
+
+                // Start the game
+                game.start();
+
+            } catch (error) {
+                console.error('Error setting up game:', error);
+            }
+        }
+    </script>
+</body>
+<script src="/Lib/GUI.Demo/BoardDynamicSizing.js"></script>
+
+</html>

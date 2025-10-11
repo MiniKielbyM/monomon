@@ -14,6 +14,7 @@
 <body>
     <div id="aspect-box">
         <div id="sixteenbynine">
+
             <div id="opponent-zone">
                 <div class="bench">
                     <div class="card benched opp empty"></div>
@@ -83,23 +84,23 @@
         import enums from '../enums.js';
         import { Card } from '../card.js';
         import BaseCards from '../Cards/Base/Base1/Cards.js';
-        
+
         const { PokemonType, CardModifiers } = enums;
         const { Alakazam, Blastoise } = BaseCards;
-        
+
         // Initialize GUI Hook
         const guiHook = new GUIHookUtils();
-        
+
         // Create players with decks
         const player1Deck = new Deck('Player 1 Test Deck');
         const player2Deck = new Deck('Player 2 Test Deck');
-        
+
         const player1 = new Client('Player 1', player1Deck);
         const player2 = new Client('Player 2', player2Deck);
-        
+
         // Create the game
         const game = new Game(player1, player2, guiHook);
-        
+
         // Create test cards for both players using Cards.js
         const p1Cards = [
             new Pikachu(player1),
@@ -109,27 +110,27 @@
             new Blastoise(player1),
             new Pikachu(player1)
         ];
-        
+
         const p2Cards = [
             new Blastoise(player2),
             new Pikachu(player2),
             new Alakazam(player2),
             new Blastoise(player2)
         ];
-        
+
         // Add cards to decks
         p1Cards.forEach(card => player1.deck.addCard(card));
         p2Cards.forEach(card => player2.deck.addCard(card));
-        
-        // Set up initial game state
+
+        // Set up initial board state
         try {
-            // Set Player 1's hand with diverse cards
+            // Set Player 1's hand
             player1.setHand([p1Cards[1], p1Cards[1], p1Cards[2], p1Cards[3], p1Cards[4], p1Cards[5]]);
 
-            // Add some Pokemon to Player 1's bench (simulate placing cards)
-            const benchCards = [p1Cards[2], p1Cards[4]]; // Blastoise cards
+            // Add Pokemon to Player 1's bench
+            const benchCards = [p1Cards[2], p1Cards[4]];
             benchCards.forEach((card, index) => {
-                if (index < 5) { // Max 5 bench slots
+                if (index < 5) {
                     const benchSlot = document.querySelectorAll('.bench .card.player.benched')[index];
                     if (benchSlot) {
                         benchSlot.style.backgroundImage = `url(${card.imgUrl})`;
@@ -139,7 +140,7 @@
                 }
             });
 
-            // Set up opponent's active Pokemon
+            // Set opponent's active Pokemon
             const oppActiveSlot = document.querySelector('.card.active.opp');
             if (oppActiveSlot && p2Cards[0]) {
                 oppActiveSlot.style.backgroundImage = `url(${p2Cards[0].imgUrl})`;
@@ -159,376 +160,24 @@
             });
 
             // Set Player 1's active Pokemon (from hand)
-            // Only set if not already set
             if (!player1.activePokemon) {
-                // Simulate click on first card in hand
                 const handCardEls = document.querySelectorAll('#PlayerHand .card');
                 if (handCardEls.length > 0) {
                     handCardEls[0].click();
                 }
             }
 
-            // Add GUI interactions
-            // 1. Click hand card to set as active (if no active)
-            document.getElementById('PlayerHand').addEventListener('click', function (e) {
-                const cardEls = Array.from(document.querySelectorAll('#PlayerHand .card'));
-                const idx = cardEls.indexOf(e.target);
-                if (idx !== -1 && !player1.activePokemon) {
-                    player1.setActivePokemon(player1.hand[idx]);
-                }
-            });
-
-            // 2. Click active to show details
-            document.getElementById('ActivePokemon').addEventListener('click', () => {
-                if (player1.activePokemon) {
-                    alert(`Active: ${player1.activePokemon.cardName}\nHP: ${player1.activePokemon.hp}\nType: ${player1.activePokemon.type}`);
-                }
-            });
-
             // Start the game
             game.start();
 
-            // --- DRAG AND DROP FUNCTIONALITY ---
-            // Helper to get bounding rects of all drop zones
-            function getDropZones() {
-                // Only allow player bench and active for now
-                const benchEls = Array.from(document.querySelectorAll('.bench .card.player.benched'));
-                const activeEl = document.getElementById('ActivePokemon');
-                return [activeEl, ...benchEls];
-            }
+            // Initialize drag and drop system using GUIHookUtils
+            const container = document.getElementById('sixteenbynine');
+            guiHook.initializeDragAndDrop(container, player1);
 
-            // Make hand cards draggable
-            function makeHandCardsDraggable() {
-                const hand = document.getElementById('PlayerHand');
-                if (!hand) return;
-                
-                // Remove old listeners if any
-                hand.querySelectorAll('.card').forEach(cardEl => {
-                    cardEl.draggable = false;
-                });
-                
-                // Add new listeners for hand cards
-                hand.querySelectorAll('.card').forEach((cardEl, idx) => {
-                    makeCardDraggable(cardEl, 'hand', idx);
-                });
-            }
-
-            // Make bench and active cards draggable
-            function makeBenchAndActiveDraggable() {
-                // Make active Pokemon draggable
-                const activeEl = document.getElementById('ActivePokemon');
-                if (activeEl && player1.activePokemon) {
-                    makeCardDraggable(activeEl, 'active', 0);
-                }
-
-                // Make bench Pokemon draggable
-                document.querySelectorAll('.bench .card.player.benched').forEach((benchEl, idx) => {
-                    if (player1.bench[idx]) {
-                        makeCardDraggable(benchEl, 'bench', idx);
-                    }
-                });
-            }
-
-            // Generic function to make any card draggable
-            function makeCardDraggable(cardEl, sourceType, sourceIndex) {
-                cardEl.style.cursor = 'grab';
-                cardEl.draggable = false;
-                let startX, startY, origX, origY, dragging = false, origZ;
-                let origRect;
-                let lastDropTarget = null;
-
-                function onPointerDown(e) {
-                    e.preventDefault();
-                    dragging = true;
-                    origRect = cardEl.getBoundingClientRect();
-                    startX = e.clientX;
-                    startY = e.clientY;
-                    origX = cardEl.offsetLeft;
-                    origY = cardEl.offsetTop;
-                    origZ = cardEl.style.zIndex;
-                    cardEl.style.zIndex = 1000;
-                    cardEl.style.position = 'absolute';
-                    cardEl.style.pointerEvents = 'none';
-                    cardEl.style.left = origRect.left + 'px';
-                    cardEl.style.top = origRect.top + 'px';
-                    cardEl.style.width = origRect.width + 'px';
-                    cardEl.style.height = origRect.height + 'px';
-                    // Fix background size to match element size
-                    cardEl.style.backgroundSize = '100% 100%';
-                    document.body.appendChild(cardEl);
-                    document.addEventListener('pointermove', onPointerMove);
-                    document.addEventListener('pointerup', onPointerUp);
-                }
-
-                function onPointerMove(e) {
-                    if (!dragging) return;
-                    const dx = e.clientX - startX;
-                    const dy = e.clientY - startY;
-                    cardEl.style.left = (origRect.left + dx) + 'px';
-                    cardEl.style.top = (origRect.top + dy) + 'px';
-
-                    // Highlight drop zones if overlapping
-                    let found = false;
-                    getDropZones().forEach(zone => {
-                        // Don't allow dropping on the same slot
-                        if (zone === cardEl.originalParent) return;
-                        
-                        const zRect = zone.getBoundingClientRect();
-                        const cRect = cardEl.getBoundingClientRect();
-                        const overlap = !(cRect.right < zRect.left || cRect.left > zRect.right || cRect.bottom < zRect.top || cRect.top > zRect.bottom);
-                        if (overlap) {
-                            zone.classList.add('drag-over');
-                            lastDropTarget = zone;
-                            found = true;
-                        } else {
-                            zone.classList.remove('drag-over');
-                            if (lastDropTarget === zone) lastDropTarget = null;
-                        }
-                    });
-                    if (!found) lastDropTarget = null;
-                }
-
-                function onPointerUp(e) {
-                    dragging = false;
-                    document.removeEventListener('pointermove', onPointerMove);
-                    document.removeEventListener('pointerup', onPointerUp);
-                    
-                    // Remove highlight
-                    getDropZones().forEach(zone => zone.classList.remove('drag-over'));
-
-                    // Handle drop if overlapping with a valid target
-                    if (lastDropTarget) {
-                        handleCardDrop(cardEl, sourceType, sourceIndex, lastDropTarget);
-                    } else {
-                        // No valid drop target - return to original position
-                        console.log('No valid drop target, returning card to original position');
-                    }
-                    
-                    // Always return card to original position (for visual consistency)
-                    restoreCardPosition(cardEl, sourceType);
-                }
-
-                // Store original parent for reference
-                cardEl.originalParent = cardEl.parentElement;
-                cardEl.addEventListener('pointerdown', onPointerDown);
-            }
-
-            // Handle the actual card drop logic
-            function handleCardDrop(cardEl, sourceType, sourceIndex, targetEl) {
-                const draggedCardBg = cardEl.style.backgroundImage;
-                let draggedCard, sourceContainer;
-
-                // Get the dragged card data
-                if (sourceType === 'hand') {
-                    draggedCard = player1.hand[sourceIndex];
-                    sourceContainer = player1.hand;
-                } else if (sourceType === 'active') {
-                    draggedCard = player1.activePokemon;
-                } else if (sourceType === 'bench') {
-                    draggedCard = player1.bench[sourceIndex];
-                    sourceContainer = player1.bench;
-                }
-
-                // Determine target type
-                if (targetEl.id === 'ActivePokemon') {
-                    // Dropping on active Pokemon slot
-                    if (sourceType === 'active') return; // Can't drop active on itself
-                    
-                    if (player1.activePokemon) {
-                        // Swap with current active
-                        const currentActiveBg = targetEl.style.backgroundImage;
-                        const currentActive = player1.activePokemon;
-                        
-                        // Update backgrounds instantly
-                        targetEl.style.backgroundImage = draggedCardBg;
-                        cardEl.style.backgroundImage = currentActiveBg;
-                        
-                        // Update game state
-                        player1.activePokemon = draggedCard;
-                        if (sourceType === 'hand') {
-                            player1.hand[sourceIndex] = currentActive;
-                        } else if (sourceType === 'bench') {
-                            player1.bench[sourceIndex] = currentActive;
-                        }
-                        
-                        console.log(`Swapped ${draggedCard.cardName} with active ${currentActive.cardName}`);
-                    } else {
-                        // Empty active slot
-                        targetEl.style.backgroundImage = draggedCardBg;
-                        targetEl.classList.remove('empty');
-                        player1.activePokemon = draggedCard;
-                        
-                        // Clear source and leave empty slot where appropriate
-                        if (sourceType === 'hand') {
-                            player1.hand.splice(sourceIndex, 1);
-                            // Hand card will be removed during restore
-                        } else if (sourceType === 'bench') {
-                            player1.bench[sourceIndex] = null;
-                            // Leave empty bench slot - don't modify cardEl here since it will be restored
-                        }
-                        
-                        console.log(`Placed ${draggedCard.cardName} as active Pokemon`);
-                    }
-                } else {
-                    // Dropping on bench slot
-                    const benchIndex = Array.from(document.querySelectorAll('.bench .card.player.benched')).indexOf(targetEl);
-                    if (benchIndex !== -1) {
-                        if (sourceType === 'bench' && sourceIndex === benchIndex) return; // Can't drop on itself
-                        
-                        if (player1.bench[benchIndex]) {
-                            // Swap with bench Pokemon
-                            const currentBenchBg = targetEl.style.backgroundImage;
-                            const currentBench = player1.bench[benchIndex];
-                            
-                            // Update backgrounds instantly
-                            targetEl.style.backgroundImage = draggedCardBg;
-                            cardEl.style.backgroundImage = currentBenchBg;
-                            
-                            // Update game state
-                            player1.bench[benchIndex] = draggedCard;
-                            if (sourceType === 'hand') {
-                                player1.hand[sourceIndex] = currentBench;
-                            } else if (sourceType === 'active') {
-                                player1.activePokemon = currentBench;
-                            } else if (sourceType === 'bench') {
-                                player1.bench[sourceIndex] = currentBench;
-                            }
-                            
-                            console.log(`Swapped ${draggedCard.cardName} with bench ${currentBench.cardName}`);
-                        } else {
-                            // Empty bench slot
-                            targetEl.style.backgroundImage = draggedCardBg;
-                            targetEl.classList.remove('empty');
-                            player1.bench[benchIndex] = draggedCard;
-                            
-                            // Clear source and leave empty slot where appropriate
-                            if (sourceType === 'hand') {
-                                player1.hand.splice(sourceIndex, 1);
-                                // Hand card will be removed during restore
-                            } else if (sourceType === 'active') {
-                                player1.activePokemon = null;
-                                // Don't modify cardEl here since it will be restored
-                            } else if (sourceType === 'bench') {
-                                player1.bench[sourceIndex] = null;
-                                // Don't modify cardEl here since it will be restored
-                            }
-                            
-                            console.log(`Placed ${draggedCard.cardName} on bench`);
-                        }
-                    }
-                }
-
-                // Refresh draggable functionality
-                setTimeout(() => {
-                    makeHandCardsDraggable();
-                    makeBenchAndActiveDraggable();
-                }, 100);
-            }
-
-            // Restore card to original position
-            function restoreCardPosition(cardEl, sourceType) {
-                cardEl.style.position = '';
-                cardEl.style.left = '';
-                cardEl.style.top = '';
-                cardEl.style.width = '';
-                cardEl.style.height = '';
-                cardEl.style.zIndex = '';
-                cardEl.style.pointerEvents = '';
-                cardEl.style.backgroundSize = ''; // Reset background size
-                
-                if (sourceType === 'hand') {
-                    // For hand cards, check if they were removed from the hand
-                    const handEl = document.getElementById('PlayerHand');
-                    if (handEl.contains(cardEl) || cardEl.parentElement === document.body) {
-                        handEl.appendChild(cardEl);
-                    }
-                } else {
-                    // For bench/active cards, restore to original parent and check if slot should be empty
-                    if (cardEl.originalParent) {
-                        cardEl.originalParent.appendChild(cardEl);
-                        
-                        // Check if this slot should now be empty based on game state
-                        if (sourceType === 'active' && !player1.activePokemon) {
-                            cardEl.style.backgroundImage = '';
-                            cardEl.classList.add('empty');
-                        } else if (sourceType === 'bench') {
-                            // Find which bench index this is
-                            const benchElements = Array.from(document.querySelectorAll('.bench .card.player.benched'));
-                            const benchIndex = benchElements.indexOf(cardEl);
-                            if (benchIndex !== -1 && !player1.bench[benchIndex]) {
-                                cardEl.style.backgroundImage = '';
-                                cardEl.classList.add('empty');
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Call after hand is rendered
-            setTimeout(() => {
-                makeHandCardsDraggable();
-                makeBenchAndActiveDraggable();
-            }, 500);
-
-            // Add some CSS for drag-over highlight
-            const style = document.createElement('style');
-            style.innerHTML = `.drag-over { outline: 3px solid #ff0; box-shadow: 0 0 10px #ff0; }`;
-            document.head.appendChild(style);
-
-            // --- END DRAG AND DROP ---
-
-            // Start the game
-            game.start();
-
-            // Log test results
-            console.log('=== TEST SETUP COMPLETE ===');
-            console.log('Game instance:', game);
-            console.log('Player 1:', player1);
-            console.log('Player 1 hand:', player1.hand);
-            console.log('Player 1 active Pokemon:', player1.activePokemon);
-            console.log('Player 1 bench:', player1.bench);
-            console.log('Player 2:', player2);
-            console.log('Player 2 active Pokemon:', player2.activePokemon);
-            console.log('Player 2 bench:', player2.bench);
         } catch (error) {
-            console.error('Error setting up test:', error);
+            console.error('Error setting up board:', error);
         }
-        
-        // Global test functions for manual testing
-        window.testFunctions = {
-            damageActiveOpponent: (amount = 20) => {
-                if (player2.activePokemon) {
-                    player2.activePokemon.damage(amount);
-                    guiHook.damageCardElement(player2.activePokemon, amount);
-                    console.log(`Dealt ${amount} damage to opponent's active Pokemon`);
-                }
-            },
-            
-            switchActive: (handIndex) => {
-                if (player1.hand[handIndex]) {
-                    player1.activePokemon = player1.hand[handIndex];
-                    document.getElementById('ActivePokemon').style.backgroundImage = `url(${player1.hand[handIndex].imgUrl})`;
-                    console.log('Switched active Pokemon to:', player1.hand[handIndex].cardName);
-                }
-            },
-            
-            showGameState: () => {
-                console.log('Current game state:', {
-                    player1Active: player1.activePokemon?.cardName,
-                    player1Hand: player1.hand.map(c => c.cardName),
-                    player1Bench: player1.bench.map(c => c.cardName),
-                    player2Active: player2.activePokemon?.cardName,
-                    player2Bench: player2.bench.map(c => c.cardName),
-                    gameRunning: game.isRunning
-                });
-            }
-        };
-        
-        console.log('\n=== TEST FUNCTIONS AVAILABLE ===');
-        console.log('Use window.testFunctions to access test utilities:');
-        console.log('- testFunctions.damageActiveOpponent(amount)');
-        console.log('- testFunctions.switchActive(handIndex)');
-        console.log('- testFunctions.showGameState()');
+
     </script>
 </body>
 <script src="BoardDynamicSizing.js"></script>
