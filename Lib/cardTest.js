@@ -5,7 +5,7 @@ class Pikachu extends Card {
     constructor(owner) {
         super(
             owner,
-            'https://images.pokemontcg.io/base1/2_hires.png',
+            'https://images.pokemontcg.io/base4/87_hires.png',
             'Pikachu',
             PokemonType.LIGHTNING,
             60,

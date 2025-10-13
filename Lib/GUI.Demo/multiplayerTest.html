@@ -53,6 +53,23 @@
             z-index: 1000;
         }
         
+        #turn-status {
+            font-weight: bold;
+            padding: 5px;
+            border-radius: 3px;
+            margin-top: 5px;
+        }
+        
+        .your-turn { 
+            background-color: #4CAF50; 
+            color: white;
+        }
+        
+        .opponent-turn { 
+            background-color: #FF9800; 
+            color: white;
+        }
+        
         /* Username input */
         #username-modal {
             position: fixed;
@@ -122,6 +139,8 @@
         <div>Player: <span id="current-username">-</span></div>
         <div>Player Number: <span id="player-number">-</span></div>
         <div>Opponent: <span id="opponent-name">-</span></div>
+        <div>Turn: <span id="turn-number">-</span></div>
+        <div id="turn-status">Waiting for game to start...</div>
     </div>
 
     <div id="aspect-box">
@@ -164,7 +183,6 @@
                 <div class="hand-outer">
                     <div class="hand-inner">
                         <div id="PlayerHand" class="hand">
-
                         </div>
                     </div>
                 </div>
@@ -191,16 +209,14 @@
     <script type="module">
         import Client from '/Lib/client.js';
         import Game from '/Lib/game.js';
-        import Deck from '/Lib/deck.js';
-        import Pikachu from '/Lib/cardTest.js';
+        // Deck import removed - server manages all deck state
         import GUIHookUtils from '/Lib/guiHookUtils.js';
         import WebSocketClient from '/Lib/webSocketClient.js';
         import enums from '/Lib/enums.js';
-        import { Card } from '/Lib/card.js';
-        import BaseCards from '/Lib/Cards/Base/Base1/Cards.js';
+        // Card imports removed - server creates all card instances
 
         const { PokemonType, CardModifiers } = enums;
-        const { Alakazam, Blastoise } = BaseCards;
+        // Card destructuring removed - server provides all card data
 
         // Initialize WebSocket client and GUI
         const wsClient = new WebSocketClient();
@@ -215,8 +231,13 @@
         const currentUsernameSpan = document.getElementById('current-username');
         const playerNumberSpan = document.getElementById('player-number');
         const opponentNameSpan = document.getElementById('opponent-name');
+        const turnNumberSpan = document.getElementById('turn-number');
+        const turnStatusDiv = document.getElementById('turn-status');
         
         let currentUsername = '';
+        let playerNumber = 0;
+        let currentTurn = 0;
+        let isMyTurn = false;
         let player1, player2, game;
         
         // Update connection status
@@ -234,6 +255,60 @@
             }, duration);
         }
         
+        // Make showGameMessage globally available
+        window.showGameMessage = showGameMessage;
+        
+        // Update turn display
+        function updateTurnDisplay(gameInfo) {
+            currentTurn = gameInfo.turn;
+            isMyTurn = gameInfo.isYourTurn;
+            
+            turnNumberSpan.textContent = currentTurn;
+            
+            if (isMyTurn) {
+                turnStatusDiv.textContent = 'YOUR TURN';
+                turnStatusDiv.className = 'your-turn';
+                showGameMessage('It\'s your turn! You can move cards and play actions.', 2000);
+            } else {
+                turnStatusDiv.textContent = 'OPPONENT\'S TURN';
+                turnStatusDiv.className = 'opponent-turn';
+            }
+        }
+        
+        // Add End Turn button functionality
+        function addEndTurnButton() {
+            if (document.getElementById('end-turn-btn')) return; // Already exists
+            
+            const endTurnBtn = document.createElement('button');
+            endTurnBtn.id = 'end-turn-btn';
+            endTurnBtn.textContent = 'End Turn';
+            endTurnBtn.style.cssText = `
+                position: fixed;
+                bottom: 10px;
+                right: 10px;
+                padding: 10px 20px;
+                background: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                z-index: 1000;
+                display: none;
+            `;
+            
+            endTurnBtn.addEventListener('click', () => {
+                if (isMyTurn) {
+                    wsClient.sendEndTurn();
+                    endTurnBtn.style.display = 'none';
+                    showGameMessage('Turn ended. Waiting for opponent...', 2000);
+                }
+            });
+            
+            document.body.appendChild(endTurnBtn);
+            return endTurnBtn;
+        }
+        
         // Set up WebSocket event listeners
         wsClient.on('waiting_for_opponent', (data) => {
             updateConnectionStatus('waiting', 'Waiting for opponent...');
@@ -241,7 +316,7 @@
         });
         
         wsClient.on('game_found', (data) => {
-            updateConnectionStatus('connected', 'Game found!');
+            updateConnectionStatus('connected', 'Connected');
             playerNumberSpan.textContent = data.playerNumber;
             opponentNameSpan.textContent = data.opponent;
             showGameMessage(`Game found! You are Player ${data.playerNumber}. Opponent: ${data.opponent}`);
@@ -257,9 +332,79 @@
         
         wsClient.on('game_start', (data) => {
             showGameMessage('Game started! You can now move your cards.');
-            // Initialize drag and drop
-            const container = document.getElementById('sixteenbynine');
-            guiHook.initializeDragAndDrop(container, player1);
+            // The game.start() method already initializes drag and drop with game reference
+            // and sends initial state for synchronization
+        });
+        
+        // Handle game state updates from server
+        wsClient.on('game_state_update', (data) => {
+            console.log('Received game state update:', data);
+            // Data contains { gameState: {...} }, so we need to extract gameState
+            const gameState = data.gameState;
+            if (window.currentGame && gameState) {
+                window.currentGame.updateFromServerState(gameState);
+                
+                // Update turn display - turn info is directly in gameState
+                updateTurnDisplay({
+                    turn: gameState.turn,
+                    isYourTurn: gameState.isYourTurn
+                });
+                
+                // Show/hide end turn button
+                const endTurnBtn = document.getElementById('end-turn-btn') || addEndTurnButton();
+                if (gameState.isYourTurn) {
+                    endTurnBtn.style.display = 'block';
+                } else {
+                    endTurnBtn.style.display = 'none';
+                }
+            } else {
+                console.error('No currentGame found or no gameState in data:', data);
+            }
+        });
+
+        // Handle turn changes
+        wsClient.on('turn_changed', (data) => {
+            console.log('Turn changed:', data);
+            const newIsMyTurn = data.currentPlayer === playerNumber;
+            
+            updateTurnDisplay({
+                turn: data.turn,
+                isYourTurn: newIsMyTurn
+            });
+            
+            // Update drag controls when turn changes
+            if (window.currentGame && window.currentGame.guiHook) {
+                const turnReason = newIsMyTurn ? 
+                    'Your turn - you can move cards' : 
+                    'Opponent\'s turn - wait for your turn';
+                window.currentGame.guiHook.setDragEnabled(newIsMyTurn, turnReason);
+            }
+            
+            showGameMessage(data.message, 3000);
+        });
+
+        // Handle action errors
+        wsClient.on('action_error', (data) => {
+            console.error('Action error from server:', data);
+            showGameMessage(`Action failed: ${data.message}`, 5000);
+        });
+
+        wsClient.on('move_error', (data) => {
+            console.error('Move error from server:', data);
+            showGameMessage(`Move error: ${data.message}`, 5000);
+            
+            // Rollback the visual changes since server rejected the move
+            if (guiHook && guiHook.rollbackLastMove) {
+                guiHook.rollbackLastMove();
+            }
+        });
+        
+        wsClient.on('move_success', (data) => {
+            console.log('Move confirmed by server:', data);
+            // Clear rollback data since move was successful
+            if (guiHook) {
+                guiHook.lastMove = null;
+            }
         });
         
         wsClient.on('opponent_disconnected', (data) => {
@@ -304,49 +449,48 @@
         });
         
         // Set up game based on player number
-        function setupGame(playerNumber) {
-            // Create players with decks
-            const player1Deck = new Deck(`${currentUsername}'s Deck`);
-            const player2Deck = new Deck('Opponent Deck');
+        function setupGame(pNum) {
+            playerNumber = pNum; // Store globally for turn management
+            
+            // Create minimal client objects (server manages all game state)
+            player1 = new Client(currentUsername);
+            player2 = new Client('Opponent');
 
-            player1 = new Client(currentUsername, player1Deck);
-            player2 = new Client('Opponent', player2Deck);
-
-            // Create the game
+            // Create the game with centralized state management
             game = new Game(player1, player2, guiHook);
-
-            // Create test cards
-            const p1Cards = [
-                new Pikachu(player1),
-                new Alakazam(player1),
-                new Blastoise(player1),
-                new Pikachu(player1),
-                new Blastoise(player1),
-                new Pikachu(player1)
-            ];
-
-            // Add cards to deck
-            p1Cards.forEach(card => player1.deck.addCard(card));
+            
+            // Link the WebSocket client to the game for action handling
+            game.wsClient = wsClient;
+            
+            // Store game globally for WebSocket handlers
+            window.currentGame = game;
 
             try {
-                // Set Player 1's hand
-                player1.setHand([p1Cards[0], p1Cards[1], p1Cards[2], p1Cards[3], p1Cards[4], p1Cards[5]]);
-
-                // Add Pokemon to Player 1's bench
-                const benchCards = [p1Cards[2], p1Cards[4]];
-                benchCards.forEach((card, index) => {
-                    if (index < 5) {
-                        const benchSlot = document.querySelectorAll('.bench .card.player.benched')[index];
-                        if (benchSlot) {
-                            benchSlot.style.backgroundImage = `url(${card.imgUrl})`;
-                            benchSlot.classList.remove('empty');
-                            player1.bench.push(card);
-                        }
-                    }
-                });
-
-                // Start the game
+                // Server will send initial game state including decks and hands
                 game.start();
+
+                // Add debug helper to window for troubleshooting
+                window.debugEnergy = function() {
+                    console.log('=== ENERGY DEBUG INFO ===');
+                    const handCards = document.querySelectorAll('#PlayerHand .card');
+                    console.log('Hand cards found:', handCards.length);
+                    
+                    handCards.forEach((card, i) => {
+                        const cardData = card.cardData || card._cardData;
+                        console.log(`Card ${i}:`, cardData);
+                        if (cardData && cardData.type === 'energy') {
+                            console.log(`  -> Energy card detected: ${cardData.cardName}`);
+                        }
+                    });
+                    
+                    const pokemonSlots = document.querySelectorAll('.card.player:not(.empty):not(.hand .card)');
+                    console.log('Pokemon slots with cards:', pokemonSlots.length);
+                    pokemonSlots.forEach((slot, i) => {
+                        console.log(`Pokemon slot ${i}:`, slot);
+                    });
+                };
+                
+                console.log('Game setup complete. Type "debugEnergy()" in console to debug energy attachment issues.');
 
             } catch (error) {
                 console.error('Error setting up game:', error);

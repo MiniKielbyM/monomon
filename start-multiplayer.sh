@@ -12,6 +12,7 @@ GAME_SERVER_PID=$!
 
 # Start the client server in the background
 echo "Starting client server on port 3000..."
+cd /workspaces/monomon/Server
 node clientServer.js &
 CLIENT_SERVER_PID=$!
 
@@ -23,15 +24,28 @@ sleep 3
 echo ""
 echo "🎮 Pokemon TCG Multiplayer System Ready!"
 echo ""
-echo "🌐 Open in browser: http://localhost:3000"
-echo "🎯 Game server: ws://localhost:8080"
+if [ -n "$CODESPACE_NAME" ]; then
+    echo "🌐 Open in browser: https://$CODESPACE_NAME-3000.app.github.dev/Lib/GUI.Demo/multiplayerTest.html"
+    echo "� Game server: wss://$CODESPACE_NAME-8080.app.github.dev"
+else
+    echo "�🌐 Open in browser: http://localhost:3000/Lib/GUI.Demo/multiplayerTest.html"
+    echo "🎯 Game server: ws://localhost:8080"
+fi
 echo ""
 echo "📋 To test multiplayer:"
-echo "1. Open http://localhost:3000 in two different browser windows/tabs"
+if [ -n "$CODESPACE_NAME" ]; then
+    echo "1. Open https://$CODESPACE_NAME-3000.app.github.dev/Lib/GUI.Demo/multiplayerTest.html in two different browser windows/tabs"
+else
+    echo "1. Open http://localhost:3000/Lib/GUI.Demo/multiplayerTest.html in two different browser windows/tabs"
+fi
 echo "2. Enter different usernames for each player"
 echo "3. Both players will be matched automatically"
 echo "4. Start moving cards and watch them sync between players!"
 echo ""
+if [ -n "$CODESPACE_NAME" ]; then
+    echo "🔓 Making port 8080 public in Codespaces..."
+    gh codespace ports visibility 8080:public -c "$CODESPACE_NAME"
+fi
 
 # Function to cleanup on exit
 cleanup() {

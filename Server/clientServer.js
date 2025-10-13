@@ -20,10 +20,18 @@ app.use(express.static(path.join(__dirname, '..'), {
     setHeaders: (res, path) => {
         if (path.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript');
+            // Add cache-busting headers for JavaScript files
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
         } else if (path.endsWith('.css')) {
             res.setHeader('Content-Type', 'text/css');
         } else if (path.endsWith('.html')) {
             res.setHeader('Content-Type', 'text/html');
+            // Add cache-busting headers for HTML files too
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
         }
     }
 }));

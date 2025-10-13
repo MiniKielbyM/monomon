@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node gameServer.js",
-    "dev": "node gameServer.js"
+    "dev": "node gameServer.js",
+    "build-cards": "node buildCardData.js"
   },
   "author": "",
   "license": "ISC",

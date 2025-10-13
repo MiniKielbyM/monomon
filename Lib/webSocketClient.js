@@ -17,6 +17,10 @@ class WebSocketClient {
                 // GitHub Codespace - use the forwarded port URL
                 const baseUrl = hostname.replace('-3000.', '-8080.');
                 serverUrl = `wss://${baseUrl}`;
+                
+                // Log the detected environment
+                console.log('GitHub Codespace detected, using WSS connection');
+                console.log('Base URL:', baseUrl);
             } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
                 // Local development
                 serverUrl = 'ws://localhost:8080';
@@ -47,18 +51,61 @@ class WebSocketClient {
                     }
                 };
                 
-                this.ws.onclose = () => {
-                    console.log('Disconnected from game server');
+                this.ws.onclose = (event) => {
+                    console.log('WebSocket connection closed:', event.code, event.reason);
                     this.connected = false;
-                    this.attemptReconnect(serverUrl);
+                    
+                    // If we're in a Codespace and got a connection failure, try alternative methods
+                    if (window.location.hostname.includes('.app.github.dev') && 
+                        event.code === 1006 && this.reconnectAttempts === 0) {
+                        console.log('WSS connection failed in Codespace, this might be a port forwarding issue');
+                        console.log('GitHub Codespaces may not properly forward WebSocket connections on port 8080');
+                        console.log('Please check that port 8080 is set to "Public" visibility in the Ports tab');
+                        
+                        // Show user-friendly error message
+                        if (window.showGameMessage) {
+                            window.showGameMessage(
+                                'Connection failed: Please ensure port 8080 is set to "Public" in VS Code Ports tab', 
+                                10000
+                            );
+                        }
+                    }
+                    
+                    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                        this.reconnectAttempts++;
+                        console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+                        setTimeout(() => this.connect(serverUrl), 2000 * this.reconnectAttempts);
+                    }
                 };
                 
                 this.ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    reject(error);
+                    console.error('WebSocket connection error:', error);
+                    console.log('This might indicate a port forwarding or connectivity issue');
+                    
+                    // If in Codespace, provide specific guidance
+                    if (window.location.hostname.includes('.app.github.dev')) {
+                        console.log('Codespace troubleshooting:');
+                        console.log('1. Check that port 8080 is forwarded and set to "Public"');
+                        console.log('2. Try refreshing the page');
+                        console.log('3. Restart the servers if needed');
+                    }
+                    
+                    if (!this.connected) {
+                        reject(error);
+                    }
                 };
                 
+                // Set a connection timeout
+                setTimeout(() => {
+                    if (!this.connected) {
+                        console.error('WebSocket connection timeout');
+                        this.ws.close();
+                        reject(new Error('Connection timeout'));
+                    }
+                }, 10000); // 10 second timeout
+                
             } catch (error) {
+                console.error('Failed to create WebSocket:', error);
                 reject(error);
             }
         });
@@ -96,6 +143,12 @@ class WebSocketClient {
             case 'game_start':
                 this.triggerCallback('game_start', data);
                 break;
+            case 'game_state_update':
+                this.triggerCallback('game_state_update', data);
+                break;
+            case 'initial_opponent_state':
+                this.triggerCallback('initial_opponent_state', data);
+                break;
             case 'opponent_card_move':
                 this.triggerCallback('opponent_card_move', data);
                 break;
@@ -104,6 +157,18 @@ class WebSocketClient {
                 break;
             case 'move_confirmed':
                 this.triggerCallback('move_confirmed', data);
+                break;
+            case 'move_error':
+                this.triggerCallback('move_error', data);
+                break;
+            case 'action_error':
+                this.triggerCallback('action_error', data);
+                break;
+            case 'game_ended':
+                this.triggerCallback('game_ended', data);
+                break;
+            case 'turn_changed':
+                this.triggerCallback('turn_changed', data);
                 break;
             case 'opponent_disconnected':
                 this.triggerCallback('opponent_disconnected', data);
@@ -140,6 +205,13 @@ class WebSocketClient {
         });
     }
 
+    sendInitialGameState(boardState) {
+        return this.send({
+            type: 'initial_game_state',
+            boardState
+        });
+    }
+
     sendCardMove(sourceType, sourceIndex, targetType, targetIndex, cardData) {
         return this.send({
             type: 'card_move',
@@ -155,6 +227,37 @@ class WebSocketClient {
         return this.send({
             type: 'game_state_update',
             playerState
+        });
+    }
+
+    sendAttackAction(attackIndex, targetPokemon = null) {
+        return this.send({
+            type: 'attack_action',
+            attackIndex,
+            targetPokemon
+        });
+    }
+
+    sendPlayCard(cardIndex, cardType, targetSlot = null, additionalData = {}) {
+        return this.send({
+            type: 'play_card',
+            cardIndex,
+            cardType,
+            targetSlot,
+            ...additionalData
+        });
+    }
+
+    sendEndTurn() {
+        return this.send({
+            type: 'end_turn'
+        });
+    }
+
+    sendRetreatAction(benchIndex) {
+        return this.send({
+            type: 'retreat_action',
+            benchIndex
         });
     }
 

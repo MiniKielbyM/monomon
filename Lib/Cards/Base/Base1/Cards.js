@@ -78,4 +78,32 @@ class Blastoise extends Card {
         this.owner.opponent.activePokemon.damage(40 + energyMod);
     }
 }
-export default { Alakazam, Blastoise };
+class Pikachu extends Card {
+    constructor(owner) {
+        super(
+            owner,
+            'https://images.pokemontcg.io/base1/58_hires.png',
+            'Pikachu',
+            PokemonType.LIGHTNING,
+            60,
+            'Pikachu',
+            null,
+            false,
+            PokemonType.LIGHTNING,
+            null,
+            1,
+            1,
+            CardModifiers.BASE
+        );
+        this.addAttack('Thunder Jolt', 'Flip a coin. If tails, Pikachu does 10 damage to itself.', [PokemonType.LIGHTNING, PokemonType.COLORLESS], this.ThunderJolt);
+    }
+    async ThunderJolt(){
+        this.owner.opponent.activePokemon.damage(30);
+        if(!await this.owner.guiHook.coinFlip()){
+            this.damage(10);
+            this.owner.guiHook.damageCardElement(this, 10);
+        }
+    }
+}
+
+export default { Alakazam, Blastoise, Pikachu };

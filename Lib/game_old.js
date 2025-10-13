@@ -61,10 +61,8 @@ class Game {
             playerActive: null,
             playerBench: [],
             playerHand: null,
-            playerDiscard: null,
             opponentActive: null,
             opponentBench: [],
-            opponentDiscard: null,
             board: null
         };
         
@@ -78,10 +76,8 @@ class Game {
         this.domElements.playerActive = document.getElementById('ActivePokemon');
         this.domElements.playerHand = document.getElementById('PlayerHand');
         this.domElements.playerBench = Array.from(document.querySelectorAll('.bench .card.player.benched'));
-        this.domElements.playerDiscard = document.querySelector('.card.discard.player');
         this.domElements.opponentActive = document.querySelector('.card.active.opp');
         this.domElements.opponentBench = Array.from(document.querySelectorAll('.bench .card.opp'));
-        this.domElements.opponentDiscard = document.querySelector('.card.discard.opp');
     }
     
     // Start the game and initialize GUI
@@ -94,7 +90,8 @@ class Game {
             this.guiHook.initializeDragAndDrop(this.domElements.board, this.client1, this);
         }
         
-        console.log('Client-side game started - waiting for server state');
+        // Don't send initial state - server manages everything now
+        console.log('Game started - waiting for server state');
     }
     
     // Update game state from server (purely display update)
@@ -130,7 +127,6 @@ class Game {
     updateGUIState() {
         this.updatePlayerGUI();
         this.updateOpponentGUI();
-        this.updateHandGUI();
     }
     
     // Update player's side of the board
@@ -158,11 +154,9 @@ class Game {
                 }
             });
         }
-
-        // Update discard pile (show stacked cards effect)
-        if (this.domElements.playerDiscard) {
-            this.updateDiscardPileVisual(this.domElements.playerDiscard, playerState.discardPile);
-        }
+        
+        // Update hand
+        this.updateHandGUI();
     }
     
     // Update opponent's side of the board
@@ -190,11 +184,9 @@ class Game {
                 }
             });
         }
-
-        // Update opponent discard pile (show stacked cards effect)
-        if (this.domElements.opponentDiscard) {
-            this.updateDiscardPileVisual(this.domElements.opponentDiscard, opponentState.discardPile);
-        }
+        
+        // Note: Opponent's hand cards are not shown (they remain face-down)
+        // Only the hand count might be displayed elsewhere if needed
     }
     
     // Update hand display
@@ -212,35 +204,25 @@ class Game {
                 const cardDiv = document.createElement('div');
                 cardDiv.classList.add('card', 'player', 'in-hand');
                 cardDiv.style.backgroundImage = `url(${card.imgUrl})`;
-                cardDiv.dataset.handIndex = index;
-                
-                // Set card data for inspection
-                this.setCardVisual(cardDiv, card);
-                
                 handContainer.appendChild(cardDiv);
             });
         }
     }
     
-        // Set a card's visual representation
+    // Set a card's visual representation
     setCardVisual(element, card) {
         if (!element || !card) return;
         
         element.style.backgroundImage = `url(${card.imgUrl})`;
         element.classList.remove('empty');
         
-        // Store card data directly on the element for inspection
-        element._cardData = card;
-        element.cardData = card; // Also store without underscore for drag system
+        // Store both the server card data and the card class instance
+        element.cardData = card; // Keep for compatibility
         
-        // Set card instance if provided
-        if (card.cardInstance) {
-            this.setCardInstance(element, card.cardInstance);
-        }
-        
-        // Update energy display if the card has attached energy
-        if (this.guiHook && this.guiHook.updatePokemonEnergyDisplay) {
-            this.guiHook.updatePokemonEnergyDisplay(element);
+        // Convert server card data to actual card class instance and store as direct pointer
+        if (this.guiHook && this.guiHook.createCardInstance) {
+            const cardInstance = this.guiHook.createCardInstance(card);
+            element.cardInstance = cardInstance; // Direct pointer to card class
         }
     }
     
@@ -252,39 +234,6 @@ class Game {
         element.classList.add('empty');
         element.cardData = null;
         element.cardInstance = null; // Clear the card class pointer
-    }
-
-    // Update discard pile visual to show stacked cards effect
-    updateDiscardPileVisual(element, discardPile) {
-        if (!element) return;
-        
-        if (!discardPile || discardPile.length === 0) {
-            // Empty discard pile
-            this.clearCardVisual(element);
-            element.style.boxShadow = '';
-            element.style.border = '';
-            return;
-        }
-
-        // Show the top card
-        const topCard = discardPile[discardPile.length - 1];
-        this.setCardVisual(element, topCard);
-        
-        // Add visual indication of stack depth
-        const stackDepth = Math.min(discardPile.length, 5); // Max 5 layers visual
-        const shadowLayers = [];
-        
-        for (let i = 1; i <= stackDepth; i++) {
-            const offset = i * 1;
-            const blur = i * 0.5;
-            shadowLayers.push(`${offset}px ${offset}px ${blur}px rgba(0,0,0,0.3)`);
-        }
-        
-        element.style.boxShadow = shadowLayers.join(', ');
-        element.style.border = '2px solid #666';
-        
-        // Store the full discard pile data for modal viewing
-        element.discardPileData = discardPile;
     }
     
     // Set a card class instance directly on a DOM element
@@ -343,7 +292,108 @@ class Game {
     handleOpponentMove(sourceType, sourceIndex, targetType, targetIndex, cardData) {
         console.log('Opponent move received:', { sourceType, sourceIndex, targetType, targetIndex, cardData });
         // The server will send updated game state, so we just wait for that
-        // No local state manipulation needed - everything comes from server
+        // No local state manipulation needed
+    }
+}
+            playerState.bench[fromIndex] = null;
+        } else if (fromType === 'active') {
+            card = playerState.activePokemon;
+            playerState.activePokemon = null;
+        }
+        
+        if (!card) return false;
+        
+        // Add to target
+        if (toType === 'active') {
+            playerState.activePokemon = card;
+        } else if (toType === 'bench') {
+            playerState.bench[toIndex] = card;
+        }
+        
+        // Update client state to match
+        this.syncClientState();
+        
+        // Update GUI
+        this.updateGUIState();
+        
+        return true;
+    }
+    
+    // Handle opponent moves (from server)
+    handleOpponentMove(sourceType, sourceIndex, targetType, targetIndex, cardData) {
+        const opponentState = this.boardState.player2;
+        
+        // Remove from source
+        if (sourceType === 'active') {
+            opponentState.activePokemon = null;
+        } else if (sourceType === 'bench') {
+            opponentState.bench[sourceIndex] = null;
+        }
+        
+        // Add to target
+        if (targetType === 'active') {
+            opponentState.activePokemon = cardData;
+        } else if (targetType === 'bench') {
+            opponentState.bench[targetIndex] = cardData;
+        }
+        
+        // Update GUI
+        this.updateOpponentGUI();
+    }
+    
+    // Synchronize client objects with game state
+    syncClientState() {
+        const playerState = this.boardState.player1;
+        
+        this.client1.activePokemon = playerState.activePokemon;
+        this.client1.bench = playerState.bench.filter(card => card !== null);
+        this.client1.hand = [...playerState.hand];
+    }
+    
+    // Set up initial game state
+    setupInitialState(player1Cards, player2Cards = []) {
+        // Set up player 1 hand
+        if (player1Cards.length > 0) {
+            this.boardState.player1.hand = [...player1Cards];
+        }
+        
+        // Set up player 2 (opponent) - start with empty field
+        if (player2Cards.length > 0) {
+            this.boardState.player2.hand = [...player2Cards];
+        }
+        
+        // Clear any existing field cards
+        this.boardState.player1.activePokemon = null;
+        this.boardState.player1.bench = Array(5).fill(null);
+        this.boardState.player2.activePokemon = null;
+        this.boardState.player2.bench = Array(5).fill(null);
+        
+        // Sync client state
+        this.syncClientState();
+        
+        // Update GUI
+        this.updateGUIState();
+    }
+    
+    // Get current game state for serialization
+    getGameState() {
+        return {
+            isRunning: this.isRunning,
+            turn: this.turn,
+            currentPlayer: this.currentPlayer === this.client1 ? 1 : 2,
+            boardState: this.boardState
+        };
+    }
+    
+    // Load game state from serialized data
+    loadGameState(state) {
+        this.isRunning = state.isRunning;
+        this.turn = state.turn;
+        this.currentPlayer = state.currentPlayer === 1 ? this.client1 : this.client2;
+        this.boardState = state.boardState;
+        
+        this.syncClientState();
+        this.updateGUIState();
     }
 }
 
