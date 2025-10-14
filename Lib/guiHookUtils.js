@@ -1728,13 +1728,67 @@ class GUIHookUtils {
             
             cardData.attacks.forEach(attack => {
                 const attackDiv = document.createElement('div');
+                
+                // Check if this attack can be used (if we have the necessary context)
+                const canUseAttack = this.canUseAttackInModal(cardEl, cardData, attack);
+                const isClickable = canUseAttack && this.isMyTurn();
+                
                 attackDiv.style.cssText = `
                     padding: 12px;
                     margin: 8px 0;
-                    background: #f8f9fa;
-                    border: 1px solid #dee2e6;
+                    background: ${isClickable ? '#fff3cd' : '#f8f9fa'};
+                    border: 1px solid ${isClickable ? '#ffc107' : '#dee2e6'};
                     border-radius: 8px;
+                    cursor: ${isClickable ? 'pointer' : 'default'};
+                    transition: all 0.2s ease;
+                    position: relative;
                 `;
+                
+                if (isClickable) {
+                    // Add hover effect
+                    attackDiv.addEventListener('mouseenter', () => {
+                        attackDiv.style.background = '#fff3a0';
+                        attackDiv.style.transform = 'translateY(-1px)';
+                        attackDiv.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                    });
+                    
+                    attackDiv.addEventListener('mouseleave', () => {
+                        attackDiv.style.background = '#fff3cd';
+                        attackDiv.style.transform = 'translateY(0)';
+                        attackDiv.style.boxShadow = 'none';
+                    });
+                    
+                    // Add click handler to use attack
+                    attackDiv.addEventListener('click', () => {
+                        this.useAttackFromModal(attack.name, modalOverlay);
+                    });
+                    
+                    // Add click indicator
+                    const clickIndicator = document.createElement('div');
+                    clickIndicator.textContent = '🎯 Click to use!';
+                    clickIndicator.style.cssText = `
+                        position: absolute;
+                        top: 8px;
+                        right: 12px;
+                        font-size: 12px;
+                        color: #856404;
+                        font-weight: bold;
+                    `;
+                    attackDiv.appendChild(clickIndicator);
+                } else if (!canUseAttack) {
+                    // Add indicator why attack cannot be used
+                    const notUsableIndicator = document.createElement('div');
+                    notUsableIndicator.textContent = '❌ Not enough energy';
+                    notUsableIndicator.style.cssText = `
+                        position: absolute;
+                        top: 8px;
+                        right: 12px;
+                        font-size: 12px;
+                        color: #6c757d;
+                        font-weight: bold;
+                    `;
+                    attackDiv.appendChild(notUsableIndicator);
+                }
 
                 // Attack header with name, cost, and damage
                 const attackHeader = document.createElement('div');
@@ -1818,18 +1872,59 @@ class GUIHookUtils {
             
             cardData.abilities.forEach(ability => {
                 const abilityDiv = document.createElement('div');
+                
+                // Check if this ability can be used
+                const canUseAbility = this.canUseAbilityInModal(cardEl, cardData, ability);
+                const isClickable = canUseAbility && this.isMyTurn();
+                
                 abilityDiv.style.cssText = `
                     padding: 12px;
                     margin: 8px 0;
-                    background: #e8f4fd;
-                    border: 1px solid #b3d4fc;
+                    background: ${isClickable ? '#d1f2eb' : '#e8f4fd'};
+                    border: 1px solid ${isClickable ? '#28a745' : '#b3d4fc'};
                     border-radius: 8px;
+                    cursor: ${isClickable ? 'pointer' : 'default'};
+                    transition: all 0.2s ease;
+                    position: relative;
                 `;
+                
+                if (isClickable) {
+                    // Add hover effect
+                    abilityDiv.addEventListener('mouseenter', () => {
+                        abilityDiv.style.background = '#c3e9d0';
+                        abilityDiv.style.transform = 'translateY(-1px)';
+                        abilityDiv.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                    });
+                    
+                    abilityDiv.addEventListener('mouseleave', () => {
+                        abilityDiv.style.background = '#d1f2eb';
+                        abilityDiv.style.transform = 'translateY(0)';
+                        abilityDiv.style.boxShadow = 'none';
+                    });
+                    
+                    // Add click handler to use ability
+                    abilityDiv.addEventListener('click', () => {
+                        this.useAbilityFromModal(ability.name, modalOverlay);
+                    });
+                    
+                    // Add click indicator
+                    const clickIndicator = document.createElement('div');
+                    clickIndicator.textContent = '✨ Click to use!';
+                    clickIndicator.style.cssText = `
+                        position: absolute;
+                        top: 8px;
+                        right: 12px;
+                        font-size: 12px;
+                        color: #155724;
+                        font-weight: bold;
+                    `;
+                    abilityDiv.appendChild(clickIndicator);
+                }
 
                 const abilityName = document.createElement('strong');
                 abilityName.textContent = ability.name;
                 abilityName.style.cssText = `
-                    color: #0066cc;
+                    color: ${isClickable ? '#155724' : '#0066cc'};
                     font-size: 16px;
                     display: block;
                     margin-bottom: 6px;
@@ -2124,6 +2219,115 @@ class GUIHookUtils {
         });
     }
 
+    // Check if an attack can be used from the modal
+    canUseAttackInModal(cardEl, cardData, attack) {
+        // Only allow attacks from active Pokemon
+        if (!cardEl || cardEl.id !== 'ActivePokemon') {
+            return false;
+        }
+
+        // Check if attack has energy requirements
+        if (!attack.energyCost || attack.energyCost.length === 0) {
+            return true; // No energy required
+        }
+
+        // Check attached energy
+        const attachedEnergy = cardData.attachedEnergy || [];
+        const energyCount = {};
+
+        // Count attached energy by type
+        attachedEnergy.forEach(energy => {
+            const type = energy.energyType || energy.type;
+            energyCount[type] = (energyCount[type] || 0) + 1;
+        });
+
+        // Check if requirements are met
+        const requiredEnergy = {};
+        attack.energyCost.forEach(type => {
+            requiredEnergy[type] = (requiredEnergy[type] || 0) + 1;
+        });
+
+        for (const [type, required] of Object.entries(requiredEnergy)) {
+            if ((energyCount[type] || 0) < required) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Check if an ability can be used from the modal
+    canUseAbilityInModal(cardEl, cardData, ability) {
+        // Most abilities can be used from any Pokemon on the field or bench
+        // Some abilities might have specific requirements - implement as needed
+        
+        // Check if this is the player's Pokemon (not opponent's)
+        const playerField = document.querySelector('#player-field');
+        if (!cardEl || !playerField.contains(cardEl)) {
+            return false;
+        }
+        
+        // Most abilities don't have energy requirements
+        // But some might have specific conditions - expand this as needed
+        return true;
+    }
+
+    // Check if it's currently the player's turn
+    isMyTurn() {
+        // Check if we have access to turn information
+        if (window.isMyTurn !== undefined) {
+            return window.isMyTurn;
+        }
+        
+        // Fallback: check if action buttons are visible (indicating it's player's turn)
+        const actionButtons = document.querySelectorAll('.action-btn');
+        return actionButtons.length > 0;
+    }
+
+    // Use attack from modal
+    useAttackFromModal(attackName, modalOverlay) {
+        // Close the modal first
+        modalOverlay.remove();
+        
+        // Use the attack via WebSocket if available
+        if (window.wsClient && window.wsClient.send) {
+            console.log(`Using attack from modal: ${attackName}`);
+            window.wsClient.send('use_attack', { attackName: attackName });
+            
+            // Show feedback message
+            if (window.showGameMessage) {
+                window.showGameMessage(`Using ${attackName}...`, 2000);
+            }
+        } else {
+            console.error('WebSocket client not available for attack');
+            if (window.showGameMessage) {
+                window.showGameMessage('Cannot use attack - not connected to game', 3000);
+            }
+        }
+    }
+
+    // Use ability from modal
+    useAbilityFromModal(abilityName, modalOverlay) {
+        // Close the modal first
+        modalOverlay.remove();
+        
+        // Use the ability via WebSocket if available
+        if (window.wsClient && window.wsClient.send) {
+            console.log(`Using ability from modal: ${abilityName}`);
+            window.wsClient.send('use_ability', { abilityName: abilityName });
+            
+            // Show feedback message
+            if (window.showGameMessage) {
+                window.showGameMessage(`Using ${abilityName}...`, 2000);
+            }
+        } else {
+            console.error('WebSocket client not available for ability');
+            if (window.showGameMessage) {
+                window.showGameMessage('Cannot use ability - not connected to game', 3000);
+            }
+        }
+    }
+
     // Close the inspection modal
     closeInspectionModal() {
         if (this.currentInspectionModal) {
@@ -2333,15 +2537,55 @@ class GUIHookUtils {
                 bottom: 4px;
                 right: 4px;
                 display: flex;
+                flex-wrap: wrap;
                 gap: 2px;
-                pointer-events: none;
+                pointer-events: auto;
                 z-index: 5;
+                background: rgba(0,0,0,0.7);
+                padding: 2px 4px;
+                border-radius: 4px;
+                max-width: 80%;
             `;
             
-            // Add energy icons
+            // Count energy by type
+            const energyCount = {};
             cardData.attachedEnergy.forEach(energy => {
-                const energyIcon = this.createEnergyIcon(energy.energyType, 16);
-                energyDisplay.appendChild(energyIcon);
+                const type = energy.energyType || energy.type;
+                energyCount[type] = (energyCount[type] || 0) + 1;
+            });
+            
+            // Create tooltip text
+            const tooltipText = Object.entries(energyCount)
+                .map(([type, count]) => `${count}x ${type.charAt(0).toUpperCase() + type.slice(1)}`)
+                .join(', ');
+            
+            energyDisplay.title = `Attached Energy: ${tooltipText} (Total: ${cardData.attachedEnergy.length})`;
+            
+            // Add energy icons with count
+            Object.entries(energyCount).forEach(([type, count]) => {
+                const energyContainer = document.createElement('div');
+                energyContainer.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 1px;
+                `;
+                
+                const energyIcon = this.createEnergyIcon(type, 14);
+                energyContainer.appendChild(energyIcon);
+                
+                if (count > 1) {
+                    const countLabel = document.createElement('span');
+                    countLabel.textContent = count;
+                    countLabel.style.cssText = `
+                        color: white;
+                        font-size: 10px;
+                        font-weight: bold;
+                        text-shadow: 1px 1px 1px black;
+                    `;
+                    energyContainer.appendChild(countLabel);
+                }
+                
+                energyDisplay.appendChild(energyContainer);
             });
             
             pokemonEl.appendChild(energyDisplay);

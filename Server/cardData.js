@@ -1,24 +1,54 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-13T15:31:53.665Z
+// Generated on 2025-10-13T22:28:10.290Z
 
 export const pokemonCards = [
     {
         "name": "Alakazam",
         "type": "psychic",
         "hp": 80,
-        "imgUrl": "https://images.pokemontcg.io/base1/1_hires.png"
+        "imgUrl": "https://images.pokemontcg.io/base1/1_hires.png",
+        "abilities": [],
+        "attacks": [
+            {
+                "name": "Confuse Ray",
+                "description": "Flip a coin. If heads, the Defending Pokémon is now Confused",
+                "energyCost": [
+                    "psychic",
+                    "psychic",
+                    "psychic"
+                ]
+            }
+        ]
     },
     {
         "name": "Blastoise",
         "type": "water",
         "hp": 100,
-        "imgUrl": "https://images.pokemontcg.io/base1/2_hires.png"
+        "imgUrl": "https://images.pokemontcg.io/base1/2_hires.png",
+        "abilities": [
+            {
+                "name": "Rain Dance",
+                "description": "Once during your turn (before your attack), you may attach a Water Energy card from your hand to 1 of your Water Pokémon. This power can\\'t be used if Blastoise is Asleep, Confused, or Paralyzed."
+            }
+        ],
+        "attacks": []
     },
     {
         "name": "Pikachu",
         "type": "lightning",
         "hp": 60,
-        "imgUrl": "https://images.pokemontcg.io/base1/58_hires.png"
+        "imgUrl": "https://images.pokemontcg.io/base1/58_hires.png",
+        "abilities": [],
+        "attacks": [
+            {
+                "name": "Thunder Jolt",
+                "description": "Flip a coin. If tails, Pikachu does 10 damage to itself.",
+                "energyCost": [
+                    "lightning",
+                    "colorless"
+                ]
+            }
+        ]
     }
 ];
 

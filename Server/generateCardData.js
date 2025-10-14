@@ -64,30 +64,107 @@ function extractCardData() {
     return { pokemonCards, energyCards };
 }
 
-// Parse the Cards.js file content to extract constructor parameters
+// (Old parseCardsFile function removed - replaced with enhanced version below)
+
+// Parse the Cards.js file content to extract constructor parameters AND abilities/attacks
 function parseCardsFile(fileContent) {
     const cardData = [];
     
-    // Regular expression to match class constructors and their super() calls
-    const classRegex = /class\s+(\w+)\s+extends\s+Card\s*{[\s\S]*?constructor\([^)]*\)\s*{[\s\S]*?super\(\s*([^)]+)\s*\)/gm;
+    // Split the file by class declarations and process each
+    const classSections = fileContent.split(/(?=class\s+\w+\s+extends\s+Card)/);
     
-    let match;
-    while ((match = classRegex.exec(fileContent)) !== null) {
-        const className = match[1];
-        const superParams = match[2];
+    for (const section of classSections) {
+        if (!section.trim() || !section.includes('extends Card')) continue;
+        
+        const classNameMatch = section.match(/class\s+(\w+)\s+extends\s+Card/);
+        if (!classNameMatch) continue;
+        
+        const className = classNameMatch[1];
         
         try {
-            const cardInfo = parseSuperParameters(superParams);
+            const cardInfo = parseCardClass(className, section);
             if (cardInfo) {
                 cardData.push(cardInfo);
-                console.log(`Extracted data for ${className}:`, cardInfo);
+                console.log(`Extracted data for ${className}: ${cardInfo.name} (${cardInfo.attacks.length} attacks, ${cardInfo.abilities.length} abilities)`);
             }
         } catch (error) {
             console.error(`Failed to parse ${className}:`, error.message);
         }
     }
-    
     return cardData;
+}
+
+// Parse a complete card class to extract all relevant data
+function parseCardClass(className, classBody) {
+    // Extract super() parameters
+    const superMatch = classBody.match(/super\(\s*([^)]+)\s*\)/);
+    if (!superMatch) return null;
+    
+    const superParams = superMatch[1];
+    const basicInfo = parseSuperParameters(superParams);
+    if (!basicInfo) return null;
+    
+    // Extract abilities
+    const abilities = extractAbilities(classBody);
+    
+    // Extract attacks
+    const attacks = extractAttacks(classBody);
+    
+    return {
+        ...basicInfo,
+        abilities: abilities,
+        attacks: attacks
+    };
+}
+
+// Extract abilities from class body
+function extractAbilities(classBody) {
+    const abilities = [];
+    // Updated regex to handle escaped quotes and different quote types
+    const abilityRegex = /this\.addAbility\(\s*['"`]([^'"`]+)['"`]\s*,\s*['"`]((?:[^'"`\\]|\\.)*?)['"`]\s*,/g;
+    
+    let match;
+    while ((match = abilityRegex.exec(classBody)) !== null) {
+        abilities.push({
+            name: match[1],
+            description: match[2]
+        });
+    }
+    
+    return abilities;
+}
+
+// Extract attacks from class body
+function extractAttacks(classBody) {
+    const attacks = [];
+    const attackRegex = /this\.addAttack\(\s*['"`]([^'"`]+)['"`]\s*,\s*['"`]([^'"`]*)['"`]\s*,\s*\[([^\]]+)\]/g;
+    
+    let match;
+    while ((match = attackRegex.exec(classBody)) !== null) {
+        const energyCost = parseEnergyCost(match[3]);
+        attacks.push({
+            name: match[1],
+            description: match[2],
+            energyCost: energyCost
+        });
+    }
+    
+    return attacks;
+}
+
+// Parse energy cost array
+function parseEnergyCost(energyString) {
+    const energyCost = [];
+    const energyMatches = energyString.match(/PokemonType\.(\w+)/g);
+    
+    if (energyMatches) {
+        energyMatches.forEach(match => {
+            const type = match.replace('PokemonType.', '').toLowerCase();
+            energyCost.push(type);
+        });
+    }
+    
+    return energyCost;
 }
 
 // Parse the super() parameters to extract card information

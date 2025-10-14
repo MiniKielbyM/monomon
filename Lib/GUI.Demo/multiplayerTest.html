@@ -308,6 +308,178 @@
             document.body.appendChild(endTurnBtn);
             return endTurnBtn;
         }
+
+        // Add Attack and Ability buttons for active Pokemon
+        function addActionButtons() {
+            // Remove existing action buttons
+            const existingButtons = document.querySelectorAll('.action-btn, .help-message');
+            existingButtons.forEach(btn => btn.remove());
+
+            if (!isMyTurn) return; // Only show buttons on player's turn
+
+            const activePokemon = document.getElementById('ActivePokemon');
+            if (!activePokemon || !activePokemon.cardData) {
+                // Show help message if no active Pokemon
+                showHelpMessage("Place a Pokémon in your Active slot to see attack options!");
+                return;
+            }
+
+            const pokemonData = activePokemon.cardData;
+            let buttonIndex = 0;
+
+            // Show help message about attacks
+            if (pokemonData.attacks && pokemonData.attacks.length > 0) {
+                showHelpMessage("Click attack buttons to battle! Energy requirements are shown.");
+            }
+
+            // Add attack buttons
+            if (pokemonData.attacks && pokemonData.attacks.length > 0) {
+                pokemonData.attacks.forEach((attack, index) => {
+                    // Create energy cost display
+                    const energyCostText = attack.energyCost && attack.energyCost.length > 0 
+                        ? ` (${attack.energyCost.length} energy)` 
+                        : '';
+                    
+                    const canUseAttack = checkCanUseAttack(pokemonData, attack);
+                    const buttonText = `⚔️ ${attack.name}${energyCostText}`;
+                    const tooltipText = `${attack.description}\nEnergy Cost: ${attack.energyCost ? attack.energyCost.join(', ') : 'None'}${canUseAttack ? '' : '\n❌ Not enough energy!'}`;
+                    
+                    const attackBtn = createActionButton(
+                        buttonText,
+                        tooltipText,
+                        buttonIndex++,
+                        () => useAttack(attack.name),
+                        'attack'
+                    );
+                    
+                    // Disable button if can't use attack
+                    if (!canUseAttack) {
+                        attackBtn.style.opacity = '0.5';
+                        attackBtn.style.cursor = 'not-allowed';
+                        attackBtn.title += '\n❌ Not enough energy!';
+                    }
+                    
+                    document.body.appendChild(attackBtn);
+                });
+            }
+
+            // Add ability buttons  
+            if (pokemonData.abilities && pokemonData.abilities.length > 0) {
+                pokemonData.abilities.forEach((ability, index) => {
+                    const abilityBtn = createActionButton(
+                        `✨ ${ability.name}`,
+                        `${ability.name}: ${ability.description}`,
+                        buttonIndex++,
+                        () => useAbility(ability.name),
+                        'ability'
+                    );
+                    document.body.appendChild(abilityBtn);
+                });
+            }
+        }
+
+        function createActionButton(text, title, index, onClick, type = 'attack') {
+            const btn = document.createElement('button');
+            btn.className = 'action-btn';
+            btn.innerHTML = text; // Use innerHTML to support energy icons
+            btn.title = title;
+            
+            const bgColor = type === 'attack' ? '#f44336' : '#4CAF50'; // Red for attacks, green for abilities
+            
+            btn.style.cssText = `
+                position: fixed;
+                bottom: ${10 + (index * 50)}px;
+                left: 10px;
+                padding: 8px 12px;
+                background: ${bgColor};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 11px;
+                z-index: 1000;
+                min-width: 150px;
+                max-width: 200px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                transition: transform 0.1s;
+            `;
+            
+            btn.addEventListener('mousedown', () => {
+                btn.style.transform = 'scale(0.95)';
+            });
+            
+            btn.addEventListener('mouseup', () => {
+                btn.style.transform = 'scale(1)';
+            });
+            
+            btn.addEventListener('click', onClick);
+            return btn;
+        }
+
+        // Use attack function
+        function useAttack(attackName) {
+            console.log(`Using attack: ${attackName}`);
+            wsClient.send('use_attack', { attackName: attackName });
+            showGameMessage(`Using ${attackName}...`, 2000);
+        }
+
+        // Use ability function  
+        function useAbility(abilityName) {
+            console.log(`Using ability: ${abilityName}`);
+            wsClient.send('use_ability', { abilityName: abilityName });
+            showGameMessage(`Using ${abilityName}...`, 2000);
+        }
+
+        // Check if Pokemon has enough energy for an attack
+        function checkCanUseAttack(pokemonData, attack) {
+            if (!attack.energyCost || attack.energyCost.length === 0) {
+                return true; // No energy required
+            }
+
+            const attachedEnergy = pokemonData.attachedEnergy || [];
+            const energyCount = {};
+
+            // Count attached energy by type
+            attachedEnergy.forEach(energy => {
+                const type = energy.energyType || energy.type;
+                energyCount[type] = (energyCount[type] || 0) + 1;
+            });
+
+            // Check if requirements are met
+            const requiredEnergy = {};
+            attack.energyCost.forEach(type => {
+                requiredEnergy[type] = (requiredEnergy[type] || 0) + 1;
+            });
+
+            for (const [type, required] of Object.entries(requiredEnergy)) {
+                if ((energyCount[type] || 0) < required) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Show help message
+        function showHelpMessage(message) {
+            const helpDiv = document.createElement('div');
+            helpDiv.className = 'help-message';
+            helpDiv.textContent = message;
+            helpDiv.style.cssText = `
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+                padding: 8px 12px;
+                background: rgba(33, 150, 243, 0.9);
+                color: white;
+                border-radius: 6px;
+                font-size: 12px;
+                z-index: 999;
+                max-width: 250px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(helpDiv);
+        }
         
         // Set up WebSocket event listeners
         wsClient.on('waiting_for_opponent', (data) => {
@@ -357,6 +529,9 @@
                 } else {
                     endTurnBtn.style.display = 'none';
                 }
+
+                // Update action buttons based on active Pokemon
+                addActionButtons();
             } else {
                 console.error('No currentGame found or no gameState in data:', data);
             }
@@ -405,6 +580,21 @@
             if (guiHook) {
                 guiHook.lastMove = null;
             }
+        });
+
+        wsClient.on('attack_used', (data) => {
+            console.log('Attack successful:', data);
+            showGameMessage(`${data.attackName} used! ${data.result.message || ''}`, 3000);
+        });
+
+        wsClient.on('ability_used', (data) => {
+            console.log('Ability successful:', data);
+            showGameMessage(`${data.abilityName} activated! ${data.result.message || ''}`, 3000);
+        });
+
+        wsClient.on('action_error', (data) => {
+            console.log('Action error:', data);
+            showGameMessage(`❌ ${data.message}`, 3000);
         });
         
         wsClient.on('opponent_disconnected', (data) => {

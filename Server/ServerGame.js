@@ -64,6 +64,157 @@ class ServerGame {
         return true;
     }
 
+    // Use a Pokemon's attack
+    useAttack(playerNumber, attackName) {
+        const player = playerNumber === 1 ? this.gameState.player1 : this.gameState.player2;
+        const opponent = playerNumber === 1 ? this.gameState.player2 : this.gameState.player1;
+
+        // Validate it's the player's turn
+        if (this.gameState.currentPlayer !== playerNumber) {
+            return { success: false, error: 'Not your turn' };
+        }
+
+        // Check if player has already attacked this turn
+        if (this.gameState.attackedThisTurn) {
+            return { success: false, error: 'Already attacked this turn' };
+        }
+
+        // Check if player has an active Pokemon
+        if (!player.activePokemon) {
+            return { success: false, error: 'No active Pokemon' };
+        }
+
+        const activePokemon = player.activePokemon;
+        
+        // Find the attack in the Pokemon's attack list
+        const attack = activePokemon.attacks?.find(atk => atk.name === attackName);
+        if (!attack) {
+            return { success: false, error: 'Attack not found' };
+        }
+
+        // Check energy requirements
+        const energyCheck = this.checkEnergyRequirements(activePokemon, attack.energyCost);
+        if (!energyCheck.success) {
+            return { success: false, error: energyCheck.error };
+        }
+
+        // Execute the attack
+        const attackResult = this.executeAttack(activePokemon, opponent.activePokemon, attack);
+        
+        // Mark that player has attacked this turn
+        this.gameState.attackedThisTurn = true;
+        
+        this.logAction(`Player ${playerNumber}'s ${activePokemon.cardName} used ${attackName}`);
+        
+        return { success: true, result: attackResult };
+    }
+
+    // Use a Pokemon's ability
+    useAbility(playerNumber, abilityName) {
+        const player = playerNumber === 1 ? this.gameState.player1 : this.gameState.player2;
+        const opponent = playerNumber === 1 ? this.gameState.player2 : this.gameState.player1;
+
+        // Validate it's the player's turn
+        if (this.gameState.currentPlayer !== playerNumber) {
+            return { success: false, error: 'Not your turn' };
+        }
+
+        // Check if player has an active Pokemon
+        if (!player.activePokemon) {
+            return { success: false, error: 'No active Pokemon' };
+        }
+
+        const activePokemon = player.activePokemon;
+        
+        // Find the ability in the Pokemon's ability list
+        const ability = activePokemon.abilities?.find(ab => ab.name === abilityName);
+        if (!ability) {
+            return { success: false, error: 'Ability not found' };
+        }
+
+        // Execute the ability
+        const abilityResult = this.executeAbility(activePokemon, ability, player, opponent);
+        
+        this.logAction(`Player ${playerNumber}'s ${activePokemon.cardName} used ability ${abilityName}`);
+        
+        return { success: true, result: abilityResult };
+    }
+
+    // Check if Pokemon has enough energy for an attack
+    checkEnergyRequirements(pokemon, energyCost) {
+        if (!energyCost || energyCost.length === 0) {
+            return { success: true };
+        }
+
+        const attachedEnergy = pokemon.attachedEnergy || [];
+        const energyCount = {};
+
+        // Count attached energy by type
+        attachedEnergy.forEach(energy => {
+            const type = energy.energyType || energy.type;
+            energyCount[type] = (energyCount[type] || 0) + 1;
+        });
+
+        // Check if requirements are met
+        const requiredEnergy = {};
+        energyCost.forEach(type => {
+            requiredEnergy[type] = (requiredEnergy[type] || 0) + 1;
+        });
+
+        for (const [type, required] of Object.entries(requiredEnergy)) {
+            if ((energyCount[type] || 0) < required) {
+                return { success: false, error: `Not enough ${type} energy` };
+            }
+        }
+
+        return { success: true };
+    }
+
+    // Execute an attack (simplified version)
+    executeAttack(attackingPokemon, defendingPokemon, attack) {
+        if (!defendingPokemon) {
+            return { message: 'No target to attack' };
+        }
+
+        // Basic attack execution - can be expanded based on attack descriptions
+        let damage = 0;
+        
+        // Simple damage calculation based on attack name
+        if (attack.name === 'Thunder Jolt') {
+            damage = 30;
+            // Implement coin flip logic here if needed
+        } else if (attack.name === 'Confuse Ray') {
+            damage = 30;
+            // Implement confusion status effect here if needed
+        } else if (attack.name === 'Hydro Pump') {
+            damage = 40;
+            // Can add energy-based damage bonus later
+        }
+
+        // Apply damage
+        defendingPokemon.health = Math.max(0, defendingPokemon.health - damage);
+        
+        return {
+            damage: damage,
+            targetHealth: defendingPokemon.health,
+            message: `${attackingPokemon.cardName} dealt ${damage} damage to ${defendingPokemon.cardName}`
+        };
+    }
+
+    // Execute an ability (simplified version)
+    executeAbility(pokemon, ability, player, opponent) {
+        // Basic ability execution - can be expanded based on ability descriptions
+        if (ability.name === 'Rain Dance') {
+            // Allow extra energy attachment (simplified)
+            return { message: 'Rain Dance activated - may attach extra Water energy' };
+        } else if (ability.name === 'Damage Swap') {
+            // Allow damage counter movement (simplified)
+            return { message: 'Damage Swap activated - may move damage counters' };
+        }
+
+        return { message: `${ability.name} activated` };
+    }
+
     initializeDecks() {
         // Use imported card data from cardData.js
         console.log('Initializing decks with imported card data:', {
@@ -86,7 +237,9 @@ class ServerGame {
                         health: template.hp,
                         imgUrl: template.imgUrl,
                         statusConditions: [],
-                        attachedEnergy: []
+                        attachedEnergy: [],
+                        abilities: template.abilities || [],
+                        attacks: template.attacks || []
                     });
                 });
             }

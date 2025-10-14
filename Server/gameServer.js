@@ -51,6 +51,12 @@ class GameServer {
             case 'attack_action':
                 this.handleAttackAction(ws, data);
                 break;
+            case 'use_attack':
+                this.handleAttackAction(ws, data);
+                break;
+            case 'use_ability':
+                this.handleAbilityAction(ws, data);
+                break;
             case 'play_card':
                 this.handlePlayCard(ws, data);
                 break;
@@ -453,21 +459,54 @@ class GameServer {
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
 
-        // Validate attack
-        const validation = this.validateGameAction(game, client.playerNumber, 'attack', data);
+        // Use ServerGame's attack method
+        const result = game.serverGame.useAttack(client.playerNumber, data.attackName);
         
-        if (!validation.valid) {
+        if (!result.success) {
             ws.send(JSON.stringify({
                 type: 'action_error',
-                message: validation.error
+                message: result.error
             }));
             return;
         }
 
-        // Execute attack
-        this.executeAttack(game, client.playerNumber, data);
+        // Send success response
+        ws.send(JSON.stringify({
+            type: 'attack_used',
+            attackName: data.attackName,
+            result: result.result
+        }));
         
-        // Send updated state
+        // Send updated state to all players
+        this.sendGameStateToPlayers(game);
+    }
+
+    handleAbilityAction(ws, data) {
+        const client = this.clients.get(ws);
+        if (!client || !client.gameId) return;
+
+        const game = this.games.get(client.gameId);
+        if (!game || game.state !== 'playing') return;
+
+        // Use ServerGame's ability method
+        const result = game.serverGame.useAbility(client.playerNumber, data.abilityName);
+        
+        if (!result.success) {
+            ws.send(JSON.stringify({
+                type: 'action_error',
+                message: result.error
+            }));
+            return;
+        }
+
+        // Send success response
+        ws.send(JSON.stringify({
+            type: 'ability_used',
+            abilityName: data.abilityName,
+            result: result.result
+        }));
+        
+        // Send updated state to all players
         this.sendGameStateToPlayers(game);
     }
 
