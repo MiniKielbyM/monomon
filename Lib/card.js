@@ -3,6 +3,30 @@ import enums from "./enums.js";
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
 import Pokemon from "./PokemonList.js";
 class Card {
+    // Check if the card has the required energy for an attack
+    hasRequiredEnergy(attackName) {
+        if (!this.attacks[attackName]) return false;
+        const required = [...this.attacks[attackName].cost];
+        // Count attached energies by type
+        const attached = {};
+        for (const energy of this.energy) {
+            attached[energy] = (attached[energy] || 0) + 1;
+        }
+        // First, fulfill all non-colorless requirements
+        for (let i = required.length - 1; i >= 0; i--) {
+            const type = required[i];
+            if (type !== PokemonType.COLORLESS) {
+                if (attached[type] && attached[type] > 0) {
+                    attached[type]--;
+                    required.splice(i, 1);
+                }
+            }
+        }
+        // Now, fulfill colorless requirements with any remaining energy
+        let totalLeft = Object.values(attached).reduce((a, b) => a + b, 0);
+        const colorlessCount = required.filter(t => t === PokemonType.COLORLESS).length;
+        return totalLeft >= colorlessCount;
+    }
     //Global card properties
     static energy = [];
     static attachments = [];

@@ -2,12 +2,11 @@
 import { Card } from "./card.js";
 import enums from "./enums.js";
 import CardsBase1 from "./Cards/Base/Base1/Cards.js";
-import Pikachu from "./cardTest.js";
 import Client from "./client.js";
 import Deck from "./deck.js";
 
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
-const { Alakazam, Blastoise } = CardsBase1;
+const { Alakazam, Blastoise, Pikachu } = CardsBase1;
 
 class GUIHookUtils {
     constructor(domElement, webSocketClient = null) {
@@ -131,9 +130,9 @@ class GUIHookUtils {
         document.addEventListener('mouseleave', (e) => this.onMouseLeave(e));
         
         // Touch events for mobile support
-        document.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
-        document.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
-        document.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false });
+        document.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: true });
+        document.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: true });
+        document.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: true });
         
         // Set up discard pile viewing functionality
         this.setupDiscardPileViewing();
@@ -441,8 +440,11 @@ class GUIHookUtils {
         
         // Handle click detection for player cards (if drag was prepared but never started)
         if (this.dragPrepared && !this.dragging) {
-            console.log('Detected click on player card:', this.dragPrepared.cardData?.name);
-            this.showCardInspectionModal(this.dragPrepared.cardEl, this.dragPrepared.cardData);
+            // Only allow inspection modal for player's own cards
+            if (this.dragPrepared.cardEl.classList.contains('player')) {
+                console.log('Detected click on player card:', this.dragPrepared.cardData?.name);
+                this.showCardInspectionModal(this.dragPrepared.cardEl, this.dragPrepared.cardData);
+            }
             this.dragPrepared = null;
             this.inspectionPrepared = null;
             return;
@@ -450,8 +452,11 @@ class GUIHookUtils {
 
         // Handle click detection for opponent cards (inspection only)
         if (this.inspectionPrepared && !this.dragging) {
-            console.log('Detected click on opponent card:', this.inspectionPrepared.cardData?.name);
-            this.showCardInspectionModal(this.inspectionPrepared.cardEl, this.inspectionPrepared.cardData);
+            // Only allow inspection modal for opponent's cards
+            if (this.inspectionPrepared.cardEl.classList.contains('opp')) {
+                console.log('Detected click on opponent card:', this.inspectionPrepared.cardData?.name);
+                this.showCardInspectionModal(this.inspectionPrepared.cardEl, this.inspectionPrepared.cardData);
+            }
             this.dragPrepared = null;
             this.inspectionPrepared = null;
             return;
@@ -2263,7 +2268,7 @@ class GUIHookUtils {
         
         // Check if this is the player's Pokemon (not opponent's)
         const playerField = document.querySelector('#player-field');
-        if (!cardEl || !playerField.contains(cardEl)) {
+        if (!cardEl || !playerField || !playerField.contains(cardEl)) {
             return false;
         }
         
