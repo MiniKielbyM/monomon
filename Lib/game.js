@@ -272,6 +272,13 @@ class Game {
     clearCardVisual(element) {
         if (!element) return;
         
+        // Remove any energy displays from this element
+        const energyDisplays = element.querySelectorAll('.attached-energy-display, .energy-display');
+        energyDisplays.forEach(display => {
+            console.log('🧹 Removing energy display from cleared card slot:', display);
+            display.remove();
+        });
+        
         element.style.backgroundImage = '';
         element.classList.add('empty');
         element.cardData = null;

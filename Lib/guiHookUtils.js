@@ -446,11 +446,26 @@ class GUIHookUtils {
         const dragRect = dragEl.getBoundingClientRect();
         this.currentDropTarget = null;
         
+        // Clean up all previous dropType properties from DOM elements
+        document.querySelectorAll('.card-slot, .card, [data-type]').forEach(el => {
+            if (el.dropType !== undefined) {
+                el.dropType = undefined;
+            }
+        });
+        
         // Get the card data to determine if it's an energy card
         const draggedCardData = this.getCardDataFromElement(this.dragging.cardEl);
         const isEnergyCard = draggedCardData && draggedCardData.type === 'energy';
         
+        console.log(`🔍 Collision detection for drag:`, {
+            cardData: draggedCardData,
+            cardType: draggedCardData?.type,
+            isEnergyCard: isEnergyCard,
+            cardName: draggedCardData?.cardName
+        });
+        
         if (isEnergyCard) {
+            console.log(`⚡ Running energy collision detection`);
             // For energy cards, check collision with Pokemon (both empty and occupied slots)
             document.querySelectorAll('.card.player:not(.discard):not(.hand .card)').forEach(slot => {
                 const s = slot.getBoundingClientRect();
@@ -462,11 +477,23 @@ class GUIHookUtils {
                 );
                 
                 // Only highlight Pokemon slots (active/bench) that have Pokemon in them - not empty slots
-                const isPokemonSlot = (slot.classList.contains('active') || slot.classList.contains('benched')) && 
-                                     !slot.classList.contains('empty');
+                const isActiveOrBench = slot.classList.contains('active') || slot.classList.contains('benched');
+                const isEmpty = slot.classList.contains('empty');
+                const isPokemonSlot = isActiveOrBench && !isEmpty;
+                
+                console.log(`Energy collision check:`, {
+                    element: slot,
+                    id: slot.id,
+                    classes: slot.className,
+                    isActiveOrBench,
+                    isEmpty,
+                    isPokemonSlot,
+                    colliding
+                });
                 
                 if (isPokemonSlot) {
                     if (colliding) {
+                        console.log(`⚡ Setting energy attachment target:`, slot);
                         this.currentDropTarget = slot;
                         this.currentDropTarget.dropType = 'attach'; // Mark as energy attachment
                     }
@@ -474,7 +501,10 @@ class GUIHookUtils {
             });
         } else {
             // For non-energy cards, check regular empty slots
-            document.querySelectorAll('.card.player.empty').forEach(slot => {
+            const emptySlots = document.querySelectorAll('.card.player.empty');
+            console.log(`🎯 Checking ${emptySlots.length} empty slots for collision`);
+            
+            emptySlots.forEach((slot, index) => {
                 const s = slot.getBoundingClientRect();
                 const colliding = !(
                     dragRect.right < s.left ||
@@ -482,7 +512,22 @@ class GUIHookUtils {
                     dragRect.bottom < s.top ||
                     dragRect.top > s.bottom
                 );
-                if (colliding) this.currentDropTarget = slot;
+                
+                console.log(`Empty slot ${index + 1}:`, {
+                    element: slot,
+                    id: slot.id,
+                    classes: slot.className,
+                    hasCardData: !!(slot.cardData || slot._cardData),
+                    hasBackgroundImage: !!slot.style.backgroundImage,
+                    colliding: colliding,
+                    rect: s
+                });
+                
+                if (colliding) {
+                    console.log(`✅ Setting drop target to empty slot:`, slot);
+                    this.currentDropTarget = slot;
+                    this.currentDropTarget.dropType = 'normal'; // Explicitly set as normal card placement
+                }
             });
         }
 
@@ -499,6 +544,9 @@ class GUIHookUtils {
             if (colliding) {
                 this.currentDropTarget = discardPile;
                 this.currentDropTarget.dropType = 'discard'; // Mark as discard
+            } else {
+                // Clear dropType when not colliding with discard pile
+                discardPile.dropType = undefined;
             }
         }
     }
@@ -539,6 +587,14 @@ class GUIHookUtils {
 
         // Handle completed drag operation
         if (this.currentDropTarget) {
+            console.log('🎯 Found drop target:', {
+                element: this.currentDropTarget,
+                id: this.currentDropTarget.id,
+                classes: this.currentDropTarget.className,
+                dropType: this.currentDropTarget.dropType,
+                isEmpty: this.currentDropTarget.classList.contains('empty')
+            });
+            
             // Store move information for potential rollback BEFORE making any changes
             this.lastMove = {
                 sourceEl: this.dragging.cardEl,
@@ -593,6 +649,12 @@ class GUIHookUtils {
                 this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
             }
         } else {
+            console.log('❌ No drop target found - returning card to origin');
+            console.log('Available empty slots at drop time:', {
+                emptySlots: document.querySelectorAll('.card.player.empty').length,
+                allPlayerSlots: document.querySelectorAll('.card.player').length
+            });
+            
             // Return to origin - no rollback needed since move wasn't attempted
             this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
             this.dragging.cardEl.classList.remove('empty');
@@ -3366,25 +3428,66 @@ class GUIHookUtils {
 
     // Clean up any orphaned energy displays that might be causing visual/collision issues
     cleanupOrphanedEnergyDisplays() {
+        console.log('🧹 Cleaning up orphaned energy displays...');
+        
         // Find all energy displays on the board
         const allEnergyDisplays = document.querySelectorAll('.attached-energy-display, .energy-display');
+        console.log(`Found ${allEnergyDisplays.length} energy displays to check`);
         
-        allEnergyDisplays.forEach(display => {
+        let removedCount = 0;
+        
+        allEnergyDisplays.forEach((display, index) => {
             const parentCard = display.closest('.card');
+            console.log(`Checking energy display ${index + 1}:`, {
+                hasParentCard: !!parentCard,
+                parentCardId: parentCard?.id,
+                parentCardClasses: parentCard?.className
+            });
+            
             if (!parentCard) {
                 // Orphaned display not attached to a card - remove it
-                console.log('Removing orphaned energy display:', display);
+                console.log('❌ Removing orphaned energy display (no parent card):', display);
                 display.remove();
+                removedCount++;
             } else {
                 // Check if the parent card actually has attached energy data
                 const cardData = this.getCardDataFromElement ? this.getCardDataFromElement(parentCard) : (parentCard.cardData || parentCard._cardData);
+                console.log(`Parent card data:`, {
+                    hasCardData: !!cardData,
+                    hasAttachedEnergy: !!(cardData?.attachedEnergy),
+                    attachedEnergyCount: cardData?.attachedEnergy?.length || 0,
+                    cardName: cardData?.cardName
+                });
+                
                 if (!cardData || !cardData.attachedEnergy || cardData.attachedEnergy.length === 0) {
                     // Card has no attached energy but still has display - remove it
-                    console.log('Removing invalid energy display from card without attached energy:', display);
+                    console.log('❌ Removing invalid energy display from card without attached energy:', display);
                     display.remove();
+                    removedCount++;
+                } else {
+                    console.log('✅ Energy display is valid, keeping it');
                 }
             }
         });
+        
+        console.log(`🧹 Cleanup complete: removed ${removedCount} orphaned/invalid energy displays`);
+        
+        // Additional cleanup: check empty card slots for leftover energy displays
+        const emptySlots = document.querySelectorAll('.card.empty, .card[style*="background-image: none"], .card[style=""]');
+        emptySlots.forEach(slot => {
+            const energyDisplays = slot.querySelectorAll('.attached-energy-display, .energy-display');
+            if (energyDisplays.length > 0) {
+                console.log(`❌ Found ${energyDisplays.length} energy displays in empty slot, removing:`, slot);
+                energyDisplays.forEach(display => {
+                    display.remove();
+                    removedCount++;
+                });
+            }
+        });
+        
+        if (removedCount > 0) {
+            console.log(`🧹 Final cleanup: removed ${removedCount} total orphaned energy displays`);
+        }
     }
 
     // Update the visual display of attached energy for a Pokemon

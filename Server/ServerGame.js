@@ -732,29 +732,33 @@ class ServerGame {
             return;
         }
         
-        // Remove card from source
+        // Get the actual card with all its current state (including attached energy)
+        let actualCard = card;
         switch (fromType) {
             case 'hand':
+                actualCard = player.hand[fromIndex];
                 player.hand.splice(fromIndex, 1);
                 break;
             case 'bench':
+                actualCard = player.bench[fromIndex];
                 player.bench[fromIndex] = null;
                 break;
             case 'active':
+                actualCard = player.activePokemon;
                 player.activePokemon = null;
                 break;
         }
         
-        // Place card in destination
+        // Place card in destination (preserving all state including attached energy)
         switch (toType) {
             case 'active':
-                player.activePokemon = card;
+                player.activePokemon = actualCard;
                 break;
             case 'bench':
-                player.bench[toIndex] = card;
+                player.bench[toIndex] = actualCard;
                 break;
             case 'discard':
-                player.discardPile.push(card);
+                player.discardPile.push(actualCard);
                 break;
         }
     }
