@@ -1,4 +1,3 @@
-import Client from "./client.js";
 import enums from "./enums.js";
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
 import Pokemon from "./PokemonList.js";
@@ -36,9 +35,7 @@ class Card {
     //Constructor
     constructor(owner, imgUrl, cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance = null, retreatCost = 0, prizeCards = 1, cardMod = CardModifiers.Base) {
         this.owner = owner;
-        if (!(owner instanceof Client)) {
-            throw new TypeError('owner must be an instance of Client');
-        }
+        // Owner validation removed to avoid circular dependency
         this.imgUrl = imgUrl;
         this.cardName = cardName;
         if (!Object.values(PokemonType).includes(type)) {
@@ -85,17 +82,35 @@ class Card {
             throw new Error(`Invalid card modifier: ${cardMod}`);
         }
         this.cardMod = cardMod;
+        
+        // Initialize energy array for tracking attached energy
+        this.energy = [];
     }
     // Utility functions, dont edit these on children classes
-    damage(amount) {
+    damage(amount, attackingType = null) {
         if (typeof amount !== 'number' || amount < 0) {
             throw new Error(`Invalid damage amount: ${amount}`);
         }
-        this.health -= amount;
+        
+        let finalDamage = amount;
+        
+        // Apply weakness (double damage if attacking type matches weakness)
+        if (attackingType && this.weakness === attackingType) {
+            console.log(`Weakness applied: ${this.cardName} is weak to ${attackingType}, damage doubled from ${amount} to ${amount * 2}`);
+            finalDamage *= 2;
+        }
+        
+        // Apply resistance (reduce damage by 30 if attacking type matches resistance)
+        if (attackingType && this.resistance === attackingType) {
+            console.log(`Resistance applied: ${this.cardName} resists ${attackingType}, damage reduced by 30 from ${finalDamage} to ${Math.max(0, finalDamage - 30)}`);
+            finalDamage = Math.max(0, finalDamage - 30);
+        }
+        
+        this.health -= finalDamage;
         if (this.health < 0) {
             this.health = 0;
         }
-        this.owner.guiHook.damageCardElement(this, amount);
+        this.owner.guiHook.damageCardElement(this, finalDamage);
     }
     heal(amount) {
         if (typeof amount !== 'number' || amount < 0) {
@@ -195,7 +210,7 @@ class Energy extends Attachment {
         super.attach(pokemon);
         this.attachedTo = pokemon;
         pokemon.energy.push(this.energyType);
-        pokemon.owner.hasAttachedEnergyThisTurn = true;
+        pokemon.owner.attachedEnergyThisTurn = true;
         pokemon.owner.guiHook.attachCardElement(pokemon, this);
     }
     detach() {

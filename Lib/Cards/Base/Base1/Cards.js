@@ -1,7 +1,5 @@
 import { Card } from "../../../card.js";
 import enums from "../../../enums.js";
-import Client from "../../../client.js";
-import GUIHookUtils from "../../../guiHookUtils.js";
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
 
 class Alakazam extends Card {
@@ -39,7 +37,9 @@ class Alakazam extends Card {
         if( await this.owner.guiHook.coinFlip()){
             this.owner.opponent.activePokemon.addStatusCondition('confused');
         }
-        this.owner.opponent.activePokemon.damage(30);
+        // Pass attacking Pokemon type for weakness/resistance calculation
+        const attackingType = this.owner.guiHook.attackingPokemonType || this.type;
+        this.owner.opponent.activePokemon.damage(30, attackingType);
         this.owner.guiHook.damageCardElement(this.owner.opponent.activePokemon, 30);
     }
 }
@@ -69,13 +69,15 @@ class Blastoise extends Card {
         }
         const potentialTargets = [this.owner.activePokemon, ...this.owner.bench].filter(card => card !== this).filter(card => card.type === PokemonType.WATER);
         const target = await this.owner.guiHook.selectFromCards(potentialTargets);
-        const tempStore = this.owner.hasAttachedEnergyThisTurn;
+        const tempStore = this.owner.attachedEnergyThisTurn;
         this.owner.hand.filter(nrg => nrg instanceof Energy).filter(nrg => nrg.type === PokemonType.WATER)[0].attachTo(target);
-        this.owner.hasAttachedEnergyThisTurn = tempStore;
+        this.owner.attachedEnergyThisTurn = tempStore;
     }
     async HydroPump(){
         const energyMod = Math.max(Math.min(this.energy.filter(nrg => nrg === PokemonType.WATER).length-3, 2), 0) * 10;
-        this.owner.opponent.activePokemon.damage(40 + energyMod);
+        // Pass attacking Pokemon type for weakness/resistance calculation
+        const attackingType = this.owner.guiHook.attackingPokemonType || this.type;
+        this.owner.opponent.activePokemon.damage(40 + energyMod, attackingType);
     }
 }
 class Pikachu extends Card {
@@ -89,7 +91,7 @@ class Pikachu extends Card {
             'Pikachu',
             null,
             false,
-            PokemonType.LIGHTNING,
+            PokemonType.FIGHTING,
             null,
             1,
             1,
@@ -98,9 +100,11 @@ class Pikachu extends Card {
         this.addAttack('Thunder Jolt', 'Flip a coin. If tails, Pikachu does 10 damage to itself.', [PokemonType.LIGHTNING, PokemonType.COLORLESS], this.ThunderJolt);
     }
     async ThunderJolt(){
-        this.owner.opponent.activePokemon.damage(30);
+        // Pass attacking Pokemon type for weakness/resistance calculation
+        const attackingType = this.owner.guiHook.attackingPokemonType || this.type;
+        this.owner.opponent.activePokemon.damage(10, attackingType);
         if(!await this.owner.guiHook.coinFlip()){
-            this.damage(10);
+            this.damage(10); // Self-damage without weakness/resistance calculation
             this.owner.guiHook.damageCardElement(this, 10);
         }
     }

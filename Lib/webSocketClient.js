@@ -170,6 +170,9 @@ class WebSocketClient {
             case 'turn_changed':
                 this.triggerCallback('turn_changed', data);
                 break;
+            case 'attack_used':
+                this.triggerCallback('attack_used', data);
+                break;
             case 'opponent_disconnected':
                 this.triggerCallback('opponent_disconnected', data);
                 break;
@@ -182,7 +185,22 @@ class WebSocketClient {
         }
     }
 
-    send(message) {
+    send(messageOrType, data = null) {
+        let message;
+        
+        // Handle both send(message) and send(type, data) signatures
+        if (typeof messageOrType === 'string' && data !== null) {
+            message = {
+                type: messageOrType,
+                ...data
+            };
+        } else if (typeof messageOrType === 'object') {
+            message = messageOrType;
+        } else {
+            console.error('Invalid send arguments:', messageOrType, data);
+            return false;
+        }
+        
         if (this.connected && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
             return true;

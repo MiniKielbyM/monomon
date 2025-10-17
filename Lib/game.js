@@ -112,7 +112,7 @@ class Game {
             }
         };
         
-        // Update turn-based drag controls
+        // Update turn-based drag controls (this will reset energy flag when turn starts)
         if (this.guiHook) {
             const isMyTurn = serverState.isYourTurn || false;
             const turnReason = isMyTurn ? 
@@ -122,12 +122,36 @@ class Game {
             this.guiHook.setDragEnabled(isMyTurn, turnReason);
         }
         
+        // Sync client flags with server state
+        if (this.client1 && serverState.yourState) {
+            console.log('DEBUG: Syncing client state with server state:', {
+                serverEnergyFlag: serverState.yourState.energyAttachedThisTurn,
+                clientEnergyFlag: this.client1.attachedEnergyThisTurn,
+                turn: serverState.turn,
+                isYourTurn: serverState.isYourTurn
+            });
+            this.client1.attachedEnergyThisTurn = serverState.yourState.energyAttachedThisTurn || false;
+            this.client1.hasPlayedSupporterThisTurn = serverState.yourState.supporterPlayedThisTurn || false;
+            this.client1.hasPlayedStadiumThisTurn = serverState.yourState.stadiumPlayedThisTurn || false;
+            
+            // Additional safety check: if it's my turn and server says no energy attached, force reset
+            if (serverState.isYourTurn && !serverState.yourState.energyAttachedThisTurn) {
+                console.log('DEBUG: My turn + server says no energy attached - forcing client flag to false');
+                this.client1.attachedEnergyThisTurn = false;
+            }
+        }
+        
         // Update GUI display
         this.updateGUIState();
     }
     
     // Update the entire GUI to match the current display state
     updateGUIState() {
+        // Clean up any orphaned energy displays before updating
+        if (this.guiHook && this.guiHook.cleanupOrphanedEnergyDisplays) {
+            this.guiHook.cleanupOrphanedEnergyDisplays();
+        }
+        
         this.updatePlayerGUI();
         this.updateOpponentGUI();
         this.updateHandGUI();

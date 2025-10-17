@@ -6,7 +6,6 @@ import Client from "./client.js";
 import Deck from "./deck.js";
 
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
-const { Alakazam, Blastoise, Pikachu } = CardsBase1;
 
 class GUIHookUtils {
     constructor(domElement, webSocketClient = null) {
@@ -18,18 +17,15 @@ class GUIHookUtils {
         this.isMultiplayer = webSocketClient !== null;
         this.playerNumber = null;
         this.game = null; // Reference to the Game instance
-        this.isMyTurn = true; // Track if it's this player's turn
+        this.myTurnFlag = true; // Track if it's this player's turn (renamed to avoid conflict with method)
         this.dragEnabled = true; // Can be disabled during opponent's turn
         
         // Store last move for potential rollback
         this.lastMove = null;
         
         // Card factory mapping
-        this.cardClasses = {
-            'Alakazam': Alakazam,
-            'Blastoise': Blastoise,
-            'Pikachu': Pikachu
-        };
+        this.cardClasses = CardsBase1;
+        console.log('GUIHookUtils initialized with card classes:', Object.keys(this.cardClasses));
     }
 
     // Convert server card data to actual card class instance
@@ -45,7 +41,7 @@ class GUIHookUtils {
         
         const CardClass = this.cardClasses[serverCardData.cardName];
         if (!CardClass) {
-            console.warn(`No card class found for: ${serverCardData.cardName}`);
+            console.warn(`No card class found for: ${serverCardData.cardName}. Available classes:`, Object.keys(this.cardClasses));
             return null;
         }
         
@@ -145,8 +141,15 @@ class GUIHookUtils {
 
     // Enable or disable drag functionality
     setDragEnabled(enabled, reason = '') {
+        const wasMyTurn = this.myTurnFlag;
         this.dragEnabled = enabled;
-        this.isMyTurn = enabled;
+        this.myTurnFlag = enabled;
+        
+        // Force reset energy flag when turn starts
+        if (enabled && !wasMyTurn) {
+            console.log('DEBUG: Turn change detected - calling onTurnStart');
+            this.onTurnStart();
+        }
         
         // Update cursor and tooltip, but don't dim cards
         const playerCards = document.querySelectorAll('.card.player:not(.empty)');
@@ -300,25 +303,41 @@ class GUIHookUtils {
         // Get card data for inspection
         const cardData = this.getCardDataFromElement(cardEl);
         
-        // Only prepare drag for player's own cards
+        // Check if this is the active Pokemon - prioritize inspection over dragging
+        const isActivePokemon = cardEl.id === 'ActivePokemon';
+        
+        // Only prepare drag for player's own cards (but not the active Pokemon unless explicitly dragging)
         if (isPlayerCard) {
-            // Start drag preparation but don't create drag element yet
-            const containerRect = this.container.getBoundingClientRect();
-            const cardRect = cardEl.getBoundingClientRect();
-            const offsetX = e.clientX - cardRect.left;
-            const offsetY = e.clientY - cardRect.top;
+            if (isActivePokemon) {
+                // For active Pokemon, prefer inspection over dragging
+                // Only prepare drag if this is clearly intended to be a drag operation
+                this.inspectionPrepared = {
+                    cardEl,
+                    cardData,
+                    mouseDownInfo: this.mouseDownInfo,
+                    preferInspection: true // Flag to indicate this should prefer inspection
+                };
+                
+                console.log('Inspection preferred for active Pokemon:', cardData?.name || 'Unknown');
+            } else {
+                // For other player cards, normal drag preparation
+                const containerRect = this.container.getBoundingClientRect();
+                const cardRect = cardEl.getBoundingClientRect();
+                const offsetX = e.clientX - cardRect.left;
+                const offsetY = e.clientY - cardRect.top;
 
-            this.dragPrepared = { 
-                cardEl, 
-                containerRect, 
-                cardRect, 
-                offsetX, 
-                offsetY,
-                cardData,
-                mouseDownInfo: this.mouseDownInfo
-            };
-            
-            console.log('Drag prepared for player card:', cardData?.name || 'Unknown');
+                this.dragPrepared = { 
+                    cardEl, 
+                    containerRect, 
+                    cardRect, 
+                    offsetX, 
+                    offsetY,
+                    cardData,
+                    mouseDownInfo: this.mouseDownInfo
+                };
+                
+                console.log('Drag prepared for player card:', cardData?.name || 'Unknown');
+            }
         } else {
             // For opponent cards, only store for inspection (no drag preparation)
             this.inspectionPrepared = {
@@ -333,7 +352,57 @@ class GUIHookUtils {
 
     // Handle mouse move events for drag movement
     onMouseMove(e) {
-        // Only process drag movement for player cards
+        // Handle inspection-preferred cards (like active Pokemon)
+        if (this.inspectionPrepared && this.inspectionPrepared.preferInspection && !this.dragging) {
+            const { mouseDownInfo } = this.inspectionPrepared;
+            const moveDistance = Math.sqrt(
+                Math.pow(e.clientX - mouseDownInfo.startX, 2) + 
+                Math.pow(e.clientY - mouseDownInfo.startY, 2)
+            );
+            
+            // For active Pokemon, require much more movement (15 pixels) to start drag
+            // This prioritizes the inspection modal over accidental dragging
+            if (moveDistance > 15 && mouseDownInfo.isPlayerCard) {
+                console.log('Converting active Pokemon inspection to drag due to significant movement');
+                
+                // Convert inspection preparation to drag preparation
+                const cardEl = this.inspectionPrepared.cardEl;
+                const containerRect = this.container.getBoundingClientRect();
+                const cardRect = cardEl.getBoundingClientRect();
+                const offsetX = e.clientX - cardRect.left;
+                const offsetY = e.clientY - cardRect.top;
+
+                this.dragPrepared = { 
+                    cardEl, 
+                    containerRect, 
+                    cardRect, 
+                    offsetX, 
+                    offsetY,
+                    cardData: this.inspectionPrepared.cardData,
+                    mouseDownInfo: this.inspectionPrepared.mouseDownInfo
+                };
+                
+                this.inspectionPrepared = null;
+                
+                // Check if drag is allowed
+                if (!this.canStartDrag(cardEl)) {
+                    this.showTurnErrorFeedback(cardEl);
+                    this.dragPrepared = null;
+                    return;
+                }
+                
+                // Start the actual drag
+                const dragEl = this.makeDragEl(cardEl, cardRect, containerRect);
+                this.container.appendChild(dragEl);
+                this.dragging = { cardEl, dragEl, offsetX, offsetY };
+                this.dragging.cardEl.style.backgroundImage = '';
+                this.dragging.cardEl.classList.add('empty');
+                this.dragPrepared = null;
+            }
+            return;
+        }
+        
+        // Only process drag movement for player cards (normal threshold)
         if (this.dragPrepared && !this.dragging) {
             const { mouseDownInfo } = this.dragPrepared;
             const moveDistance = Math.sqrt(
@@ -450,13 +519,10 @@ class GUIHookUtils {
             return;
         }
 
-        // Handle click detection for opponent cards (inspection only)
+        // Handle click detection for inspection-preferred cards (active Pokemon) or opponent cards
         if (this.inspectionPrepared && !this.dragging) {
-            // Only allow inspection modal for opponent's cards
-            if (this.inspectionPrepared.cardEl.classList.contains('opp')) {
-                console.log('Detected click on opponent card:', this.inspectionPrepared.cardData?.name);
-                this.showCardInspectionModal(this.inspectionPrepared.cardEl, this.inspectionPrepared.cardData);
-            }
+            console.log('Detected click for inspection:', this.inspectionPrepared.cardData?.name);
+            this.showCardInspectionModal(this.inspectionPrepared.cardEl, this.inspectionPrepared.cardData);
             this.dragPrepared = null;
             this.inspectionPrepared = null;
             return;
@@ -493,12 +559,31 @@ class GUIHookUtils {
             
             // Check if this is energy attachment
             if (this.currentDropTarget.dropType === 'attach') {
-                // Energy attachment - don't change the visual of the target Pokemon
-                // The energy will be shown as attached energy icons/counters
-                this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+                // Energy attachment - validate first before making any changes
+                const energyCardData = this.getCardDataFromElement(this.dragging.cardEl);
+                const targetCardData = this.getCardDataFromElement(this.currentDropTarget);
                 
-                // Visual feedback for energy attachment
-                this.showEnergyAttachmentFeedback(this.currentDropTarget);
+                if (this.canAttachEnergy(energyCardData, targetCardData, this.currentDropTarget)) {
+                    // Valid energy attachment - proceed with local update
+                    console.log('DEBUG: Energy attachment validation passed, proceeding with attachment');
+                    this.handleLocalEnergyAttachment(this.dragging.cardEl, this.currentDropTarget);
+                    
+                    // Then update game state
+                    this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+                    
+                    // Visual feedback for energy attachment
+                    this.showEnergyAttachmentFeedback(this.currentDropTarget);
+                } else {
+                    // Invalid energy attachment - rollback
+                    console.log('Energy attachment not allowed - rolling back');
+                    this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                    this.dragging.cardEl.classList.remove('empty');
+                    
+                    // Show error message
+                    if (window.showGameMessage) {
+                        window.showGameMessage('Cannot attach energy: Already attached energy this turn or invalid target', 3000);
+                    }
+                }
             } else {
                 // Regular card placement
                 this.currentDropTarget.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
@@ -787,6 +872,252 @@ class GUIHookUtils {
                 this.player1.activePokemon = null;
                 break;
         }
+    }
+
+    // Handle local energy attachment (client-side card data update)
+    handleLocalEnergyAttachment(energyCardEl, targetPokemonEl) {
+        // Get the energy card data
+        const energyCardData = this.getCardDataFromElement(energyCardEl);
+        if (!energyCardData) {
+            console.warn('No energy card data found for attachment');
+            return;
+        }
+
+        // Get the target Pokemon's card data
+        let targetCardData = this.getCardDataFromElement(targetPokemonEl);
+        if (!targetCardData) {
+            console.warn('No target Pokemon card data found for energy attachment');
+            return;
+        }
+
+        // Ensure the target has an attachedEnergy array
+        if (!targetCardData.attachedEnergy) {
+            targetCardData.attachedEnergy = [];
+        }
+
+        // Create energy data object
+        const energyData = {
+            energyType: energyCardData.energyType || energyCardData.type || 'colorless',
+            cardName: energyCardData.name || energyCardData.cardName || `${(energyCardData.energyType || energyCardData.type || 'Colorless')} Energy`,
+            type: energyCardData.type || 'energy',
+            description: energyCardData.description || `Provides ${energyCardData.energyType || energyCardData.type || 'colorless'} energy`
+        };
+
+        // Add the energy to the target Pokemon's attached energy
+        targetCardData.attachedEnergy.push(energyData);
+
+        // Update the DOM element's card data
+        if (targetPokemonEl.cardData) {
+            targetPokemonEl.cardData = targetCardData;
+        }
+
+        // Also update the card instance if available
+        if (targetPokemonEl.cardInstance && targetPokemonEl.cardInstance.attachedEnergy) {
+            if (!targetPokemonEl.cardInstance.attachedEnergy) {
+                targetPokemonEl.cardInstance.attachedEnergy = [];
+            }
+            targetPokemonEl.cardInstance.attachedEnergy.push(energyData);
+        }
+
+        console.log(`Attached ${energyData.cardName} to ${targetCardData.name || targetCardData.cardName}`, {
+            totalAttached: targetCardData.attachedEnergy.length,
+            attachedEnergy: targetCardData.attachedEnergy
+        });
+
+        // Mark that energy has been attached this turn
+        if (this.player1) {
+            this.player1.attachedEnergyThisTurn = true;
+        }
+
+        // Update the visual energy display
+        this.updateAttachedEnergyDisplay(targetPokemonEl, targetCardData);
+    }
+
+    // Validate if energy attachment is allowed
+    canAttachEnergy(energyCardData, targetCardData, targetPokemonEl) {
+        const playerAttachedEnergyThisTurn = this.player1 ? this.player1.attachedEnergyThisTurn : false;
+        console.log('DEBUG: Starting energy attachment validation', {
+            attachedEnergyThisTurn: playerAttachedEnergyThisTurn,
+            isMyTurn: this.isMyTurn(),
+            energyCardType: energyCardData?.type,
+            targetCardType: targetCardData?.type
+        });
+
+        // Basic validation checks
+        if (!energyCardData || !targetCardData) {
+            console.log('Energy attachment failed: Missing card data');
+            return false;
+        }
+
+        // Check if the energy card is actually an energy card
+        if (energyCardData.type !== 'energy') {
+            console.log('Energy attachment failed: Source card is not an energy card');
+            return false;
+        }
+
+        // Check if the target is a Pokemon
+        if (targetCardData.type !== 'pokemon' && !targetCardData.hp) {
+            console.log('Energy attachment failed: Target is not a Pokemon');
+            return false;
+        }
+
+        // Check if it's the player's turn and they haven't already attached energy this turn
+        if (!this.isMyTurn()) {
+            console.log('Energy attachment failed: Not player\'s turn');
+            return false;
+        }
+
+        // Check if player has already attached energy this turn (basic rule)
+        const playerAttachedEnergyFlag = this.player1 ? this.player1.attachedEnergyThisTurn : false;
+        console.log('DEBUG: Checking energy attachment flag:', playerAttachedEnergyFlag, {
+            player1Exists: !!this.player1,
+            player1Username: this.player1?.username,
+            flagValue: this.player1?.attachedEnergyThisTurn
+        });
+        if (playerAttachedEnergyFlag) {
+            console.log('Energy attachment failed: Already attached energy this turn');
+            return false;
+        }
+
+        // Check if the target Pokemon is on the player's side
+        if (!targetPokemonEl.classList.contains('player')) {
+            console.log('Energy attachment failed: Target Pokemon is not a player card (missing .player class)');
+            console.log('DEBUG: Target element classes:', targetPokemonEl.className);
+            return false;
+        }
+
+        // All validation checks passed
+        console.log('Energy attachment validation passed');
+        return true;
+    }
+
+    // Reset energy attachment flag (for testing or turn management)
+    resetEnergyAttachmentFlag() {
+        const currentFlag = this.player1 ? this.player1.attachedEnergyThisTurn : false;
+        console.log('DEBUG: Manually resetting energy attachment flag from:', currentFlag);
+        if (this.player1) {
+            this.player1.attachedEnergyThisTurn = false;
+        }
+        console.log('Energy attachment flag manually reset to:', this.player1 ? this.player1.attachedEnergyThisTurn : false);
+    }
+
+    // Force reset energy flag when turn changes
+    onTurnStart() {
+        console.log('DEBUG: onTurnStart called - forcing energy flag reset');
+        if (this.player1) {
+            this.player1.attachedEnergyThisTurn = false;
+            console.log('DEBUG: Energy flag forcibly reset on turn start to:', this.player1.attachedEnergyThisTurn);
+        }
+    }
+
+    // Debug method to check current flag status
+    checkEnergyAttachmentStatus() {
+        const playerFlag = this.player1 ? this.player1.attachedEnergyThisTurn : false;
+        console.log('Energy attachment status:', {
+            attachedEnergyThisTurn: playerFlag,
+            isMyTurn: this.isMyTurn(),
+            dragEnabled: this.dragEnabled,
+            myTurnFlag: this.myTurnFlag
+        });
+        return playerFlag;
+    }
+
+    // Update the visual display of attached energy for a Pokemon
+    updateAttachedEnergyDisplay(pokemonEl, cardData) {
+        // Get the Pokemon's card data to check attached energy
+        if (!cardData || !cardData.attachedEnergy || cardData.attachedEnergy.length === 0) {
+            // Remove any existing energy display (both class names)
+            const existingDisplay1 = pokemonEl.querySelector('.attached-energy-display');
+            if (existingDisplay1) {
+                existingDisplay1.remove();
+            }
+            const existingDisplay2 = pokemonEl.querySelector('.energy-display');
+            if (existingDisplay2) {
+                existingDisplay2.remove();
+            }
+            return;
+        }
+
+        // Remove existing energy display if present (both class names)
+        const existingDisplay1 = pokemonEl.querySelector('.attached-energy-display');
+        if (existingDisplay1) {
+            existingDisplay1.remove();
+        }
+        const existingDisplay2 = pokemonEl.querySelector('.energy-display');
+        if (existingDisplay2) {
+            existingDisplay2.remove();
+        }
+
+        // Create energy display container
+        const energyDisplay = document.createElement('div');
+        energyDisplay.className = 'attached-energy-display';
+        energyDisplay.style.cssText = `
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            display: flex;
+            gap: 2px;
+            z-index: 10;
+            pointer-events: none;
+        `;
+
+        // Create energy count by type
+        const energyCount = {};
+        cardData.attachedEnergy.forEach(energy => {
+            const type = energy.energyType || energy.type || 'colorless';
+            energyCount[type] = (energyCount[type] || 0) + 1;
+        });
+
+        // Create visual indicators for each energy type
+        Object.entries(energyCount).forEach(([type, count]) => {
+            const energyIcon = this.createEnergyIcon(type, 16);
+            energyIcon.style.cssText += `
+                border: 1px solid rgba(255, 255, 255, 0.8);
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.9);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            `;
+
+            // Add count badge if more than 1
+            if (count > 1) {
+                const countBadge = document.createElement('div');
+                countBadge.textContent = count;
+                countBadge.style.cssText = `
+                    position: absolute;
+                    top: -4px;
+                    right: -4px;
+                    background: #dc3545;
+                    color: white;
+                    border-radius: 50%;
+                    width: 14px;
+                    height: 14px;
+                    font-size: 10px;
+                    font-weight: bold;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid white;
+                `;
+
+                const iconContainer = document.createElement('div');
+                iconContainer.style.cssText = 'position: relative; display: inline-block;';
+                iconContainer.appendChild(energyIcon);
+                iconContainer.appendChild(countBadge);
+                energyDisplay.appendChild(iconContainer);
+            } else {
+                energyDisplay.appendChild(energyIcon);
+            }
+        });
+
+        // Add tooltip with energy details
+        const tooltipText = cardData.attachedEnergy.map(energy => 
+            energy.cardName || `${(energy.energyType || energy.type || 'Colorless')} Energy`
+        ).join(', ');
+        
+        energyDisplay.title = `Attached Energy: ${tooltipText} (Total: ${cardData.attachedEnergy.length})`;
+
+        // Append to Pokemon card
+        pokemonEl.appendChild(energyDisplay);
     }
 
     damageCardElement(cardElement, amount) {
@@ -1213,7 +1544,12 @@ class GUIHookUtils {
         // First priority: Check for direct card class instance pointer
         if (cardEl.cardInstance) {
             console.log('DEBUG: Found direct card class instance:', cardEl.cardInstance);
-            return this.extractDataFromCardInstance(cardEl.cardInstance);
+            const data = this.extractDataFromCardInstance(cardEl.cardInstance);
+            // Preserve attached energy from card instance if available
+            if (cardEl.cardInstance.attachedEnergy) {
+                data.attachedEnergy = cardEl.cardInstance.attachedEnergy;
+            }
+            return data;
         }
         
         // Second priority: Try to get card data from the cardData property and convert it
@@ -1221,15 +1557,31 @@ class GUIHookUtils {
             const card = cardEl.cardData || cardEl._cardData;
             console.log('DEBUG: Found card data, attempting conversion:', card);
             
+            // Preserve attached energy if it exists in the card data
+            const attachedEnergy = card.attachedEnergy;
+            
             // Check if it's already a card class instance
             if (card.constructor.name !== 'Object' && card.attacks && card.abilities) {
                 // It's already a card class instance, extract data directly
-                return this.extractDataFromCardInstance(card);
+                const data = this.extractDataFromCardInstance(card);
+                // Restore attached energy
+                if (attachedEnergy) {
+                    data.attachedEnergy = attachedEnergy;
+                }
+                return data;
             } else {
                 // It's server card data, convert to card instance first
                 const cardInstance = this.createCardInstance(card);
                 if (cardInstance) {
-                    return this.extractDataFromCardInstance(cardInstance);
+                    const data = this.extractDataFromCardInstance(cardInstance);
+                    // Restore attached energy
+                    if (attachedEnergy) {
+                        data.attachedEnergy = attachedEnergy;
+                    }
+                    return data;
+                } else {
+                    // Fallback: return the card data as-is with attached energy preserved
+                    return card;
                 }
             }
         }
@@ -1616,6 +1968,7 @@ class GUIHookUtils {
         }
         
         console.log('NEW ENHANCED MODAL - Card data:', cardData);
+        console.log('DEBUG: Attached energy in modal:', cardData.attachedEnergy);
         
         // Create modal overlay
         const modalOverlay = document.createElement('div');
@@ -2109,6 +2462,180 @@ class GUIHookUtils {
             infoSection.appendChild(statusSection);
         }
 
+        // Attached Cards section (for Pokemon with attached energy/cards)
+        if (cardData.attachedEnergy && cardData.attachedEnergy.length > 0) {
+            const attachedSection = document.createElement('div');
+            attachedSection.innerHTML = '<h3 style="color: #555; margin: 15px 0 10px 0;">Attached Cards:</h3>';
+            
+            const attachedContainer = document.createElement('div');
+            attachedContainer.style.cssText = `
+                padding: 12px;
+                background: #f0f8ff;
+                border-radius: 8px;
+                border: 1px solid #b3d9ff;
+                max-height: 200px;
+                overflow-y: auto;
+            `;
+            
+            cardData.attachedEnergy.forEach((energy, index) => {
+                const attachedCardDiv = document.createElement('div');
+                attachedCardDiv.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 8px;
+                    margin: 4px 0;
+                    background: white;
+                    border-radius: 6px;
+                    border: 1px solid #d6ebff;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                `;
+                
+                // Add hover effect
+                attachedCardDiv.addEventListener('mouseenter', () => {
+                    attachedCardDiv.style.background = '#e6f3ff';
+                    attachedCardDiv.style.transform = 'translateX(5px)';
+                });
+                
+                attachedCardDiv.addEventListener('mouseleave', () => {
+                    attachedCardDiv.style.background = 'white';
+                    attachedCardDiv.style.transform = 'translateX(0)';
+                });
+                
+                // Energy type icon
+                const energyIcon = this.createEnergyIcon(energy.energyType || energy.type || 'colorless', 24);
+                energyIcon.style.cssText += 'flex-shrink: 0;';
+                attachedCardDiv.appendChild(energyIcon);
+                
+                // Card info
+                const cardInfo = document.createElement('div');
+                cardInfo.style.cssText = 'flex: 1;';
+                
+                const cardName = document.createElement('div');
+                cardName.textContent = energy.cardName || energy.name || `${(energy.energyType || energy.type || 'Colorless').charAt(0).toUpperCase() + (energy.energyType || energy.type || 'colorless').slice(1)} Energy`;
+                cardName.style.cssText = `
+                    font-weight: bold;
+                    color: #333;
+                    font-size: 14px;
+                `;
+                cardInfo.appendChild(cardName);
+                
+                // Additional energy info if available
+                if (energy.description) {
+                    const cardDesc = document.createElement('div');
+                    cardDesc.textContent = energy.description;
+                    cardDesc.style.cssText = `
+                        color: #666;
+                        font-size: 12px;
+                        margin-top: 2px;
+                    `;
+                    cardInfo.appendChild(cardDesc);
+                }
+                
+                attachedCardDiv.appendChild(cardInfo);
+                
+                // Card number indicator
+                const cardNumber = document.createElement('div');
+                cardNumber.textContent = `#${index + 1}`;
+                cardNumber.style.cssText = `
+                    background: #007bff;
+                    color: white;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    font-size: 10px;
+                    font-weight: bold;
+                    flex-shrink: 0;
+                `;
+                attachedCardDiv.appendChild(cardNumber);
+                
+                // Click handler to show attached card details
+                attachedCardDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showAttachedCardDetails(energy, modalOverlay);
+                });
+                
+                attachedContainer.appendChild(attachedCardDiv);
+            });
+            
+            // Summary info
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.cssText = `
+                margin-top: 10px;
+                padding: 8px;
+                background: #e6f3ff;
+                border-radius: 6px;
+                text-align: center;
+                font-size: 12px;
+                color: #0066cc;
+                font-weight: bold;
+            `;
+            summaryDiv.textContent = `Total Attached: ${cardData.attachedEnergy.length} card${cardData.attachedEnergy.length !== 1 ? 's' : ''}`;
+            attachedContainer.appendChild(summaryDiv);
+            
+            attachedSection.appendChild(attachedContainer);
+            infoSection.appendChild(attachedSection);
+        } else if (cardData.hp) {
+            // Show a demo/placeholder section for Pokemon cards with no attached energy
+            const attachedSection = document.createElement('div');
+            attachedSection.innerHTML = '<h3 style="color: #555; margin: 15px 0 10px 0;">Attached Cards:</h3>';
+            
+            const placeholderContainer = document.createElement('div');
+            placeholderContainer.style.cssText = `
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border: 1px solid #dee2e6;
+                text-align: center;
+            `;
+            
+            const placeholderText = document.createElement('div');
+            placeholderText.innerHTML = `
+                <div style="color: #666; font-size: 14px; margin-bottom: 8px;">No cards attached</div>
+                <div style="color: #999; font-size: 12px;">Drag energy cards to this Pokémon to attach them</div>
+            `;
+            placeholderContainer.appendChild(placeholderText);
+            
+            // Add a demo button to test the functionality
+            const testButton = document.createElement('button');
+            testButton.textContent = 'Add Test Energy (Demo)';
+            testButton.style.cssText = `
+                margin-top: 10px;
+                padding: 6px 12px;
+                background: #007bff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            
+            testButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Add test energy data and refresh the modal
+                cardData.attachedEnergy = [
+                    {
+                        energyType: 'fire',
+                        cardName: 'Fire Energy',
+                        description: 'Provides Fire energy'
+                    },
+                    {
+                        energyType: 'water',
+                        cardName: 'Water Energy', 
+                        description: 'Provides Water energy'
+                    }
+                ];
+                
+                // Close current modal and reopen with updated data
+                modalOverlay.remove();
+                this.showCardInspectionModal(cardEl, cardData);
+            });
+            
+            placeholderContainer.appendChild(testButton);
+            attachedSection.appendChild(placeholderContainer);
+            infoSection.appendChild(attachedSection);
+        }
+
         // Evolution section
         if (cardData.evolvesFrom || cardData.canEvolve !== undefined) {
             const evolutionSection = document.createElement('div');
@@ -2140,8 +2667,8 @@ class GUIHookUtils {
             infoSection.appendChild(evolutionSection);
         }
 
-        // Current Health section (if different from max HP)
-        if (cardData.health !== undefined && cardData.hp && cardData.health !== cardData.hp) {
+        // Current Health section (if Pokemon has taken damage)
+        if (cardData.hp !== undefined && cardData.health !== undefined && cardData.hp < cardData.health) {
             const healthSection = document.createElement('div');
             healthSection.innerHTML = '<h3 style="color: #555; margin: 15px 0 10px 0;">Current Status:</h3>';
             
@@ -2154,8 +2681,8 @@ class GUIHookUtils {
             `;
             
             const healthEl = document.createElement('div');
-            const damageAmount = cardData.hp - cardData.health;
-            healthEl.innerHTML = `<strong>Damage:</strong> ${damageAmount} damage (${cardData.health}/${cardData.hp} HP remaining)`;
+            const damageAmount = cardData.health - cardData.hp;
+            healthEl.innerHTML = `<strong>Damage:</strong> ${damageAmount} damage (${cardData.hp}/${cardData.health} HP remaining)`;
             healthEl.style.cssText = 'color: #721c24; font-size: 14px;';
             healthContainer.appendChild(healthEl);
             
@@ -2246,15 +2773,32 @@ class GUIHookUtils {
             energyCount[type] = (energyCount[type] || 0) + 1;
         });
 
-        // Check if requirements are met
+        // Count required energy by type
         const requiredEnergy = {};
         attack.energyCost.forEach(type => {
             requiredEnergy[type] = (requiredEnergy[type] || 0) + 1;
         });
 
+        // Create a copy of energyCount to track what's been used
+        const availableEnergy = { ...energyCount };
+
+        // First, satisfy all non-colorless energy requirements
         for (const [type, required] of Object.entries(requiredEnergy)) {
-            if ((energyCount[type] || 0) < required) {
-                return false;
+            if (type !== 'colorless') {
+                if ((availableEnergy[type] || 0) < required) {
+                    return false; // Not enough specific energy type
+                }
+                // Use up the specific energy type
+                availableEnergy[type] -= required;
+            }
+        }
+
+        // Now handle colorless energy requirements - can use any remaining energy
+        const colorlessRequired = requiredEnergy['colorless'] || 0;
+        if (colorlessRequired > 0) {
+            const totalRemainingEnergy = Object.values(availableEnergy).reduce((sum, count) => sum + count, 0);
+            if (totalRemainingEnergy < colorlessRequired) {
+                return false; // Not enough energy for colorless cost
             }
         }
 
@@ -2279,9 +2823,14 @@ class GUIHookUtils {
 
     // Check if it's currently the player's turn
     isMyTurn() {
-        // Check if we have access to turn information
+        // Check if we have access to turn information from window
         if (window.isMyTurn !== undefined) {
             return window.isMyTurn;
+        }
+        
+        // Check our internal flag
+        if (this.myTurnFlag !== undefined) {
+            return this.myTurnFlag;
         }
         
         // Fallback: check if action buttons are visible (indicating it's player's turn)
@@ -2295,18 +2844,60 @@ class GUIHookUtils {
         modalOverlay.remove();
         
         // Use the attack via WebSocket if available
-        if (window.wsClient && window.wsClient.send) {
+        if (this.webSocketClient && this.webSocketClient.send) {
             console.log(`Using attack from modal: ${attackName}`);
-            window.wsClient.send('use_attack', { attackName: attackName });
             
-            // Show feedback message
-            if (window.showGameMessage) {
-                window.showGameMessage(`Using ${attackName}...`, 2000);
+            // Check connection status
+            if (!this.webSocketClient.connected) {
+                console.error('WebSocket client not connected');
+                if (window.showGameMessage) {
+                    window.showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
+                }
+                return;
+            }
+            
+            // Check if in a game
+            if (!this.webSocketClient.gameId) {
+                console.error('Not in a game');
+                if (window.showGameMessage) {
+                    window.showGameMessage('❌ Not in a game! Please join a game first.', 3000);
+                }
+                return;
+            }
+            
+            // Check if it's the player's turn
+            const currentTurnState = this.isMyTurn();
+            console.log('DEBUG: Attack attempt turn check:', {
+                isMyTurn: currentTurnState,
+                windowIsMyTurn: window.isMyTurn,
+                myTurnFlag: this.myTurnFlag,
+                actionButtonsVisible: document.querySelectorAll('.action-btn').length > 0
+            });
+            
+            if (!currentTurnState) {
+                console.error('Not player\'s turn');
+                if (window.showGameMessage) {
+                    window.showGameMessage('❌ Not your turn!', 2000);
+                }
+                return;
+            }
+            
+            const success = this.webSocketClient.send('use_attack', { attackName: attackName });
+            
+            if (success) {
+                // Show feedback message
+                if (window.showGameMessage) {
+                    window.showGameMessage(`⚔️ Using ${attackName}...`, 2000);
+                }
+            } else {
+                if (window.showGameMessage) {
+                    window.showGameMessage('❌ Failed to send attack command!', 3000);
+                }
             }
         } else {
             console.error('WebSocket client not available for attack');
             if (window.showGameMessage) {
-                window.showGameMessage('Cannot use attack - not connected to game', 3000);
+                window.showGameMessage('❌ Cannot use attack - not connected to game', 3000);
             }
         }
     }
@@ -2331,6 +2922,257 @@ class GUIHookUtils {
                 window.showGameMessage('Cannot use ability - not connected to game', 3000);
             }
         }
+    }
+
+    // Show detailed information about an attached card
+    showAttachedCardDetails(attachedCardData, parentModal) {
+        // Create a smaller overlay modal for the attached card
+        const detailOverlay = document.createElement('div');
+        detailOverlay.className = 'attached-card-detail-overlay';
+        detailOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+            backdrop-filter: blur(3px);
+        `;
+
+        const detailContent = document.createElement('div');
+        detailContent.className = 'attached-card-detail-content';
+        detailContent.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 400px;
+            max-height: 80vh;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow-y: auto;
+        `;
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        `;
+        
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background = '#f0f0f0';
+            closeBtn.style.color = '#333';
+        });
+        
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background = 'none';
+            closeBtn.style.color = '#666';
+        });
+        
+        closeBtn.addEventListener('click', () => {
+            detailOverlay.remove();
+        });
+        
+        detailContent.appendChild(closeBtn);
+
+        // Card header
+        const cardHeader = document.createElement('div');
+        cardHeader.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ddd;
+        `;
+
+        // Energy icon
+        const energyIcon = this.createEnergyIcon(attachedCardData.energyType || attachedCardData.type || 'colorless', 32);
+        cardHeader.appendChild(energyIcon);
+
+        // Card name
+        const cardName = document.createElement('h3');
+        cardName.textContent = attachedCardData.cardName || attachedCardData.name || 
+            `${(attachedCardData.energyType || attachedCardData.type || 'Colorless').charAt(0).toUpperCase() + 
+             (attachedCardData.energyType || attachedCardData.type || 'colorless').slice(1)} Energy`;
+        cardName.style.cssText = `
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+            flex: 1;
+        `;
+        cardHeader.appendChild(cardName);
+
+        detailContent.appendChild(cardHeader);
+
+        // Card type
+        const cardType = document.createElement('div');
+        cardType.style.cssText = `
+            margin-bottom: 15px;
+        `;
+        
+        const typeLabel = document.createElement('strong');
+        typeLabel.textContent = 'Type: ';
+        typeLabel.style.color = '#555';
+        cardType.appendChild(typeLabel);
+        
+        const typeValue = document.createElement('span');
+        typeValue.textContent = `${(attachedCardData.energyType || attachedCardData.type || 'Colorless')} Energy`;
+        typeValue.style.cssText = `
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        `;
+        cardType.appendChild(typeValue);
+        
+        detailContent.appendChild(cardType);
+
+        // Description (if available)
+        if (attachedCardData.description) {
+            const descSection = document.createElement('div');
+            descSection.style.cssText = `
+                margin-bottom: 15px;
+            `;
+            
+            const descLabel = document.createElement('h4');
+            descLabel.textContent = 'Description:';
+            descLabel.style.cssText = `
+                margin: 0 0 8px 0;
+                color: #555;
+                font-size: 14px;
+            `;
+            descSection.appendChild(descLabel);
+            
+            const descText = document.createElement('div');
+            descText.textContent = attachedCardData.description;
+            descText.style.cssText = `
+                padding: 10px;
+                background: #f8f9fa;
+                border-radius: 6px;
+                border: 1px solid #dee2e6;
+                color: #333;
+                font-size: 13px;
+                line-height: 1.4;
+            `;
+            descSection.appendChild(descText);
+            
+            detailContent.appendChild(descSection);
+        }
+
+        // Energy value/effect
+        const energyInfo = document.createElement('div');
+        energyInfo.style.cssText = `
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #fff3cd;
+            border-radius: 6px;
+            border: 1px solid #ffeaa7;
+        `;
+        
+        const energyLabel = document.createElement('h4');
+        energyLabel.textContent = 'Energy Provided:';
+        energyLabel.style.cssText = `
+            margin: 0 0 8px 0;
+            color: #856404;
+            font-size: 14px;
+        `;
+        energyInfo.appendChild(energyLabel);
+        
+        const energyValue = document.createElement('div');
+        energyValue.innerHTML = `Provides 1 ${(attachedCardData.energyType || attachedCardData.type || 'Colorless')} energy for attacks and abilities`;
+        energyValue.style.cssText = `
+            color: #856404;
+            font-size: 13px;
+            font-weight: 500;
+        `;
+        energyInfo.appendChild(energyValue);
+        
+        detailContent.appendChild(energyInfo);
+
+        // Additional properties (if any)
+        if (attachedCardData.special || attachedCardData.properties) {
+            const propsSection = document.createElement('div');
+            propsSection.style.cssText = `
+                margin-bottom: 15px;
+            `;
+            
+            const propsLabel = document.createElement('h4');
+            propsLabel.textContent = 'Special Properties:';
+            propsLabel.style.cssText = `
+                margin: 0 0 8px 0;
+                color: #555;
+                font-size: 14px;
+            `;
+            propsSection.appendChild(propsLabel);
+            
+            const propsList = document.createElement('ul');
+            propsList.style.cssText = `
+                margin: 0;
+                padding-left: 20px;
+                color: #333;
+                font-size: 13px;
+            `;
+            
+            if (attachedCardData.special) {
+                const li = document.createElement('li');
+                li.textContent = attachedCardData.special;
+                propsList.appendChild(li);
+            }
+            
+            if (attachedCardData.properties) {
+                attachedCardData.properties.forEach(prop => {
+                    const li = document.createElement('li');
+                    li.textContent = prop;
+                    propsList.appendChild(li);
+                });
+            }
+            
+            propsSection.appendChild(propsList);
+            detailContent.appendChild(propsSection);
+        }
+
+        detailOverlay.appendChild(detailContent);
+
+        // Close on overlay click
+        detailOverlay.addEventListener('click', (e) => {
+            if (e.target === detailOverlay) {
+                detailOverlay.remove();
+            }
+        });
+
+        // Close on Escape key
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                detailOverlay.remove();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
+
+        // Add to page
+        document.body.appendChild(detailOverlay);
     }
 
     // Close the inspection modal
@@ -2522,21 +3364,48 @@ class GUIHookUtils {
         this.updatePokemonEnergyDisplay(pokemonEl);
     }
 
+    // Clean up any orphaned energy displays that might be causing visual/collision issues
+    cleanupOrphanedEnergyDisplays() {
+        // Find all energy displays on the board
+        const allEnergyDisplays = document.querySelectorAll('.attached-energy-display, .energy-display');
+        
+        allEnergyDisplays.forEach(display => {
+            const parentCard = display.closest('.card');
+            if (!parentCard) {
+                // Orphaned display not attached to a card - remove it
+                console.log('Removing orphaned energy display:', display);
+                display.remove();
+            } else {
+                // Check if the parent card actually has attached energy data
+                const cardData = this.getCardDataFromElement ? this.getCardDataFromElement(parentCard) : (parentCard.cardData || parentCard._cardData);
+                if (!cardData || !cardData.attachedEnergy || cardData.attachedEnergy.length === 0) {
+                    // Card has no attached energy but still has display - remove it
+                    console.log('Removing invalid energy display from card without attached energy:', display);
+                    display.remove();
+                }
+            }
+        });
+    }
+
     // Update the visual display of attached energy for a Pokemon
     updatePokemonEnergyDisplay(pokemonEl) {
         // Get the Pokemon's card data to check attached energy
         const cardData = this.getCardDataFromElement(pokemonEl);
         
-        // Remove existing energy display
-        const existingEnergyDisplay = pokemonEl.querySelector('.energy-display');
-        if (existingEnergyDisplay) {
-            existingEnergyDisplay.remove();
+        // Remove existing energy display (both class names)
+        const existingEnergyDisplay1 = pokemonEl.querySelector('.energy-display');
+        if (existingEnergyDisplay1) {
+            existingEnergyDisplay1.remove();
+        }
+        const existingEnergyDisplay2 = pokemonEl.querySelector('.attached-energy-display');
+        if (existingEnergyDisplay2) {
+            existingEnergyDisplay2.remove();
         }
         
         // Create new energy display if there's attached energy
         if (cardData && cardData.attachedEnergy && cardData.attachedEnergy.length > 0) {
             const energyDisplay = document.createElement('div');
-            energyDisplay.className = 'energy-display';
+            energyDisplay.className = 'attached-energy-display';
             energyDisplay.style.cssText = `
                 position: absolute;
                 bottom: 4px;
@@ -2724,9 +3593,29 @@ class GUIHookUtils {
         // Restore target element 
         if (targetEl) {
             if (moveType === 'attach') {
-                // For energy attachment, no special target restoration needed
-                // Note: We don't need to remove energy icons since they're added by server state updates
-                // If the server rejects the move, it won't update the pokemon's energy, so icons won't appear
+                // For energy attachment rollback, we need to:
+                // 1. Remove the attached energy from local data
+                // 2. Reset the energy attachment flag
+                // 3. Remove visual energy display
+                
+                console.log('Rolling back energy attachment');
+                
+                // Reset energy attachment flag since the server rejected it
+                if (this.player1 && this.player1.attachedEnergyThisTurn) {
+                    console.log('Resetting energy attachment flag due to rollback');
+                    this.player1.attachedEnergyThisTurn = false;
+                }
+                
+                // Remove attached energy from target Pokemon's data
+                if (targetEl.cardData && targetEl.cardData.attachedEnergy) {
+                    // Remove the last attached energy (most recent one)
+                    targetEl.cardData.attachedEnergy.pop();
+                    console.log('Removed last attached energy from card data');
+                }
+                
+                // Update visual display to reflect the rollback
+                this.updateAttachedEnergyDisplay(targetEl, targetEl.cardData || {});
+                
             } else {
                 // For regular moves, restore the target slot state
                 if (targetWasEmpty) {

@@ -112,6 +112,27 @@
         #join-button:hover {
             background: #45a049;
         }
+        
+        /* Deck count display */
+        .deck-count {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        .deck {
+            position: relative;
+        }
     </style>
 </head>
 
@@ -222,6 +243,9 @@
         const wsClient = new WebSocketClient();
         const guiHook = new GUIHookUtils(document.body, wsClient);
         
+        // Make wsClient available globally for attack functions
+        window.wsClient = wsClient;
+        
         // UI Elements
         const usernameModal = document.getElementById('username-modal');
         const usernameInput = document.getElementById('username-input');
@@ -244,6 +268,64 @@
         function updateConnectionStatus(status, message) {
             connectionStatus.className = `status-${status}`;
             connectionStatus.textContent = message;
+        }
+        
+        // Initialize deck count displays
+        function initializeDeckCounts() {
+            const playerDeck = document.querySelector('.deck.player');
+            const opponentDeck = document.querySelector('.deck.opp');
+            
+            if (playerDeck && !playerDeck.querySelector('.deck-count')) {
+                const playerDeckCount = document.createElement('div');
+                playerDeckCount.className = 'deck-count';
+                playerDeckCount.id = 'player-deck-count';
+                playerDeckCount.textContent = '60';
+                playerDeck.appendChild(playerDeckCount);
+            }
+            
+            if (opponentDeck && !opponentDeck.querySelector('.deck-count')) {
+                const opponentDeckCount = document.createElement('div');
+                opponentDeckCount.className = 'deck-count';
+                opponentDeckCount.id = 'opponent-deck-count';
+                opponentDeckCount.textContent = '60';
+                opponentDeck.appendChild(opponentDeckCount);
+            }
+        }
+        
+        // Update deck count displays
+        function updateDeckCounts(gameState) {
+            if (!gameState) return;
+            
+            const playerDeckCount = document.getElementById('player-deck-count');
+            const opponentDeckCount = document.getElementById('opponent-deck-count');
+            
+            if (playerDeckCount && gameState.yourState) {
+                const deckCount = gameState.yourState.deckCount || (gameState.yourState.deck ? gameState.yourState.deck.length : 0);
+                playerDeckCount.textContent = deckCount;
+                
+                // Change color based on deck count
+                if (deckCount === 0) {
+                    playerDeckCount.style.background = 'rgba(244, 67, 54, 0.9)'; // Red for empty
+                } else if (deckCount <= 5) {
+                    playerDeckCount.style.background = 'rgba(255, 152, 0, 0.9)'; // Orange for low
+                } else {
+                    playerDeckCount.style.background = 'rgba(0, 0, 0, 0.8)'; // Default black
+                }
+            }
+            
+            if (opponentDeckCount && gameState.opponentState) {
+                const deckCount = gameState.opponentState.deckCount || (gameState.opponentState.deck ? gameState.opponentState.deck.length : 0);
+                opponentDeckCount.textContent = deckCount;
+                
+                // Change color based on deck count
+                if (deckCount === 0) {
+                    opponentDeckCount.style.background = 'rgba(244, 67, 54, 0.9)'; // Red for empty
+                } else if (deckCount <= 5) {
+                    opponentDeckCount.style.background = 'rgba(255, 152, 0, 0.9)'; // Orange for low
+                } else {
+                    opponentDeckCount.style.background = 'rgba(0, 0, 0, 0.8)'; // Default black
+                }
+            }
         }
         
         // Show game message
@@ -418,16 +500,66 @@
 
         // Use attack function
         function useAttack(attackName) {
-            console.log(`Using attack: ${attackName}`);
-            wsClient.send('use_attack', { attackName: attackName });
-            showGameMessage(`Using ${attackName}...`, 2000);
+            console.log(`Attempting to use attack: ${attackName}`);
+            
+            // Check WebSocket connection
+            if (!wsClient.connected) {
+                showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
+                return;
+            }
+            
+            // Check if game is in progress
+            if (!wsClient.gameId) {
+                showGameMessage('❌ Not in a game! Please join a game first.', 3000);
+                return;
+            }
+            
+            // Check if it's the player's turn
+            if (!isMyTurn) {
+                showGameMessage('❌ Not your turn!', 2000);
+                return;
+            }
+            
+            console.log(`Sending attack: ${attackName}`);
+            const success = wsClient.send('use_attack', { attackName: attackName });
+            
+            if (success) {
+                showGameMessage(`⚔️ Using ${attackName}...`, 2000);
+            } else {
+                showGameMessage('❌ Failed to send attack command!', 3000);
+            }
         }
 
         // Use ability function  
         function useAbility(abilityName) {
-            console.log(`Using ability: ${abilityName}`);
-            wsClient.send('use_ability', { abilityName: abilityName });
-            showGameMessage(`Using ${abilityName}...`, 2000);
+            console.log(`Attempting to use ability: ${abilityName}`);
+            
+            // Check WebSocket connection
+            if (!wsClient.connected) {
+                showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
+                return;
+            }
+            
+            // Check if game is in progress
+            if (!wsClient.gameId) {
+                showGameMessage('❌ Not in a game! Please join a game first.', 3000);
+                return;
+            }
+            
+            // Check if it's the player's turn
+            if (!isMyTurn) {
+                showGameMessage('❌ Not your turn!', 2000);
+                return;
+            }
+            
+            console.log(`Sending ability: ${abilityName}`);
+            const success = wsClient.send('use_ability', { abilityName: abilityName });
+            
+            if (success) {
+                showGameMessage(`✨ Using ${abilityName}...`, 2000);
+            } else {
+                showGameMessage('❌ Failed to send ability command!', 3000);
+            }
         }
 
         // Check if Pokemon has enough energy for an attack
@@ -445,15 +577,32 @@
                 energyCount[type] = (energyCount[type] || 0) + 1;
             });
 
-            // Check if requirements are met
+            // Count required energy by type
             const requiredEnergy = {};
             attack.energyCost.forEach(type => {
                 requiredEnergy[type] = (requiredEnergy[type] || 0) + 1;
             });
 
+            // Create a copy of energyCount to track what's been used
+            const availableEnergy = { ...energyCount };
+
+            // First, satisfy all non-colorless energy requirements
             for (const [type, required] of Object.entries(requiredEnergy)) {
-                if ((energyCount[type] || 0) < required) {
-                    return false;
+                if (type !== 'colorless') {
+                    if ((availableEnergy[type] || 0) < required) {
+                        return false; // Not enough specific energy type
+                    }
+                    // Use up the specific energy type
+                    availableEnergy[type] -= required;
+                }
+            }
+
+            // Now handle colorless energy requirements - can use any remaining energy
+            const colorlessRequired = requiredEnergy['colorless'] || 0;
+            if (colorlessRequired > 0) {
+                const totalRemainingEnergy = Object.values(availableEnergy).reduce((sum, count) => sum + count, 0);
+                if (totalRemainingEnergy < colorlessRequired) {
+                    return false; // Not enough energy for colorless cost
                 }
             }
 
@@ -506,6 +655,9 @@
             showGameMessage('Game started! You can now move your cards.');
             // The game.start() method already initializes drag and drop with game reference
             // and sends initial state for synchronization
+            
+            // Initialize deck count displays when game starts
+            initializeDeckCounts();
         });
         
         // Handle game state updates from server
@@ -521,6 +673,9 @@
                     turn: gameState.turn,
                     isYourTurn: gameState.isYourTurn
                 });
+                
+                // Update deck counts
+                updateDeckCounts(gameState);
                 
                 // Show/hide end turn button
                 const endTurnBtn = document.getElementById('end-turn-btn') || addEndTurnButton();
@@ -542,10 +697,19 @@
             console.log('Turn changed:', data);
             const newIsMyTurn = data.currentPlayer === playerNumber;
             
+            // Update global turn state for guiHookUtils.isMyTurn() method
+            window.isMyTurn = newIsMyTurn;
+            console.log('DEBUG: Set window.isMyTurn to:', window.isMyTurn);
+            
             updateTurnDisplay({
                 turn: data.turn,
                 isYourTurn: newIsMyTurn
             });
+            
+            // Update deck counts if gameState is provided
+            if (data.gameState) {
+                updateDeckCounts(data.gameState);
+            }
             
             // Update drag controls when turn changes
             if (window.currentGame && window.currentGame.guiHook) {
@@ -553,6 +717,12 @@
                     'Your turn - you can move cards' : 
                     'Opponent\'s turn - wait for your turn';
                 window.currentGame.guiHook.setDragEnabled(newIsMyTurn, turnReason);
+                
+                // Force reset energy flag when it becomes my turn
+                if (newIsMyTurn) {
+                    console.log('DEBUG: My turn detected - forcing energy flag reset');
+                    window.currentGame.guiHook.onTurnStart();
+                }
             }
             
             showGameMessage(data.message, 3000);
@@ -568,9 +738,9 @@
             console.error('Move error from server:', data);
             showGameMessage(`Move error: ${data.message}`, 5000);
             
-            // Rollback the visual changes since server rejected the move
-            if (guiHook && guiHook.rollbackLastMove) {
-                guiHook.rollbackLastMove();
+            // Rollback the move on client side
+            if (window.currentGame && window.currentGame.guiHook && window.currentGame.guiHook.rollbackLastMove) {
+                window.currentGame.guiHook.rollbackLastMove();
             }
         });
         
@@ -658,6 +828,9 @@
             try {
                 // Server will send initial game state including decks and hands
                 game.start();
+                
+                // Initialize deck count displays
+                initializeDeckCounts();
 
                 // Add debug helper to window for troubleshooting
                 window.debugEnergy = function() {

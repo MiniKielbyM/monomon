@@ -183,6 +183,14 @@ class GameServer {
     sendGameStateToPlayers(game) {
         console.log('Sending game state update to players');
         
+        // Debug: Log the HP of active Pokemon before sending
+        if (game.gameState?.player1?.activePokemon) {
+            console.log('Player 1 active Pokemon HP:', game.gameState.player1.activePokemon.hp);
+        }
+        if (game.gameState?.player2?.activePokemon) {
+            console.log('Player 2 active Pokemon HP:', game.gameState.player2.activePokemon.hp);
+        }
+        
         // Use ServerGame's method to get safe game state for each player
         const player1State = {
             type: 'game_state_update',
@@ -452,15 +460,25 @@ class GameServer {
 
     // =================== ACTION HANDLERS ===================
 
-    handleAttackAction(ws, data) {
+    async handleAttackAction(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
 
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
 
-        // Use ServerGame's attack method
-        const result = game.serverGame.useAttack(client.playerNumber, data.attackName);
+        // Debug logging
+        console.log('Game object:', {
+            gameId: client.gameId,
+            gameExists: !!game,
+            gameState: game?.state,
+            gameType: typeof game,
+            hasUseAttack: typeof game?.useAttack,
+            gameConstructor: game?.constructor?.name
+        });
+
+        // Use ServerGame's attack method (now async)
+        const result = await game.useAttack(client.playerNumber, data.attackName);
         
         if (!result.success) {
             ws.send(JSON.stringify({
@@ -489,7 +507,7 @@ class GameServer {
         if (!game || game.state !== 'playing') return;
 
         // Use ServerGame's ability method
-        const result = game.serverGame.useAbility(client.playerNumber, data.abilityName);
+        const result = game.useAbility(client.playerNumber, data.abilityName);
         
         if (!result.success) {
             ws.send(JSON.stringify({
@@ -676,7 +694,22 @@ class GameServer {
     executeEndTurn(game) {
         const gameState = game.gameState;
         
-        // Reset turn flags for current player
+        // Get current player before switching
+        const currentPlayerNumber = gameState.currentPlayer;
+        const currentPlayerState = gameState[`player${currentPlayerNumber}`];
+        
+        // Reset turn flags for current player (ending their turn)
+        currentPlayerState.energyAttachedThisTurn = false;
+        currentPlayerState.supporterPlayedThisTurn = false;
+        currentPlayerState.stadiumPlayedThisTurn = false;
+        
+        console.log(`DEBUG: executeEndTurn - Reset flags for ending Player ${currentPlayerNumber}:`, {
+            energyAttachedThisTurn: currentPlayerState.energyAttachedThisTurn,
+            supporterPlayedThisTurn: currentPlayerState.supporterPlayedThisTurn,
+            stadiumPlayedThisTurn: currentPlayerState.stadiumPlayedThisTurn
+        });
+        
+        // Reset global turn flags
         gameState.drewCard = false;
         gameState.playedEnergy = false;
         gameState.attackedThisTurn = false;
@@ -686,11 +719,22 @@ class GameServer {
         gameState.turn++;
         gameState.phase = 'draw'; // Start new turn with draw phase
         
+        // Get new current player and reset their flags too
+        const newPlayerState = gameState[`player${gameState.currentPlayer}`];
+        newPlayerState.energyAttachedThisTurn = false;
+        newPlayerState.supporterPlayedThisTurn = false;
+        newPlayerState.stadiumPlayedThisTurn = false;
+        
+        console.log(`DEBUG: executeEndTurn - Reset flags for starting Player ${gameState.currentPlayer}:`, {
+            energyAttachedThisTurn: newPlayerState.energyAttachedThisTurn,
+            supporterPlayedThisTurn: newPlayerState.supporterPlayedThisTurn,
+            stadiumPlayedThisTurn: newPlayerState.stadiumPlayedThisTurn
+        });
+        
         // Draw card for new active player (mandatory at start of turn)
-        const newActivePlayer = gameState[`player${gameState.currentPlayer}`];
-        if (newActivePlayer.deck.length > 0) {
-            const drawnCard = newActivePlayer.deck.pop();
-            newActivePlayer.hand.push(drawnCard);
+        if (newPlayerState.deck.length > 0) {
+            const drawnCard = newPlayerState.deck.pop();
+            newPlayerState.hand.push(drawnCard);
             gameState.drewCard = true;
             gameState.phase = 'main'; // Move to main phase after drawing
         } else {
@@ -722,6 +766,46 @@ class GameServer {
                 break;
             // Add more trainer effects as needed
         }
+    }
+
+    // Execute Professor Oak effect: Discard hand, then draw 7 cards
+    executeProfessorOak(game, playerNumber) {
+        const playerState = game.gameState[`player${playerNumber}`];
+        
+        console.log(`Executing Professor Oak for Player ${playerNumber}`);
+        
+        // Discard entire hand
+        playerState.discardPile.push(...playerState.hand);
+        playerState.hand = [];
+        
+        // Draw 7 new cards
+        for (let i = 0; i < 7 && playerState.deck.length > 0; i++) {
+            const drawnCard = playerState.deck.pop();
+            playerState.hand.push(drawnCard);
+        }
+        
+        console.log(`Professor Oak: Discarded hand and drew ${Math.min(7, playerState.deck.length)} cards`);
+        
+        // Broadcast the updated game state
+        this.broadcastGameStateUpdate(game);
+    }
+
+    // Execute Bill effect: Draw 2 cards
+    executeBill(game, playerNumber) {
+        const playerState = game.gameState[`player${playerNumber}`];
+        
+        console.log(`Executing Bill for Player ${playerNumber}`);
+        
+        // Draw 2 cards
+        for (let i = 0; i < 2 && playerState.deck.length > 0; i++) {
+            const drawnCard = playerState.deck.pop();
+            playerState.hand.push(drawnCard);
+        }
+        
+        console.log(`Bill: Drew ${Math.min(2, playerState.deck.length)} cards`);
+        
+        // Broadcast the updated game state
+        this.broadcastGameStateUpdate(game);
     }
 
     executePlayerReady(ws, data) {
