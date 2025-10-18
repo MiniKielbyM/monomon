@@ -447,7 +447,9 @@
 
             // Add ability buttons  
             if (pokemonData.abilities && pokemonData.abilities.length > 0) {
+                console.log('DEBUG: Action buttons abilities data:', pokemonData.abilities);
                 pokemonData.abilities.forEach((ability, index) => {
+                    console.log(`DEBUG: Processing ability ${index} for action button:`, ability);
                     const abilityBtn = createActionButton(
                         `✨ ${ability.name}`,
                         `${ability.name}: ${ability.description}`,

@@ -1,5 +1,5 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-18T02:45:05.927Z
+// Generated on 2025-10-18T16:13:01.784Z
 
 export const pokemonCards = [
     {
@@ -7,7 +7,12 @@ export const pokemonCards = [
         "type": "psychic",
         "hp": 80,
         "imgUrl": "https://images.pokemontcg.io/base1/1_hires.png",
-        "abilities": [],
+        "abilities": [
+            {
+                "name": "Damage Swap",
+                "description": "As often as you like during your turn (before your attack), you may move 1 damage counter from 1 of your Pokémon to another as long as you don't Knock Out that Pokémon. This power can't be used if Alakazam is Asleep, Confused, or Paralyzed."
+            }
+        ],
         "attacks": [
             {
                 "name": "Confuse Ray",
@@ -25,7 +30,12 @@ export const pokemonCards = [
         "type": "water",
         "hp": 100,
         "imgUrl": "https://images.pokemontcg.io/base1/2_hires.png",
-        "abilities": [],
+        "abilities": [
+            {
+                "name": "Rain Dance",
+                "description": "As often as you like during your turn (before your attack), you may attach 1 Water Energy card from your hand to 1 of your Water Pokémon. This power can't be used if Blastoise is Asleep, Confused, or Paralyzed."
+            }
+        ],
         "attacks": []
     },
     {

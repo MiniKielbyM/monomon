@@ -1276,12 +1276,20 @@ class ServerGame {
                 resistance: card.resistance,
                 retreatCost: card.retreatCost,
                 // Include abilities and attacks data without the callback functions
-                abilities: card.abilities ? Object.keys(card.abilities).map(abilityName => ({
-                    name: abilityName,
-                    description: card.abilities[abilityName].description || '',
-                    event: card.abilities[abilityName].event,
-                    hasValidator: !!(card.abilities[abilityName].effectValidator)
-                })) : [],
+                abilities: card.abilities ? (Array.isArray(card.abilities) 
+                    ? card.abilities.map(ability => ({
+                        name: ability.name,
+                        description: ability.description || '',
+                        event: ability.event,
+                        hasValidator: !!(ability.effectValidator)
+                    }))
+                    : Object.keys(card.abilities).map(abilityName => ({
+                        name: abilityName,
+                        description: card.abilities[abilityName].description || '',
+                        event: card.abilities[abilityName].event,
+                        hasValidator: !!(card.abilities[abilityName].effectValidator)
+                    }))
+                ) : [],
                 attacks: card.attacks ? Object.keys(card.attacks).map(attackName => ({
                     name: attackName,
                     description: card.attacks[attackName].description || '',

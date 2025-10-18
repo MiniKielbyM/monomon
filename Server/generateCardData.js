@@ -120,15 +120,39 @@ function parseCardClass(className, classBody) {
 // Extract abilities from class body
 function extractAbilities(classBody) {
     const abilities = [];
-    // Updated regex to handle escaped quotes and different quote types
-    const abilityRegex = /this\.addAbility\(\s*['"`]([^'"`]+)['"`]\s*,\s*['"`]((?:[^'"`\\]|\\.)*?)['"`]\s*,/g;
     
+    // More comprehensive approach: find all addAbility calls and extract content between quotes
+    const abilityCallRegex = /this\.addAbility\(/g;
     let match;
-    while ((match = abilityRegex.exec(classBody)) !== null) {
-        abilities.push({
-            name: match[1],
-            description: match[2]
-        });
+    
+    while ((match = abilityCallRegex.exec(classBody)) !== null) {
+        const startPos = match.index;
+        let pos = startPos + match[0].length;
+        let parenCount = 1;
+        let callContent = '';
+        
+        // Find the complete function call by counting parentheses
+        while (pos < classBody.length && parenCount > 0) {
+            const char = classBody[pos];
+            if (char === '(') parenCount++;
+            else if (char === ')') parenCount--;
+            
+            if (parenCount > 0) {
+                callContent += char;
+            }
+            pos++;
+        }
+        
+        // Extract name and description from the complete call
+        const nameMatch = callContent.match(/^\s*(['"`])([^'"`]+)\1/);
+        const descMatch = callContent.match(/,\s*(['"`])((?:(?!\1)[^\\]|\\.)*)?\1/);
+        
+        if (nameMatch && descMatch) {
+            abilities.push({
+                name: nameMatch[2],
+                description: descMatch[2] || ''
+            });
+        }
     }
     
     return abilities;

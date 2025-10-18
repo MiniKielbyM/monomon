@@ -1,9 +1,5 @@
-// Enhanced Card Inspection System v2.2 - Updated to use card extension classes
-import { Card } from "./card.js";
+// Enhanced Card Inspection System v2.2 - Server-data driven (no client-side card instances)
 import enums from "./enums.js";
-import CardsBase1 from "./Cards/Base/Base1/Cards.js";
-import Client from "./client.js";
-import Deck from "./deck.js";
 
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
 
@@ -23,127 +19,36 @@ class GUIHookUtils {
         // Store last move for potential rollback
         this.lastMove = null;
         
-        // Card factory mapping
-        this.cardClasses = CardsBase1;
-        console.log('GUIHookUtils initialized with card classes:', Object.keys(this.cardClasses));
+        console.log('GUIHookUtils initialized with server-data driven architecture');
     }
 
-    // Convert server card data to actual card class instance
+    // Convert server card data to client-side card data (no class instantiation)
     createCardInstance(serverCardData, owner = null) {
         if (!serverCardData || !serverCardData.cardName) {
             return null;
         }
         
-        // Energy cards don't need card class instances - they're simple data objects
-        if (serverCardData.type === 'energy') {
-            return serverCardData; // Return the energy card data as-is
-        }
-        
-        const CardClass = this.cardClasses[serverCardData.cardName];
-        if (!CardClass) {
-            console.warn(`No card class found for: ${serverCardData.cardName}. Available classes:`, Object.keys(this.cardClasses));
-            return null;
-        }
-        
-        // Get a proper owner (Client instance) for the card
-        if (!owner) {
-            // Try to get owner from the game instance
-            if (this.game && this.game.client1) {
-                owner = this.game.client1;
-            } else {
-                // Create a minimal inspection client
-                try {
-                    const inspectionDeck = new Deck('inspection');
-                    owner = new Client('inspection', inspectionDeck);
-                } catch (error) {
-                    console.error('Could not create inspection client:', error);
-                    return null;
-                }
-            }
-        }
-        
-        try {
-            const cardInstance = new CardClass(owner);
-            
-            // Update the card instance with server state data
-            if (serverCardData.hp !== undefined) {
-                cardInstance.hp = serverCardData.hp;
-            }
-            if (serverCardData.maxHp !== undefined) {
-                cardInstance.maxHp = serverCardData.maxHp;
-            }
-            // Legacy support for old health format
-            if (serverCardData.health !== undefined && serverCardData.hp === undefined) {
-                cardInstance.hp = serverCardData.health;
-            }
-            if (serverCardData.statusConditions) {
-                cardInstance.statusConditions = [...serverCardData.statusConditions];
-            }
-            
-            return cardInstance;
-        } catch (error) {
-            console.error(`Error creating card instance for ${serverCardData.cardName}:`, error);
-            return null;
-        }
+        // Return server data directly - no need to create class instances on client side
+        // The server manages all card state, we just need the data for UI display
+        return serverCardData;
     }
 
-    // Helper method to set a card class instance directly on a DOM element
-    setCardInstance(element, cardInstance) {
-        if (!element || !cardInstance) return;
+    // Helper method to set card data directly on a DOM element
+    setCardInstance(element, cardData) {
+        if (!element || !cardData) return;
         
-        element.cardInstance = cardInstance;
+        // Store the card data directly (server data is already in the right format)
+        element.cardData = cardData;
         
-        // Convert abilities object to array format for UI compatibility
-        const abilitiesArray = [];
-        if (cardInstance.abilities && typeof cardInstance.abilities === 'object') {
-            for (const [abilityName, abilityData] of Object.entries(cardInstance.abilities)) {
-                abilitiesArray.push({
-                    name: abilityName,
-                    description: abilityData.description || '',
-                    event: abilityData.event,
-                    callback: abilityData.callback
-                });
-            }
-        }
+        // For backwards compatibility, also set as cardInstance
+        element.cardInstance = cardData;
         
-        // Convert attacks object to array format for UI compatibility
-        const attacksArray = [];
-        if (cardInstance.attacks && typeof cardInstance.attacks === 'object') {
-            for (const [attackName, attackData] of Object.entries(cardInstance.attacks)) {
-                attacksArray.push({
-                    name: attackName,
-                    description: attackData.description || '',
-                    cost: attackData.cost || [],
-                    energyCost: attackData.energyCost || attackData.cost || [], // Fallback for different naming
-                    damage: attackData.damage,
-                    callback: attackData.callback
-                });
-            }
-        }
-        
-        // Also set cardData for compatibility (using server-like data format)
-        element.cardData = {
-            cardName: cardInstance.cardName,
-            type: cardInstance.type,
-            hp: cardInstance.hp,
-            maxHp: cardInstance.maxHp,
-            imgUrl: cardInstance.imgUrl,
-            statusConditions: cardInstance.statusConditions || [],
-            abilities: abilitiesArray,
-            attacks: attacksArray,
-            // Additional properties for full compatibility
-            weakness: cardInstance.weakness,
-            resistance: cardInstance.resistance,
-            retreatCost: cardInstance.retreatCost,
-            attachedEnergy: cardInstance.attachedEnergy || []
-        };
-        
-        console.log('Set card instance on element:', {
-            cardName: cardInstance.cardName,
-            attacks: attacksArray.map(a => a.name),
-            abilities: abilitiesArray.map(a => a.name),
-            totalAbilities: abilitiesArray.length,
-            totalAttacks: attacksArray.length
+        console.log('Set card data on element:', {
+            cardName: cardData.cardName,
+            attacks: cardData.attacks ? cardData.attacks.map(a => a.name) : [],
+            abilities: cardData.abilities ? cardData.abilities.map(a => a.name) : [],
+            totalAbilities: cardData.abilities ? cardData.abilities.length : 0,
+            totalAttacks: cardData.attacks ? cardData.attacks.length : 0
         });
     }
 
@@ -1878,403 +1783,28 @@ class GUIHookUtils {
     getCardDataFromElement(cardEl) {
         if (!cardEl) return null;
         
-        // First priority: Check for direct card class instance pointer
+        // Simply return the server-provided card data
+        // Since we're using server-driven architecture, cardData should contain everything we need
+        if (cardEl.cardData) {
+            return cardEl.cardData;
+        }
+        
+        // Legacy support for _cardData
+        if (cardEl._cardData) {
+            return cardEl._cardData;
+        }
+        
+        // Legacy support for cardInstance (which is now just data)
         if (cardEl.cardInstance) {
-            console.log('DEBUG: Found direct card class instance:', cardEl.cardInstance);
-            const data = this.extractDataFromCardInstance(cardEl.cardInstance);
-            // Preserve attached energy from card instance if available
-            if (cardEl.cardInstance.attachedEnergy) {
-                data.attachedEnergy = cardEl.cardInstance.attachedEnergy;
-            }
-            return data;
+            return cardEl.cardInstance;
         }
         
-        // Second priority: Try to get card data from the cardData property and convert it
-        if (cardEl.cardData || cardEl._cardData) {
-            const card = cardEl.cardData || cardEl._cardData;
-            console.log('DEBUG: Found card data, attempting conversion:', card);
-            
-            // Preserve attached energy if it exists in the card data
-            const attachedEnergy = card.attachedEnergy;
-            
-            // Check if it's already a card class instance
-            if (card.constructor.name !== 'Object' && card.attacks && card.abilities) {
-                // It's already a card class instance, extract data directly
-                const data = this.extractDataFromCardInstance(card);
-                // Restore attached energy
-                if (attachedEnergy) {
-                    data.attachedEnergy = attachedEnergy;
-                }
-                return data;
-            } else {
-                // It's server card data, convert to card instance first
-                const cardInstance = this.createCardInstance(card);
-                if (cardInstance) {
-                    const data = this.extractDataFromCardInstance(cardInstance);
-                    // Restore attached energy
-                    if (attachedEnergy) {
-                        data.attachedEnergy = attachedEnergy;
-                    }
-                    return data;
-                } else {
-                    // Fallback: return the card data as-is with attached energy preserved
-                    return card;
-                }
-            }
-        }
-        
-        // Third priority: Try to get card data from background image URL (for opponent cards)
-        const bgImage = window.getComputedStyle(cardEl).backgroundImage;
-        const urlMatch = bgImage.match(/url\("?([^"]*)"?\)/);
-        
-        if (urlMatch && urlMatch[1]) {
-            const imgUrl = urlMatch[1];
-            console.log('DEBUG: Fallback to URL lookup for:', imgUrl);
-            
-            // Try to determine card name from URL and create instance
-            const cardName = this.getCardNameFromUrl(imgUrl);
-            if (cardName && this.cardClasses[cardName]) {
-                const cardInstance = this.createCardInstance({ cardName, imgUrl });
-                if (cardInstance) {
-                    return this.extractDataFromCardInstance(cardInstance);
-                }
-            }
-            
-            // Ultimate fallback to hardcoded data
-            const enhancedData = this.getEnhancedCardDataByUrl(imgUrl);
-            return {
-                name: enhancedData.name || 'Unknown Card',
-                imgUrl: imgUrl,
-                type: enhancedData.type || 'pokemon',
-                ...enhancedData
-            };
-        }
-        
-        // Final fallback to placeholder data
-        return {
-            name: 'Unknown Card',
-            imgUrl: '/Lib/blank_card.png',
-            type: 'pokemon',
-            hp: null,
-            pokemonType: null,
-            attacks: [],
-            abilities: [],
-            weakness: null,
-            resistance: null,
-            retreatCost: 0
-        };
+        // If no card data found, return null
+        console.warn('No card data found on element:', cardEl);
+        return null;
     }
 
     // Extract display data from a card class instance
-    extractDataFromCardInstance(card) {
-        // Handle energy cards (simple data objects)
-        if (card.type === 'energy') {
-            return {
-                name: card.cardName || card.name || 'Unknown Energy',
-                imgUrl: card.imgUrl,
-                type: 'energy',
-                energyType: card.energyType,
-                hp: null,
-                maxHp: null,
-                pokemonType: null,
-                attacks: [],
-                abilities: [],
-                weakness: null,
-                resistance: null,
-                retreatCost: 0,
-                statusConditions: []
-            };
-        }
-        
-        // Handle Pokemon cards (card class instances)
-        const attacks = [];
-        if (card.attacks && typeof card.attacks === 'object') {
-            // Convert attacks object to array format
-            for (const [attackName, attackData] of Object.entries(card.attacks)) {
-                attacks.push({
-                    name: attackName,
-                    description: attackData.description,
-                    cost: attackData.cost || [],
-                    damage: this.extractDamageFromDescription(attackData.description)
-                });
-            }
-        }
-        
-        const abilities = [];
-        if (card.abilities) {
-            if (Array.isArray(card.abilities)) {
-                // New format: abilities are already an array
-                card.abilities.forEach(ability => {
-                    abilities.push({
-                        name: ability.name,
-                        description: ability.description,
-                        type: ability.event || 'passive'
-                    });
-                });
-            } else if (typeof card.abilities === 'object') {
-                // Old format: convert abilities object to array format
-                for (const [abilityName, abilityData] of Object.entries(card.abilities)) {
-                    abilities.push({
-                        name: abilityName,
-                        description: abilityData.description,
-                        type: abilityData.event || 'passive'
-                    });
-                }
-            }
-        }
-        
-        return {
-            name: card.cardName || card.pokemon || 'Unknown Card',
-            imgUrl: card.imgUrl,
-            type: 'pokemon',
-            hp: card.hp,
-            maxHp: card.maxHp,
-            pokemonType: card.type,
-            attacks: attacks,
-            abilities: abilities,
-            weakness: card.weakness,
-            resistance: card.resistance,
-            retreatCost: card.retreatCost,
-            evolvesFrom: card.evolvesFrom,
-            canEvolve: card.canEvolve,
-            statusConditions: card.statusConditions || []
-        };
-    }
-
-    // Extract card name from URL pattern
-    getCardNameFromUrl(imgUrl) {
-        const urlMappings = {
-            'base1/1_hires.png': 'Alakazam',
-            'base1/2_hires.png': 'Blastoise',
-            'base4/87_hires.png': 'Pikachu',
-            'base1/58_hires.png': 'Pikachu'  // Alternative Pikachu URL
-        };
-        
-        for (const [urlPattern, cardName] of Object.entries(urlMappings)) {
-            if (imgUrl.includes(urlPattern)) {
-                return cardName;
-            }
-        }
-        
-        return null;
-    }
-
-    // Helper function to extract damage from attack descriptions
-    extractDamageFromDescription(description) {
-        if (!description) return null;
-        
-        // Look for damage patterns like "30 damage", "does 40 damage", "40 plus", etc.
-        const damagePatterns = [
-            /does (\d+) damage/i,
-            /(\d+) damage/i,
-            /(\d+) plus/i,
-            /(\d+)\s*$/i  // number at end of description
-        ];
-        
-        for (const pattern of damagePatterns) {
-            const match = description.match(pattern);
-            if (match && match[1]) {
-                return parseInt(match[1]);
-            }
-        }
-        
-        return null;
-    }
-
-    // Get enhanced card data based on image URL mapping
-    getEnhancedCardDataByUrl(imgUrl) {
-        // Map Pokemon TCG image URLs to card data
-        const urlToCardData = {
-            // Base Set 1 cards
-            'https://images.pokemontcg.io/base1/1_hires.png': {
-                name: 'Alakazam',
-                type: 'pokemon',
-                hp: 80,
-                pokemonType: 'psychic',
-                attacks: [
-                    {
-                        name: 'Confuse Ray',
-                        cost: ['psychic', 'psychic', 'psychic'],
-                        damage: '30',
-                        description: 'Flip a coin. If heads, the Defending Pokémon is now Confused.'
-                    }
-                ],
-                abilities: [
-                    {
-                        name: 'Damage Swap',
-                        description: 'As often as you like during your turn (before your attack), you may move 1 damage counter from 1 of your Pokémon to another as long as you don\'t Knock Out that Pokémon. This power can\'t be used if Alakazam is Asleep, Confused, or Paralyzed.'
-                    }
-                ],
-                weakness: 'psychic',
-                resistance: null,
-                retreatCost: 3
-            },
-            'https://images.pokemontcg.io/base1/2_hires.png': {
-                name: 'Blastoise',
-                type: 'pokemon',
-                hp: 100,
-                pokemonType: 'water',
-                attacks: [
-                    {
-                        name: 'Hydro Pump',
-                        cost: ['water', 'water', 'water'],
-                        damage: '40+',
-                        description: 'Does 40 damage plus 10 more damage for each Water Energy attached to Blastoise but not used to pay for this attack\'s Energy cost.'
-                    }
-                ],
-                abilities: [
-                    {
-                        name: 'Rain Dance',
-                        description: 'As often as you like during your turn (before your attack), you may attach 1 Water Energy card from your hand to 1 of your Water Pokémon. This power can\'t be used if Blastoise is Asleep, Confused, or Paralyzed.'
-                    }
-                ],
-                weakness: 'lightning',
-                resistance: null,
-                retreatCost: 3
-            },
-            'https://images.pokemontcg.io/base1/4_hires.png': {
-                name: 'Charizard',
-                type: 'pokemon',
-                hp: 120,
-                pokemonType: 'fire',
-                attacks: [
-                    {
-                        name: 'Fire Spin',
-                        cost: ['fire', 'fire', 'fire', 'fire'],
-                        damage: '100',
-                        description: 'Discard 2 Energy cards attached to Charizard in order to use this attack.'
-                    }
-                ],
-                abilities: [],
-                weakness: 'water',
-                resistance: 'fighting',
-                retreatCost: 3
-            },
-            'https://images.pokemontcg.io/base1/58_hires.png': {
-                name: 'Pikachu',
-                type: 'pokemon',
-                hp: 60,
-                pokemonType: 'lightning',
-                attacks: [
-                    {
-                        name: 'Gnaw',
-                        cost: ['colorless'],
-                        damage: '10',
-                        description: ''
-                    },
-                    {
-                        name: 'Thunder Jolt',
-                        cost: ['lightning', 'colorless'],
-                        damage: '30',
-                        description: 'Flip a coin. If tails, Pikachu does 10 damage to itself.'
-                    }
-                ],
-                abilities: [],
-                weakness: 'fighting',
-                resistance: null,
-                retreatCost: 1
-            },
-            // Trainer cards
-            'https://images.pokemontcg.io/base1/78_hires.png': {
-                name: 'Bill',
-                type: 'trainer',
-                hp: null,
-                pokemonType: null,
-                attacks: [],
-                abilities: [],
-                weakness: null,
-                resistance: null,
-                retreatCost: 0,
-                trainerEffect: 'Draw 2 cards.'
-            },
-            'https://images.pokemontcg.io/base1/88_hires.png': {
-                name: 'Professor Oak',
-                type: 'trainer',
-                hp: null,
-                pokemonType: null,
-                attacks: [],
-                abilities: [],
-                weakness: null,
-                resistance: null,
-                retreatCost: 0,
-                trainerEffect: 'Discard your hand, then draw 7 cards.'
-            },
-            // Energy cards
-            'https://images.pokemontcg.io/base1/98_hires.png': {
-                name: 'Fire Energy',
-                type: 'energy',
-                hp: null,
-                pokemonType: 'fire',
-                attacks: [],
-                abilities: [],
-                weakness: null,
-                resistance: null,
-                retreatCost: 0,
-                energyType: 'fire'
-            },
-            'https://images.pokemontcg.io/base1/102_hires.png': {
-                name: 'Water Energy',
-                type: 'energy',
-                hp: null,
-                pokemonType: 'water',
-                attacks: [],
-                abilities: [],
-                weakness: null,
-                resistance: null,
-                retreatCost: 0,
-                energyType: 'water'
-            },
-            'https://images.pokemontcg.io/base1/100_hires.png': {
-                name: 'Lightning Energy',
-                type: 'energy',
-                hp: null,
-                pokemonType: 'lightning',
-                attacks: [],
-                abilities: [],
-                weakness: null,
-                resistance: null,
-                retreatCost: 0,
-                energyType: 'lightning'
-            }
-        };
-
-        // Check for exact URL match first
-        if (urlToCardData[imgUrl]) {
-            console.log('DEBUG: Found exact URL match for:', imgUrl);
-            return urlToCardData[imgUrl];
-        }
-
-        // If no exact match, try to extract card ID from URL pattern
-        const urlPattern = /images\.pokemontcg\.io\/([^\/]+)\/(\d+)_hires\.png/;
-        const match = imgUrl.match(urlPattern);
-        
-        if (match) {
-            const set = match[1];
-            const cardNumber = match[2];
-            console.log('DEBUG: Extracted set:', set, 'card number:', cardNumber);
-            
-            // Try to find by pattern
-            const patternUrl = `https://images.pokemontcg.io/${set}/${cardNumber}_hires.png`;
-            if (urlToCardData[patternUrl]) {
-                return urlToCardData[patternUrl];
-            }
-        }
-
-        // Fallback for unknown cards
-        console.log('DEBUG: No card data found for URL:', imgUrl);
-        return {
-            name: 'Unknown Card',
-            type: 'pokemon',
-            hp: null,
-            pokemonType: null,
-            attacks: [],
-            abilities: [],
-            weakness: null,
-            resistance: null,
-            retreatCost: 0
-        };
-    }
-
     // Determine card type from name or URL
     determineCardType(cardName, imgUrl) {
         const name = cardName.toLowerCase();
@@ -2588,10 +2118,12 @@ class GUIHookUtils {
 
         // Abilities section
         if (cardData.abilities && cardData.abilities.length > 0) {
+            console.log('DEBUG: Modal abilities data:', cardData.abilities);
             const abilitiesSection = document.createElement('div');
             abilitiesSection.innerHTML = '<h3 style="color: #555; margin: 15px 0 10px 0;">Abilities:</h3>';
             
-            cardData.abilities.forEach(ability => {
+            cardData.abilities.forEach((ability, index) => {
+                console.log(`DEBUG: Processing ability ${index}:`, ability);
                 const abilityDiv = document.createElement('div');
                 
                 // Check if this ability can be used
@@ -3700,7 +3232,7 @@ class GUIHookUtils {
     async handleDamageSwapClientSide() {
         try {
             // Get current game state
-            const gameState = this.getCurrentGameState();
+            const gameState = this.game?.displayState;
             if (!gameState || !gameState.yourState) {
                 return { success: false, error: 'Cannot get game state' };
             }

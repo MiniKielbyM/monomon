@@ -65,7 +65,7 @@ class Alakazam extends Card {
             1,
             CardModifiers.BASE
         );
-        this.addAbility('Damage Swap', `As often as you like during your turn (before your attack), you may move 1 damage counter from 1 of your Pokémon to another as long as you don't Knock Out that Pokémon. This power can't be used if Alakazam is Asleep, Confused, or Paralyzed.`, AbilityEventListeners.ONABILITYUSE, null);
+        this.addAbility('Damage Swap', `As often as you like during your turn (before your attack), you may move 1 damage counter from 1 of your Pokémon to another as long as you don't Knock Out that Pokémon. This power can't be used if Alakazam is Asleep, Confused, or Paralyzed.`, AbilityEventListeners.ONABILITYUSE, this.DamageSwap);
         this.addAttack('Confuse Ray', 'Flip a coin. If heads, the Defending Pokémon is now Confused', [PokemonType.PSYCHIC, PokemonType.PSYCHIC, PokemonType.PSYCHIC], this.ConfuseRay);
     }
     async DamageSwap(){
