@@ -497,23 +497,47 @@ class GameServer {
         
         // Send updated state to all players
         this.sendGameStateToPlayers(game);
+        
+        // After a successful attack, end the player's turn server-side (attacking ends your turn)
+        // This ensures the authoritative server advances the turn instead of relying on clients.
+        try {
+            console.log('Server: executing end-turn due to attack completion');
+            this.executeEndTurn(game);
+            // Broadcast the new state after ending the turn
+            this.sendGameStateToPlayers(game);
+        } catch (err) {
+            console.error('Error executing end turn after attack:', err);
+        }
     }
 
-    handleAbilityAction(ws, data) {
+    async handleAbilityAction(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
 
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
 
-        // Use ServerGame's ability method
-        const result = game.useAbility(client.playerNumber, data.abilityName);
+        // Debug logging
+        console.log('Ability action received:', {
+            gameId: client.gameId,
+            playerNumber: client.playerNumber,
+            abilityName: data.abilityName,
+            gameExists: !!game,
+            gameState: game?.state
+        });
+
+        // Use ServerGame's ability method (now async)
+        const result = await game.useAbility(client.playerNumber, data.abilityName);
+        
+        console.log('Ability result from ServerGame:', result);
         
         if (!result.success) {
-            ws.send(JSON.stringify({
+            const errorResponse = {
                 type: 'action_error',
-                message: result.error
-            }));
+                message: result.error || 'Unknown ability error'
+            };
+            console.log('Sending error response:', errorResponse);
+            ws.send(JSON.stringify(errorResponse));
             return;
         }
 
@@ -702,11 +726,13 @@ class GameServer {
         currentPlayerState.energyAttachedThisTurn = false;
         currentPlayerState.supporterPlayedThisTurn = false;
         currentPlayerState.stadiumPlayedThisTurn = false;
+        currentPlayerState.abilitiesUsedThisTurn = new Set(); // Reset ability usage tracking
         
         console.log(`DEBUG: executeEndTurn - Reset flags for ending Player ${currentPlayerNumber}:`, {
             energyAttachedThisTurn: currentPlayerState.energyAttachedThisTurn,
             supporterPlayedThisTurn: currentPlayerState.supporterPlayedThisTurn,
-            stadiumPlayedThisTurn: currentPlayerState.stadiumPlayedThisTurn
+            stadiumPlayedThisTurn: currentPlayerState.stadiumPlayedThisTurn,
+            abilitiesUsedThisTurn: Array.from(currentPlayerState.abilitiesUsedThisTurn)
         });
         
         // Reset global turn flags
@@ -724,11 +750,13 @@ class GameServer {
         newPlayerState.energyAttachedThisTurn = false;
         newPlayerState.supporterPlayedThisTurn = false;
         newPlayerState.stadiumPlayedThisTurn = false;
+        newPlayerState.abilitiesUsedThisTurn = new Set(); // Reset ability usage tracking
         
         console.log(`DEBUG: executeEndTurn - Reset flags for starting Player ${gameState.currentPlayer}:`, {
             energyAttachedThisTurn: newPlayerState.energyAttachedThisTurn,
             supporterPlayedThisTurn: newPlayerState.supporterPlayedThisTurn,
-            stadiumPlayedThisTurn: newPlayerState.stadiumPlayedThisTurn
+            stadiumPlayedThisTurn: newPlayerState.stadiumPlayedThisTurn,
+            abilitiesUsedThisTurn: Array.from(newPlayerState.abilitiesUsedThisTurn)
         });
         
         // Draw card for new active player (mandatory at start of turn)

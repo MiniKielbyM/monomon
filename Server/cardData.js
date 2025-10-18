@@ -1,5 +1,5 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-17T22:42:55.566Z
+// Generated on 2025-10-18T02:45:05.927Z
 
 export const pokemonCards = [
     {
@@ -25,12 +25,7 @@ export const pokemonCards = [
         "type": "water",
         "hp": 100,
         "imgUrl": "https://images.pokemontcg.io/base1/2_hires.png",
-        "abilities": [
-            {
-                "name": "Rain Dance",
-                "description": "Once during your turn (before your attack), you may attach a Water Energy card from your hand to 1 of your Water Pokémon. This power can\\'t be used if Blastoise is Asleep, Confused, or Paralyzed."
-            }
-        ],
+        "abilities": [],
         "attacks": []
     },
     {

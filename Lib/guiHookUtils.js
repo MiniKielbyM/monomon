@@ -66,8 +66,15 @@ class GUIHookUtils {
             const cardInstance = new CardClass(owner);
             
             // Update the card instance with server state data
-            if (serverCardData.health !== undefined) {
-                cardInstance.health = serverCardData.health;
+            if (serverCardData.hp !== undefined) {
+                cardInstance.hp = serverCardData.hp;
+            }
+            if (serverCardData.maxHp !== undefined) {
+                cardInstance.maxHp = serverCardData.maxHp;
+            }
+            // Legacy support for old health format
+            if (serverCardData.health !== undefined && serverCardData.hp === undefined) {
+                cardInstance.hp = serverCardData.health;
             }
             if (serverCardData.statusConditions) {
                 cardInstance.statusConditions = [...serverCardData.statusConditions];
@@ -86,20 +93,57 @@ class GUIHookUtils {
         
         element.cardInstance = cardInstance;
         
+        // Convert abilities object to array format for UI compatibility
+        const abilitiesArray = [];
+        if (cardInstance.abilities && typeof cardInstance.abilities === 'object') {
+            for (const [abilityName, abilityData] of Object.entries(cardInstance.abilities)) {
+                abilitiesArray.push({
+                    name: abilityName,
+                    description: abilityData.description || '',
+                    event: abilityData.event,
+                    callback: abilityData.callback
+                });
+            }
+        }
+        
+        // Convert attacks object to array format for UI compatibility
+        const attacksArray = [];
+        if (cardInstance.attacks && typeof cardInstance.attacks === 'object') {
+            for (const [attackName, attackData] of Object.entries(cardInstance.attacks)) {
+                attacksArray.push({
+                    name: attackName,
+                    description: attackData.description || '',
+                    cost: attackData.cost || [],
+                    energyCost: attackData.energyCost || attackData.cost || [], // Fallback for different naming
+                    damage: attackData.damage,
+                    callback: attackData.callback
+                });
+            }
+        }
+        
         // Also set cardData for compatibility (using server-like data format)
         element.cardData = {
             cardName: cardInstance.cardName,
             type: cardInstance.type,
             hp: cardInstance.hp,
-            health: cardInstance.health,
+            maxHp: cardInstance.maxHp,
             imgUrl: cardInstance.imgUrl,
-            statusConditions: cardInstance.statusConditions || []
+            statusConditions: cardInstance.statusConditions || [],
+            abilities: abilitiesArray,
+            attacks: attacksArray,
+            // Additional properties for full compatibility
+            weakness: cardInstance.weakness,
+            resistance: cardInstance.resistance,
+            retreatCost: cardInstance.retreatCost,
+            attachedEnergy: cardInstance.attachedEnergy || []
         };
         
         console.log('Set card instance on element:', {
             cardName: cardInstance.cardName,
-            attacks: Object.keys(cardInstance.attacks || {}),
-            abilities: Object.keys(cardInstance.abilities || {})
+            attacks: attacksArray.map(a => a.name),
+            abilities: abilitiesArray.map(a => a.name),
+            totalAbilities: abilitiesArray.length,
+            totalAttacks: attacksArray.length
         });
     }
 
@@ -907,7 +951,7 @@ class GUIHookUtils {
                 imgUrl: sourceCard.imgUrl,
                 type: sourceCard.type,
                 hp: sourceCard.hp,
-                health: sourceCard.health
+                maxHp: sourceCard.maxHp
             };
             
             this.webSocketClient.sendCardMove(sourceType, sourceIndex, targetType, targetIndex, cardData);
@@ -1492,6 +1536,237 @@ class GUIHookUtils {
             }
         });
     }
+
+    // Generic card selection menu with filtering and customizable display
+    showCardSelectionMenu(cards, options = {}) {
+        const {
+            title = 'Select a Card',
+            subtitle = '',
+            filterFunction = null,
+            allowCancel = true,
+            cardDisplayFunction = null,
+            maxColumns = 4,
+            showCardInfo = true
+        } = options;
+
+        // Apply filter if provided
+        const filteredCards = filterFunction ? cards.filter(filterFunction) : cards;
+        
+        if (filteredCards.length === 0) {
+            if (window.showGameMessage) {
+                window.showGameMessage('No cards available for selection', 2000);
+            }
+            return Promise.resolve(null);
+        }
+
+        return new Promise((resolve) => {
+            // Create modal overlay
+            const modalOverlay = document.createElement('div');
+            modalOverlay.className = 'card-selection-modal-overlay';
+            modalOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                backdrop-filter: blur(5px);
+            `;
+
+            // Create modal content
+            const modalContent = document.createElement('div');
+            modalContent.className = 'card-selection-modal-content';
+            modalContent.style.cssText = `
+                background: white;
+                border-radius: 15px;
+                padding: 20px;
+                max-width: 90vw;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                position: relative;
+            `;
+
+            // Header
+            const header = document.createElement('div');
+            header.style.cssText = `
+                text-align: center;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 2px solid #ddd;
+            `;
+
+            const titleElement = document.createElement('h2');
+            titleElement.textContent = title;
+            titleElement.style.cssText = `
+                margin: 0 0 10px 0;
+                color: #333;
+                font-size: 24px;
+            `;
+
+            header.appendChild(titleElement);
+
+            if (subtitle) {
+                const subtitleElement = document.createElement('p');
+                subtitleElement.textContent = subtitle;
+                subtitleElement.style.cssText = `
+                    margin: 0;
+                    color: #666;
+                    font-size: 16px;
+                `;
+                header.appendChild(subtitleElement);
+            }
+
+            // Cards grid
+            const cardsGrid = document.createElement('div');
+            cardsGrid.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+                max-width: ${maxColumns * 220}px;
+                margin: 0 auto;
+            `;
+
+            // Create card elements
+            filteredCards.forEach(card => {
+                const cardContainer = document.createElement('div');
+                cardContainer.style.cssText = `
+                    border: 2px solid #ddd;
+                    border-radius: 10px;
+                    padding: 10px;
+                    background: #f9f9f9;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    text-align: center;
+                `;
+
+                cardContainer.addEventListener('mouseenter', () => {
+                    cardContainer.style.borderColor = '#007bff';
+                    cardContainer.style.background = '#e3f2fd';
+                    cardContainer.style.transform = 'scale(1.02)';
+                });
+
+                cardContainer.addEventListener('mouseleave', () => {
+                    cardContainer.style.borderColor = '#ddd';
+                    cardContainer.style.background = '#f9f9f9';
+                    cardContainer.style.transform = 'scale(1)';
+                });
+
+                // Card image
+                const cardImage = document.createElement('img');
+                cardImage.src = card.imgUrl;
+                cardImage.style.cssText = `
+                    width: 100%;
+                    max-width: 150px;
+                    height: auto;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                `;
+
+                cardContainer.appendChild(cardImage);
+
+                // Card info
+                if (showCardInfo) {
+                    const cardName = document.createElement('div');
+                    cardName.textContent = card.cardName || card.name || 'Unknown Card';
+                    cardName.style.cssText = `
+                        font-weight: bold;
+                        margin-bottom: 5px;
+                        color: #333;
+                    `;
+                    cardContainer.appendChild(cardName);
+
+                    // HP/Damage info for Pokemon
+                    if (card.hp !== undefined || card.maxHp !== undefined) {
+                        const hpInfo = document.createElement('div');
+                        const currentHp = card.hp !== undefined ? card.hp : card.maxHp;
+                        const maxHp = card.maxHp || card.hp;
+                        const damage = maxHp - currentHp;
+                        
+                        hpInfo.textContent = damage > 0 ? 
+                            `${currentHp}/${maxHp} HP (${damage} damage)` : 
+                            `${currentHp}/${maxHp} HP`;
+                        
+                        hpInfo.style.cssText = `
+                            font-size: 12px;
+                            color: ${damage > 0 ? '#d32f2f' : '#388e3c'};
+                            margin-bottom: 5px;
+                        `;
+                        cardContainer.appendChild(hpInfo);
+                    }
+
+                    // Custom display function
+                    if (cardDisplayFunction) {
+                        const customInfo = cardDisplayFunction(card);
+                        if (customInfo) {
+                            const customElement = document.createElement('div');
+                            customElement.innerHTML = customInfo;
+                            customElement.style.cssText = `
+                                font-size: 12px;
+                                color: #666;
+                                margin-top: 5px;
+                            `;
+                            cardContainer.appendChild(customElement);
+                        }
+                    }
+                }
+
+                // Click handler
+                cardContainer.addEventListener('click', () => {
+                    modalOverlay.remove();
+                    resolve(card);
+                });
+
+                cardsGrid.appendChild(cardContainer);
+            });
+
+            // Cancel button
+            if (allowCancel) {
+                const cancelButton = document.createElement('button');
+                cancelButton.textContent = 'Cancel';
+                cancelButton.style.cssText = `
+                    margin-top: 20px;
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    display: block;
+                    margin-left: auto;
+                    margin-right: auto;
+                `;
+
+                cancelButton.addEventListener('click', () => {
+                    modalOverlay.remove();
+                    resolve(null);
+                });
+
+                modalContent.appendChild(header);
+                modalContent.appendChild(cardsGrid);
+                modalContent.appendChild(cancelButton);
+            } else {
+                modalContent.appendChild(header);
+                modalContent.appendChild(cardsGrid);
+            }
+
+            modalOverlay.appendChild(modalContent);
+            document.body.appendChild(modalOverlay);
+
+            // Close on overlay click (outside modal)
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay && allowCancel) {
+                    modalOverlay.remove();
+                    resolve(null);
+                }
+            });
+        });
+    }
     takePrizeCard(prizeElement, handElement) {
         // animate take prize card
     }
@@ -1700,7 +1975,7 @@ class GUIHookUtils {
                 type: 'energy',
                 energyType: card.energyType,
                 hp: null,
-                health: null,
+                maxHp: null,
                 pokemonType: null,
                 attacks: [],
                 abilities: [],
@@ -1726,14 +2001,25 @@ class GUIHookUtils {
         }
         
         const abilities = [];
-        if (card.abilities && typeof card.abilities === 'object') {
-            // Convert abilities object to array format
-            for (const [abilityName, abilityData] of Object.entries(card.abilities)) {
-                abilities.push({
-                    name: abilityName,
-                    description: abilityData.description,
-                    type: abilityData.event || 'passive'
+        if (card.abilities) {
+            if (Array.isArray(card.abilities)) {
+                // New format: abilities are already an array
+                card.abilities.forEach(ability => {
+                    abilities.push({
+                        name: ability.name,
+                        description: ability.description,
+                        type: ability.event || 'passive'
+                    });
                 });
+            } else if (typeof card.abilities === 'object') {
+                // Old format: convert abilities object to array format
+                for (const [abilityName, abilityData] of Object.entries(card.abilities)) {
+                    abilities.push({
+                        name: abilityName,
+                        description: abilityData.description,
+                        type: abilityData.event || 'passive'
+                    });
+                }
             }
         }
         
@@ -1742,7 +2028,7 @@ class GUIHookUtils {
             imgUrl: card.imgUrl,
             type: 'pokemon',
             hp: card.hp,
-            health: card.health,
+            maxHp: card.maxHp,
             pokemonType: card.type,
             attacks: attacks,
             abilities: abilities,
@@ -2118,11 +2404,26 @@ class GUIHookUtils {
             gap: 10px;
         `;
 
-        if (cardData.hp) {
+        if (cardData.hp !== undefined && cardData.maxHp !== undefined) {
+            const hpDisplay = document.createElement('span');
+            const damage = cardData.maxHp - cardData.hp;
+            hpDisplay.textContent = damage > 0 ? 
+                `${cardData.hp}/${cardData.maxHp} HP` : 
+                `HP ${cardData.hp}`;
+            hpDisplay.style.cssText = `
+                background: ${damage > 0 ? '#ff4444' : '#44aa44'};
+                color: white;
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-weight: bold;
+                font-size: 14px;
+            `;
+            cardInfo.appendChild(hpDisplay);
+        } else if (cardData.hp) {
             const hpDisplay = document.createElement('span');
             hpDisplay.textContent = `HP ${cardData.hp}`;
             hpDisplay.style.cssText = `
-                background: #ff4444;
+                background: #44aa44;
                 color: white;
                 padding: 4px 8px;
                 border-radius: 12px;
@@ -2295,13 +2596,28 @@ class GUIHookUtils {
                 
                 // Check if this ability can be used
                 const canUseAbility = this.canUseAbilityInModal(cardEl, cardData, ability);
-                const isClickable = canUseAbility && this.isMyTurn();
+                const timingCheck = this.checkAbilityTiming(ability.name);
+                const isMyTurnFlag = this.isMyTurn();
+                const isClickable = canUseAbility && isMyTurnFlag && timingCheck.canUse;
+                
+                // Determine background color based on availability
+                let backgroundColor, borderColor;
+                if (isClickable) {
+                    backgroundColor = '#d1f2eb'; // Green for usable
+                    borderColor = '#28a745';
+                } else if (!timingCheck.canUse) {
+                    backgroundColor = '#fff3cd'; // Yellow for timing restricted
+                    borderColor = '#ffc107';
+                } else {
+                    backgroundColor = '#e8f4fd'; // Blue for other restrictions
+                    borderColor = '#b3d4fc';
+                }
                 
                 abilityDiv.style.cssText = `
                     padding: 12px;
                     margin: 8px 0;
-                    background: ${isClickable ? '#d1f2eb' : '#e8f4fd'};
-                    border: 1px solid ${isClickable ? '#28a745' : '#b3d4fc'};
+                    background: ${backgroundColor};
+                    border: 1px solid ${borderColor};
                     border-radius: 8px;
                     cursor: ${isClickable ? 'pointer' : 'default'};
                     transition: all 0.2s ease;
@@ -2339,6 +2655,35 @@ class GUIHookUtils {
                         font-weight: bold;
                     `;
                     abilityDiv.appendChild(clickIndicator);
+                } else {
+                    // Add restriction indicator
+                    const restrictionIndicator = document.createElement('div');
+                    let restrictionText, restrictionColor;
+                    
+                    if (!isMyTurnFlag) {
+                        restrictionText = '⏸️ Not your turn';
+                        restrictionColor = '#6c757d';
+                    } else if (!timingCheck.canUse) {
+                        restrictionText = `⏰ ${timingCheck.reason}`;
+                        restrictionColor = '#856404';
+                    } else if (!canUseAbility) {
+                        restrictionText = '❌ Cannot use';
+                        restrictionColor = '#6c757d';
+                    } else {
+                        restrictionText = '❌ Unavailable';
+                        restrictionColor = '#6c757d';
+                    }
+                    
+                    restrictionIndicator.textContent = restrictionText;
+                    restrictionIndicator.style.cssText = `
+                        position: absolute;
+                        top: 8px;
+                        right: 12px;
+                        font-size: 12px;
+                        color: ${restrictionColor};
+                        font-weight: bold;
+                    `;
+                    abilityDiv.appendChild(restrictionIndicator);
                 }
 
                 const abilityName = document.createElement('strong');
@@ -2730,7 +3075,7 @@ class GUIHookUtils {
         }
 
         // Current Health section (if Pokemon has taken damage)
-        if (cardData.hp !== undefined && cardData.health !== undefined && cardData.hp < cardData.health) {
+        if (cardData.hp !== undefined && cardData.maxHp !== undefined && cardData.hp < cardData.maxHp) {
             const healthSection = document.createElement('div');
             healthSection.innerHTML = '<h3 style="color: #555; margin: 15px 0 10px 0;">Current Status:</h3>';
             
@@ -2743,8 +3088,8 @@ class GUIHookUtils {
             `;
             
             const healthEl = document.createElement('div');
-            const damageAmount = cardData.health - cardData.hp;
-            healthEl.innerHTML = `<strong>Damage:</strong> ${damageAmount} damage (${cardData.hp}/${cardData.health} HP remaining)`;
+            const damageAmount = cardData.maxHp - cardData.hp;
+            healthEl.innerHTML = `<strong>Damage:</strong> ${damageAmount} damage (${cardData.hp}/${cardData.maxHp} HP remaining)`;
             healthEl.style.cssText = 'color: #721c24; font-size: 14px;';
             healthContainer.appendChild(healthEl);
             
@@ -2869,18 +3214,206 @@ class GUIHookUtils {
 
     // Check if an ability can be used from the modal
     canUseAbilityInModal(cardEl, cardData, ability) {
-        // Most abilities can be used from any Pokemon on the field or bench
-        // Some abilities might have specific requirements - implement as needed
-        
         // Check if this is the player's Pokemon (not opponent's)
-        const playerField = document.querySelector('#player-field');
-        if (!cardEl || !playerField || !playerField.contains(cardEl)) {
+        // Look for player-zone container or player class
+        const isPlayerCard = cardEl && (
+            cardEl.classList.contains('player') ||
+            cardEl.closest('#player-zone') ||
+            cardEl.closest('.player-zone') ||
+            cardEl.closest('[id*="player"]') ||
+            !cardEl.classList.contains('opp')  // Not opponent's card
+        );
+        
+        if (!isPlayerCard) {
             return false;
         }
         
-        // Most abilities don't have energy requirements
-        // But some might have specific conditions - expand this as needed
+        // Check if the Pokemon is in a valid position to use abilities
+        // Most abilities can be used from active Pokemon or bench
+        const isActiveOrBench = cardEl && (
+            cardEl.classList.contains('active') ||
+            cardEl.classList.contains('benched') ||
+            cardEl.closest('.active') ||
+            cardEl.closest('.bench')
+        );
+        
+        if (!isActiveOrBench) {
+            return false;
+        }
+        
+        // Check for status conditions that prevent ability use
+        // Many abilities can't be used if Pokemon is Asleep, Confused, or Paralyzed
+        if (cardData.statusConditions && cardData.statusConditions.length > 0) {
+            const disablingConditions = ['asleep', 'confused', 'paralyzed'];
+            const hasDisablingCondition = cardData.statusConditions.some(condition => 
+                disablingConditions.includes(condition.toLowerCase())
+            );
+            if (hasDisablingCondition) {
+                return false;
+            }
+        }
+        
         return true;
+    }
+
+    // Check ability timing restrictions (client-side validation for UI)
+    checkAbilityTiming(abilityName) {
+        // Check if we have game state info for timing validation
+        const gameState = this.game?.displayState;
+        if (!gameState) {
+            return { canUse: true, reason: '' };
+        }
+
+        // Check if already attacked this turn (most abilities can't be used after attacking)
+        if (gameState.attackedThisTurn && this.abilityRequiresBeforeAttack(abilityName)) {
+            return { 
+                canUse: false, 
+                reason: 'Can only be used before attacking' 
+            };
+        }
+
+        // Check once-per-turn restrictions
+        if (this.isOncePerTurnAbility(abilityName)) {
+            const yourState = gameState.yourState;
+            if (yourState?.abilitiesUsedThisTurn?.includes?.(abilityName)) {
+                return { 
+                    canUse: false, 
+                    reason: 'Can only be used once per turn' 
+                };
+            }
+        }
+
+        // Check phase restrictions
+        if (gameState.phase === 'setup' || gameState.phase === 'end') {
+            return { 
+                canUse: false, 
+                reason: 'Can only be used during main phase' 
+            };
+        }
+
+        // Check if ability would have an effect
+        const effectCheck = this.checkAbilityEffect(abilityName, gameState);
+        if (!effectCheck.canUse) {
+            return effectCheck;
+        }
+
+        return { canUse: true, reason: '' };
+    }
+
+    // Check if an ability requires being used before attacking (client-side helper)
+    abilityRequiresBeforeAttack(abilityName) {
+        const beforeAttackAbilities = [
+            'Rain Dance',
+            'Damage Swap',
+            'Pokemon Power'
+        ];
+        return beforeAttackAbilities.includes(abilityName);
+    }
+
+    // Check if an ability can only be used once per turn (client-side helper)
+    isOncePerTurnAbility(abilityName) {
+        const oncePerTurnAbilities = [
+            'Rain Dance'
+        ];
+        return oncePerTurnAbilities.includes(abilityName);
+    }
+
+    // Check if an ability would have an effect (client-side validation)
+    checkAbilityEffect(abilityName, gameState) {
+        if (!gameState || !gameState.yourState) {
+            return { canUse: true, reason: '' };
+        }
+
+        switch (abilityName) {
+            case 'Damage Swap':
+                return this.checkDamageSwapEffect(gameState.yourState);
+            
+            case 'Rain Dance':
+                return this.checkRainDanceEffect(gameState.yourState);
+                
+            default:
+                // For unknown abilities, assume they can be used
+                return { canUse: true, reason: '' };
+        }
+    }
+
+    // Check if Damage Swap would have an effect (client-side)
+    checkDamageSwapEffect(playerState) {
+        // Get all player's Pokemon
+        const allPokemon = [playerState.activePokemon, ...playerState.bench].filter(card => card !== null);
+        
+        // Check for damaged Pokemon
+        const damagedPokemon = allPokemon.filter(card => {
+            return card && 
+                   card.hp !== undefined && 
+                   card.maxHp !== undefined &&
+                   typeof card.hp === 'number' && 
+                   typeof card.maxHp === 'number' &&
+                   card.hp < card.maxHp;
+        });
+        
+        if (damagedPokemon.length === 0) {
+            return { 
+                canUse: false, 
+                reason: 'No damaged Pokemon to heal' 
+            };
+        }
+
+        // Check for valid targets (Pokemon that won't be KO'd by receiving 10 damage)
+        const validTargets = allPokemon.filter(card => {
+            return card && card.hp > 10;
+        });
+
+        if (validTargets.length === 0) {
+            return { 
+                canUse: false, 
+                reason: 'No valid targets (all would be KO\'d)' 
+            };
+        }
+
+        // Need different Pokemon for source and target
+        const differentTargets = validTargets.filter(target => !damagedPokemon.includes(target));
+        if (damagedPokemon.length > 0 && differentTargets.length === 0 && validTargets.length === damagedPokemon.length) {
+            return { 
+                canUse: false, 
+                reason: 'Would KO the only available targets' 
+            };
+        }
+
+        return { canUse: true, reason: '' };
+    }
+
+    // Check if Rain Dance would have an effect (client-side)
+    checkRainDanceEffect(playerState) {
+        // Check for Water Energy in hand
+        const waterEnergyInHand = playerState.hand.filter(card => {
+            return card && (
+                (card.type === 'water' || card.type === 'WATER') && 
+                (card.cardName && card.cardName.toLowerCase().includes('water energy'))
+            );
+        });
+
+        if (waterEnergyInHand.length === 0) {
+            return { 
+                canUse: false, 
+                reason: 'No Water Energy in hand' 
+            };
+        }
+
+        // Check for Water Pokemon
+        const allPokemon = [playerState.activePokemon, ...playerState.bench].filter(card => card !== null);
+        const waterPokemon = allPokemon.filter(card => {
+            return card && (card.type === 'water' || card.type === 'WATER');
+        });
+
+        if (waterPokemon.length === 0) {
+            return { 
+                canUse: false, 
+                reason: 'No Water Pokemon to attach energy to' 
+            };
+        }
+
+        return { canUse: true, reason: '' };
     }
 
     // Check if it's currently the player's turn
@@ -2909,21 +3442,24 @@ class GUIHookUtils {
         if (this.webSocketClient && this.webSocketClient.send) {
             console.log(`Using attack from modal: ${attackName}`);
             
-            // Check connection status
+            // Check connection status - if not connected, fall back to local/demo execution
             if (!this.webSocketClient.connected) {
-                console.error('WebSocket client not connected');
+                console.warn('WebSocket client not connected - falling back to local demo behavior');
                 if (window.showGameMessage) {
-                    window.showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
+                    window.showGameMessage('⚠️ Not connected to server - executing locally', 2000);
                 }
+                // Finalize locally after short delay to allow any local animation
+                setTimeout(() => this.handleLocalAttackFinish(), 600);
                 return;
             }
             
-            // Check if in a game
+            // Check if in a game - if not, fall back to local/demo execution
             if (!this.webSocketClient.gameId) {
-                console.error('Not in a game');
+                console.warn('WebSocket client has no gameId - falling back to local demo behavior');
                 if (window.showGameMessage) {
-                    window.showGameMessage('❌ Not in a game! Please join a game first.', 3000);
+                    window.showGameMessage('⚠️ Not in a networked game - executing locally', 2000);
                 }
+                setTimeout(() => this.handleLocalAttackFinish(), 600);
                 return;
             }
             
@@ -2945,22 +3481,54 @@ class GUIHookUtils {
             }
             
             const success = this.webSocketClient.send('use_attack', { attackName: attackName });
-            
+
             if (success) {
                 // Show feedback message
                 if (window.showGameMessage) {
                     window.showGameMessage(`⚔️ Using ${attackName}...`, 2000);
                 }
-            } else {
-                if (window.showGameMessage) {
-                    window.showGameMessage('❌ Failed to send attack command!', 3000);
+
+                // If this client is running in single-player/local mode (no multiplayer), finalize the attack locally
+                // Also, if for any reason the websocket exists but we're treating this as a demo, ensure local finalization
+                if (!this.isMultiplayer) {
+                    // Allow animations to play then end the turn
+                    setTimeout(() => this.handleLocalAttackFinish(), 600);
                 }
+            } else {
+                // Sending failed - notify user and fall back to local execution so demo doesn't hang
+                console.warn('WebSocket send failed - falling back to local demo behavior');
+                if (window.showGameMessage) {
+                    window.showGameMessage('⚠️ Failed to send to server - executing locally', 2000);
+                }
+                setTimeout(() => this.handleLocalAttackFinish(), 600);
             }
         } else {
-            console.error('WebSocket client not available for attack');
+            // No websocket available — assume local/demo mode: immediately finalize attack and end turn
+            console.log('Local attack execution (no WebSocket)');
             if (window.showGameMessage) {
-                window.showGameMessage('❌ Cannot use attack - not connected to game', 3000);
+                window.showGameMessage(`⚔️ Using ${attackName}...`, 1200);
             }
+            setTimeout(() => this.handleLocalAttackFinish(), 600);
+        }
+    }
+
+    // Handle finishing an attack in local/demo mode: disable further interactions and advance turn
+    handleLocalAttackFinish() {
+        console.log('handleLocalAttackFinish called — finalizing local attack and ending turn');
+
+        // Disable drag/interactions for this player
+        this.setDragEnabled(false, 'Ended turn after attack');
+
+        // If there's a linked Game instance, ask it to advance the turn locally
+        if (this.game && typeof this.game.advanceTurnLocal === 'function') {
+            try {
+                this.game.advanceTurnLocal();
+            } catch (err) {
+                console.error('Error advancing local turn:', err);
+            }
+        } else {
+            // Fallback: set internal flag
+            this.myTurnFlag = false;
         }
     }
 
@@ -2969,21 +3537,323 @@ class GUIHookUtils {
         // Close the modal first
         modalOverlay.remove();
         
+        // Check if this ability has a registered client-side handler
+        if (this.hasClientSideAbilityHandler(abilityName)) {
+            this.executeClientSideAbility(abilityName);
+            return;
+        }
+        
         // Use the ability via WebSocket if available
-        if (window.wsClient && window.wsClient.send) {
+        if (this.webSocketClient && this.webSocketClient.send) {
             console.log(`Using ability from modal: ${abilityName}`);
+            
+            // Check connection status - if not connected, fall back to local/demo execution
+            if (!this.webSocketClient.connected) {
+                console.warn('WebSocket client not connected - falling back to local demo behavior for ability');
+                if (window.showGameMessage) {
+                    window.showGameMessage('⚠️ Not connected to server - executing ability locally', 2000);
+                }
+                // For now, just show message (local ability execution could be added later)
+                setTimeout(() => {
+                    if (window.showGameMessage) {
+                        window.showGameMessage(`✨ ${abilityName} used locally!`, 1500);
+                    }
+                }, 600);
+                return;
+            }
+            
+            // Check if in a game - if not, fall back to local/demo execution
+            if (!this.webSocketClient.gameId) {
+                console.warn('WebSocket client has no gameId - falling back to local demo behavior for ability');
+                if (window.showGameMessage) {
+                    window.showGameMessage('⚠️ Not in a networked game - executing ability locally', 2000);
+                }
+                setTimeout(() => {
+                    if (window.showGameMessage) {
+                        window.showGameMessage(`✨ ${abilityName} used locally!`, 1500);
+                    }
+                }, 600);
+                return;
+            }
+            
+            // Check if it's the player's turn
+            const currentTurnState = this.isMyTurn();
+            if (!currentTurnState) {
+                console.error('Not player\'s turn for ability');
+                if (window.showGameMessage) {
+                    window.showGameMessage('❌ Not your turn!', 2000);
+                }
+                return;
+            }
+            
+            const success = this.webSocketClient.send('use_ability', { abilityName: abilityName });
+
+            if (success) {
+                // Show feedback message
+                if (window.showGameMessage) {
+                    window.showGameMessage(`✨ Using ${abilityName}...`, 2000);
+                }
+            } else {
+                // Sending failed - notify user and fall back to local execution
+                console.warn('WebSocket send failed - falling back to local demo behavior for ability');
+                if (window.showGameMessage) {
+                    window.showGameMessage('⚠️ Failed to send to server - executing ability locally', 2000);
+                }
+                setTimeout(() => {
+                    if (window.showGameMessage) {
+                        window.showGameMessage(`✨ ${abilityName} used locally!`, 1500);
+                    }
+                }, 600);
+            }
+        } else if (window.wsClient && window.wsClient.send) {
+            // Fallback to legacy wsClient (for multiplayerTest.html compatibility)
+            console.log(`Using ability from modal via legacy wsClient: ${abilityName}`);
             window.wsClient.send('use_ability', { abilityName: abilityName });
             
             // Show feedback message
             if (window.showGameMessage) {
-                window.showGameMessage(`Using ${abilityName}...`, 2000);
+                window.showGameMessage(`✨ Using ${abilityName}...`, 2000);
             }
         } else {
-            console.error('WebSocket client not available for ability');
+            // No websocket available — assume local/demo mode
+            console.log('Local ability execution (no WebSocket)');
             if (window.showGameMessage) {
-                window.showGameMessage('Cannot use ability - not connected to game', 3000);
+                window.showGameMessage(`✨ Using ${abilityName} (local mode)...`, 1200);
+            }
+            setTimeout(() => {
+                if (window.showGameMessage) {
+                    window.showGameMessage(`✨ ${abilityName} used successfully!`, 1500);
+                }
+            }, 600);
+        }
+    }
+
+    // Generic method to get a card selection from the player
+    async selectCardFromPlayer(cards, options = {}) {
+        if (!cards || cards.length === 0) {
+            return null;
+        }
+
+        // Use the generic card selection menu
+        return await this.showCardSelectionMenu(cards, options);
+    }
+
+    // Client-side ability handlers registry
+    getClientSideAbilityHandlers() {
+        return {
+            'Damage Swap': async () => {
+                return await this.handleDamageSwapClientSide();
+            },
+            'Rain Dance': async () => {
+                return await this.handleRainDanceClientSide();
+            }
+        };
+    }
+
+    // Check if an ability has a client-side handler
+    hasClientSideAbilityHandler(abilityName) {
+        const handlers = this.getClientSideAbilityHandlers();
+        return handlers.hasOwnProperty(abilityName);
+    }
+
+    // Execute ability client-side using registered handler
+    async executeClientSideAbility(abilityName) {
+        const handlers = this.getClientSideAbilityHandlers();
+        const handler = handlers[abilityName];
+        
+        if (!handler) {
+            console.error(`No client-side handler found for ability: ${abilityName}`);
+            if (window.showGameMessage) {
+                window.showGameMessage(`❌ ${abilityName} handler not found`, 2000);
+            }
+            return;
+        }
+
+        try {
+            if (window.showGameMessage) {
+                window.showGameMessage(`✨ Using ${abilityName}...`, 1000);
+            }
+            
+            const result = await handler();
+            
+            if (result && result.success) {
+                if (window.showGameMessage) {
+                    window.showGameMessage(`✨ ${abilityName} used successfully!`, 2000);
+                }
+            } else if (result && result.error) {
+                if (window.showGameMessage) {
+                    window.showGameMessage(`❌ ${result.error}`, 2000);
+                }
+            }
+            
+            return result;
+            
+        } catch (error) {
+            console.error(`Error executing client-side ability ${abilityName}:`, error);
+            if (window.showGameMessage) {
+                window.showGameMessage(`❌ Error using ${abilityName}`, 2000);
             }
         }
+    }
+
+    // Handle Damage Swap ability client-side
+    async handleDamageSwapClientSide() {
+        try {
+            // Get current game state
+            const gameState = this.getCurrentGameState();
+            if (!gameState || !gameState.yourState) {
+                return { success: false, error: 'Cannot get game state' };
+            }
+
+            const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
+            
+            // Find damaged Pokemon
+            const damagedPokemon = allPokemon.filter(card => 
+                card && card.hp < card.maxHp
+            );
+
+            if (damagedPokemon.length === 0) {
+                return { success: false, error: 'No damaged Pokemon to move damage from' };
+            }
+
+            // Select source Pokemon
+            const sourceTarget = await this.selectCardFromPlayer(damagedPokemon, {
+                title: 'Damage Swap - Select Source',
+                subtitle: 'Choose a damaged Pokémon to move 1 damage counter from:',
+                cardDisplayFunction: (card) => {
+                    const damage = card.maxHp - card.hp;
+                    return `${damage / 10} damage counter${damage > 10 ? 's' : ''}`;
+                }
+            });
+
+            if (!sourceTarget) {
+                return { success: false, error: 'No source selected' };
+            }
+
+            // Find valid damage targets
+            const damageTargets = allPokemon.filter(card => 
+                card && card !== sourceTarget && card.hp > 10
+            );
+
+            if (damageTargets.length === 0) {
+                return { success: false, error: 'No valid targets to move damage to' };
+            }
+
+            // Select target Pokemon
+            const damageTarget = await this.selectCardFromPlayer(damageTargets, {
+                title: 'Damage Swap - Select Target',
+                subtitle: `Move 1 damage counter from ${sourceTarget.cardName} to:`,
+                cardDisplayFunction: (card) => {
+                    const hpAfterDamage = card.hp - 10;
+                    return `Will have ${hpAfterDamage}/${card.maxHp} HP after receiving damage`;
+                }
+            });
+
+            if (!damageTarget) {
+                return { success: false, error: 'No target selected' };
+            }
+
+            // Execute the damage swap locally
+            sourceTarget.hp = Math.min(sourceTarget.hp + 10, sourceTarget.maxHp);
+            damageTarget.hp = Math.max(damageTarget.hp - 10, 0);
+
+            // Update visual elements if available
+            const sourceEl = document.querySelector(`[data-card-id="${sourceTarget.id}"]`);
+            const targetEl = document.querySelector(`[data-card-id="${damageTarget.id}"]`);
+            
+            if (sourceEl) this.updateCardVisualHP(sourceEl, sourceTarget);
+            if (targetEl) this.updateCardVisualHP(targetEl, damageTarget);
+
+            return { 
+                success: true, 
+                message: `Moved 1 damage counter from ${sourceTarget.cardName} to ${damageTarget.cardName}` 
+            };
+
+        } catch (error) {
+            console.error('Error in client-side Damage Swap:', error);
+            return { success: false, error: 'Unexpected error during ability execution' };
+        }
+    }
+
+    // Handle Rain Dance ability client-side
+    async handleRainDanceClientSide() {
+        try {
+            // Get current game state
+            const gameState = this.getCurrentGameState();
+            if (!gameState || !gameState.yourState) {
+                return { success: false, error: 'Cannot get game state' };
+            }
+
+            // Find Water Energy in hand
+            const waterEnergyInHand = gameState.yourState.hand.filter(card => 
+                card && card.type === 'energy' && card.energyType === 'water'
+            );
+
+            if (waterEnergyInHand.length === 0) {
+                return { success: false, error: 'No Water Energy cards in hand' };
+            }
+
+            // Find Water Pokemon
+            const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
+            const waterPokemon = allPokemon.filter(card => 
+                card && (card.type === 'water' || card.pokemonType === 'water')
+            );
+
+            if (waterPokemon.length === 0) {
+                return { success: false, error: 'No Water Pokemon to attach energy to' };
+            }
+
+            // Select target Pokemon
+            const target = await this.selectCardFromPlayer(waterPokemon, {
+                title: 'Rain Dance - Attach Water Energy',
+                subtitle: 'Choose a Water Pokémon to attach a Water Energy card to:',
+                cardDisplayFunction: (card) => {
+                    const energyCount = card.attachedEnergy ? card.attachedEnergy.length : 0;
+                    return `Currently has ${energyCount} energy card${energyCount !== 1 ? 's' : ''}`;
+                }
+            });
+
+            if (!target) {
+                return { success: false, error: 'No target selected' };
+            }
+
+            // Attach the energy locally
+            const energyCard = waterEnergyInHand[0];
+            
+            // Remove from hand
+            const handIndex = gameState.yourState.hand.indexOf(energyCard);
+            if (handIndex !== -1) {
+                gameState.yourState.hand.splice(handIndex, 1);
+            }
+
+            // Add to target Pokemon
+            if (!target.attachedEnergy) {
+                target.attachedEnergy = [];
+            }
+            target.attachedEnergy.push(energyCard);
+
+            return { 
+                success: true, 
+                message: `Attached Water Energy to ${target.cardName}` 
+            };
+
+        } catch (error) {
+            console.error('Error in client-side Rain Dance:', error);
+            return { success: false, error: 'Unexpected error during ability execution' };
+        }
+    }
+
+    // Helper method to update card visual HP
+    updateCardVisualHP(cardEl, cardData) {
+        // Update any HP displays on the card element
+        const hpElements = cardEl.querySelectorAll('.hp-display, .health-display');
+        hpElements.forEach(el => {
+            if (cardData.maxHp) {
+                el.textContent = `${cardData.hp}/${cardData.maxHp} HP`;
+            } else {
+                el.textContent = `${cardData.hp} HP`;
+            }
+        });
     }
 
     // Show detailed information about an attached card

@@ -144,6 +144,21 @@ class Game {
         // Update GUI display
         this.updateGUIState();
     }
+
+    // Advance turn locally for demo mode (flips isYourTurn flag and notifies GUI)
+    advanceTurnLocal() {
+        console.log('advanceTurnLocal called — flipping local turn state');
+        // Flip the displayState turn owner
+        this.displayState.currentPlayer = this.displayState.currentPlayer === 1 ? 2 : 1;
+        this.displayState.isYourTurn = !this.displayState.isYourTurn;
+        this.displayState.turn = (this.displayState.turn || 0) + 1;
+
+        // Re-enable drag for the new current player if this client is player 1
+        const isMyTurn = this.displayState.currentPlayer === 1;
+        if (this.guiHook) {
+            this.guiHook.setDragEnabled(isMyTurn, isMyTurn ? 'Your turn (after attack)' : 'Opponent turn');
+        }
+    }
     
     // Update the entire GUI to match the current display state
     updateGUIState() {

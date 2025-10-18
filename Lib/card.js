@@ -45,8 +45,8 @@ class Card {
         if (typeof hp !== 'number' || hp < 0) {
             throw new Error(`Invalid Pokemon HP: ${hp}`);
         }
-        this.hp = hp;
-        this.health = hp;
+        this.maxHp = hp;  // Store the original maximum HP
+        this.hp = hp;     // Current HP (will decrease with damage)
         if (typeof pokemon !== 'string' || !Pokemon.includes(pokemon)) {
             throw new Error(`Invalid Pokemon: ${pokemon}`);
         }
@@ -106,9 +106,9 @@ class Card {
             finalDamage = Math.max(0, finalDamage - 30);
         }
         
-        this.health -= finalDamage;
-        if (this.health < 0) {
-            this.health = 0;
+        this.hp -= finalDamage;
+        if (this.hp < 0) {
+            this.hp = 0;
         }
         this.owner.guiHook.damageCardElement(this, finalDamage);
     }
@@ -116,9 +116,9 @@ class Card {
         if (typeof amount !== 'number' || amount < 0) {
             throw new Error(`Invalid heal amount: ${amount}`);
         }
-        this.health += amount;
-        if (this.health > this.hp) {
-            this.health = this.hp;
+        this.hp += amount;
+        if (this.hp > this.maxHp) {
+            this.hp = this.maxHp;
         }
         this.owner.guiHook.healCardElement(this, amount);
     }
@@ -143,20 +143,52 @@ class Card {
         }
         this.attacks[attackName] = { description: attackDesc, cost: attackCost, callback: attackFunction };
     }
-    addAbility(abilityName, abilityDesc, eventListener, abilityFunction) {
+    addAbility(abilityName, abilityDesc, abilityData, effectValidator = null) {
         if (typeof abilityName !== 'string') {
             throw new Error(`Invalid ability name: ${abilityName}`);
         }
         if (typeof abilityDesc !== 'string') {
             throw new Error(`Invalid ability description: ${abilityDesc}`);
         }
-        if (!Object.values(AbilityEventListeners).includes(eventListener)) {
-            throw new Error(`Invalid ability event listener: ${eventListener}`);
+        
+        // Handle both old and new ability formats
+        let abilityConfig;
+        if (typeof abilityData === 'object' && abilityData !== null) {
+            // New format: ability data is an object with event, callback, etc.
+            abilityConfig = {
+                name: abilityName,
+                description: abilityDesc,
+                ...abilityData
+            };
+        } else {
+            // Old format: eventListener and abilityFunction as separate parameters
+            const eventListener = abilityData;
+            const abilityFunction = effectValidator; // In old format, this is the 4th parameter
+            
+            if (!Object.values(AbilityEventListeners).includes(eventListener)) {
+                throw new Error(`Invalid ability event listener: ${eventListener}`);
+            }
+            if (typeof abilityFunction !== 'function') {
+                throw new Error(`Invalid ability function: ${abilityFunction}`);
+            }
+            
+            abilityConfig = {
+                name: abilityName,
+                description: abilityDesc,
+                event: eventListener,
+                callback: abilityFunction
+            };
         }
-        if (typeof abilityFunction !== 'function') {
-            throw new Error(`Invalid ability function: ${abilityFunction}`);
+        
+        // Add effectValidator if provided
+        if (effectValidator && typeof effectValidator === 'function') {
+            abilityConfig.effectValidator = effectValidator;
         }
-        this.abilities[abilityName] = { description: abilityDesc, event: eventListener, callback: abilityFunction };
+        
+        if (!this.abilities) {
+            this.abilities = [];
+        }
+        this.abilities.push(abilityConfig);
     }
     addStatusCondition(status) {
         if (typeof status !== 'string') {
