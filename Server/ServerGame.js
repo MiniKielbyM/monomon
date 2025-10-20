@@ -214,40 +214,86 @@ class ServerGame {
             try {
                 // Set up the attacking Pokemon's owner and opponent references
                 if (activePokemon.owner) {
-                    activePokemon.owner.opponent = {
-                        activePokemon: opponent.activePokemon,
-                        bench: opponent.bench || []
-                    };
-                    
-                    // Provide server-side guiHook with coin flip functionality
                     const game = this; // Capture reference to the game instance
+
+                    // Helper to locate owner player and slot for a given card object
+                    const findOwnerAndSlot = (cardObj) => {
+                        if (!cardObj || !cardObj.id) return null;
+                        const p1 = game.gameState.player1;
+                        const p2 = game.gameState.player2;
+
+                        if (p1.activePokemon && p1.activePokemon.id === cardObj.id) return { player: p1, type: 'active', index: 0 };
+                        if (p2.activePokemon && p2.activePokemon.id === cardObj.id) return { player: p2, type: 'active', index: 0 };
+
+                        const b1 = p1.bench.findIndex(c => c && c.id === cardObj.id);
+                        if (b1 !== -1) return { player: p1, type: 'bench', index: b1 };
+                        const b2 = p2.bench.findIndex(c => c && c.id === cardObj.id);
+                        if (b2 !== -1) return { player: p2, type: 'bench', index: b2 };
+
+                        return null;
+                    };
+
+                    // Create a proxy wrapper for a pokemon object that exposes .damage and .heal like client Card
+                    const makeProxyFor = (cardRef) => {
+                        return {
+                            get cardName() { return cardRef ? cardRef.cardName : undefined; },
+                            get id() { return cardRef ? cardRef.id : undefined; },
+                            get hp() { return cardRef ? cardRef.hp : undefined; },
+                            set hp(v) { if (cardRef) cardRef.hp = v; },
+                            damage(amount, attackingType = null) {
+                                if (!cardRef) return;
+                                let finalDamage = amount;
+                                if (attackingType && cardRef.weakness === attackingType) finalDamage *= 2;
+                                if (attackingType && cardRef.resistance === attackingType) finalDamage = Math.max(0, finalDamage - 30);
+                                cardRef.hp = Math.max(0, cardRef.hp - finalDamage);
+                                if (activePokemon.owner && activePokemon.owner.guiHook && activePokemon.owner.guiHook.damageCardElement) {
+                                    activePokemon.owner.guiHook.damageCardElement(cardRef, finalDamage);
+                                } else {
+                                    console.log(`Server: ${cardRef.cardName} takes ${finalDamage} damage`);
+                                }
+
+                                // If knocked out, attempt to resolve via game.handleKnockout
+                                if (cardRef.hp === 0) {
+                                    const slot = findOwnerAndSlot(cardRef);
+                                    if (slot) {
+                                        try { game.handleKnockout(slot.player, slot.type, slot.index); } catch (err) { console.error('Error handling KO from proxy.damage:', err); }
+                                    }
+                                }
+                            },
+                            heal(amount) {
+                                if (!cardRef) return;
+                                cardRef.hp = Math.min(cardRef.maxHp || cardRef.hp, cardRef.hp + amount);
+                                if (activePokemon.owner && activePokemon.owner.guiHook && activePokemon.owner.guiHook.healCardElement) {
+                                    activePokemon.owner.guiHook.healCardElement(cardRef, amount);
+                                }
+                            }
+                        };
+                    };
+
+                    // Create opponent proxy containing proxied activePokemon and bench entries
+                    const opponentProxy = {
+                        activePokemon: opponent.activePokemon ? makeProxyFor(opponent.activePokemon) : null,
+                        bench: Array.isArray(opponent.bench) ? opponent.bench.map(c => makeProxyFor(c)) : []
+                    };
+
+                    activePokemon.owner.opponent = opponentProxy;
+
+                    // Provide server-side guiHook with coin flip functionality and helpers
                     activePokemon.owner.guiHook = {
                         async coinFlip() {
                             const result = Math.random() < 0.5;
                             console.log(`Server coin flip result: ${result ? 'heads' : 'tails'}`);
-                            
                             // Broadcast coin flip to all clients
                             game.broadcastCoinFlip(result, activePokemon.owner.username || activePokemon.cardName);
-                            
                             return result;
                         },
                         damageCardElement(pokemon, damage) {
-                            console.log(`Server: ${pokemon.cardName} takes ${damage} damage (GUI update skipped)`);
+                            console.log(`Server: ${pokemon?.cardName || 'unknown'} takes ${damage} damage (GUI update skipped)`);
                         },
                         handleKnockout(pokemon) {
-                            // Find which player owns this Pokemon and handle knockout
-                            const playerNumber = activePokemon.owner === game.gameState.player1 ? 1 : 2;
-                            const player = playerNumber === 1 ? game.gameState.player1 : game.gameState.player2;
-                            
-                            // Determine if this is active or bench Pokemon
-                            if (player.activePokemon && player.activePokemon.id === pokemon.id) {
-                                game.handleKnockout(player, 'active', 0);
-                            } else {
-                                // Find on bench
-                                const benchIndex = player.bench.findIndex(p => p && p.id === pokemon.id);
-                                if (benchIndex !== -1) {
-                                    game.handleKnockout(player, 'bench', benchIndex);
-                                }
+                            const slot = findOwnerAndSlot(pokemon);
+                            if (slot) {
+                                try { game.handleKnockout(slot.player, slot.type, slot.index); } catch (err) { console.error('Error handling KO from guiHook.handleKnockout:', err); }
                             }
                         },
                         // Store attacking Pokemon type for weakness/resistance calculations
@@ -1021,6 +1067,14 @@ class ServerGame {
             const game = this; // Capture reference to the game instance
             const mockOwner = {
                 uuid: `server-player-${playerNumber}`,
+                // Minimal player-like shape so Card methods can safely reference owner properties
+                hand: [],
+                deck: [],
+                bench: Array(5).fill(null),
+                discardPile: [],
+                prizeCards: Array(6).fill(null),
+                attachedEnergyThisTurn: false,
+                abilitiesUsedThisTurn: new Set(),
                 guiHook: {
                     coinFlip: () => {
                         const result = Math.random() < 0.5;
@@ -1111,6 +1165,25 @@ class ServerGame {
         // Draw initial hands (7 cards each)
         this.gameState.player1.hand = this.gameState.player1.deck.splice(0, 7);
         this.gameState.player2.hand = this.gameState.player2.deck.splice(0, 7);
+
+        // Assign ownership for all cards that are now in players' zones (deck, hand, prize, discard, bench, active)
+        const assignOwnersForPlayer = (playerObj) => {
+            const assign = (card) => {
+                if (card && typeof card === 'object') {
+                    card.owner = playerObj;
+                    // Ensure attachedEnergy array exists for consistent API
+                    if (!card.attachedEnergy) card.attachedEnergy = [];
+                }
+            };
+
+            ['deck', 'hand', 'discardPile', 'prizeCards', 'bench'].forEach(zone => {
+                if (Array.isArray(playerObj[zone])) playerObj[zone].forEach(assign);
+            });
+            if (playerObj.activePokemon) assign(playerObj.activePokemon);
+        };
+
+        assignOwnersForPlayer(this.gameState.player1);
+        assignOwnersForPlayer(this.gameState.player2);
         
         // Set up prize cards (6 cards each)
         for (let i = 0; i < 6; i++) {
@@ -1323,6 +1396,12 @@ class ServerGame {
                 actualCard = player.activePokemon;
                 player.activePokemon = null;
                 break;
+        }
+
+        // Ensure the moved card's owner is set to the current player
+        if (actualCard && typeof actualCard === 'object') {
+            actualCard.owner = player;
+            if (!actualCard.attachedEnergy) actualCard.attachedEnergy = [];
         }
         
         // Place card in destination (preserving all state including attached energy)
@@ -1793,7 +1872,12 @@ class ServerGame {
                 hp: card.hp,
                 imgUrl: card.imgUrl,
                 statusConditions: card.statusConditions || [],
-                attachedEnergy: card.attachedEnergy || [],
+                attachedEnergy: (card.attachedEnergy || []).map(e => ({
+                    cardName: e.cardName || e.name || null,
+                    type: e.type || 'energy',
+                    energyType: e.energyType || e.type || null,
+                    description: e.description || ''
+                })),
                 weakness: card.weakness,
                 resistance: card.resistance,
                 retreatCost: card.retreatCost,

@@ -686,29 +686,43 @@ class GUIHookUtils {
             
             // Check if this is energy attachment
             if (this.currentDropTarget.dropType === 'attach') {
-                // Energy attachment - validate first before making any changes
-                const energyCardData = this.getCardDataFromElement(this.dragging.cardEl);
-                const targetCardData = this.getCardDataFromElement(this.currentDropTarget);
-                
-                if (this.canAttachEnergy(energyCardData, targetCardData, this.currentDropTarget)) {
-                    // Valid energy attachment - proceed with local update
-                    console.log('DEBUG: Energy attachment validation passed, proceeding with attachment');
-                    this.handleLocalEnergyAttachment(this.dragging.cardEl, this.currentDropTarget);
-                    
-                    // Then update game state
-                    this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
-                    
-                    // Visual feedback for energy attachment
-                    this.showEnergyAttachmentFeedback(this.currentDropTarget);
-                } else {
-                    // Invalid energy attachment - rollback
-                    console.log('Energy attachment not allowed - rolling back');
-                    this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
-                    this.dragging.cardEl.classList.remove('empty');
-                    
-                    // Show error message
-                    if (window.showGameMessage) {
-                        window.showGameMessage('Cannot attach energy: Already attached energy this turn or invalid target', 3000);
+                try {
+                    // Energy attachment - validate first before making any changes
+                    const energyCardData = this.getCardDataFromElement(this.dragging.cardEl);
+                    const targetCardData = this.getCardDataFromElement(this.currentDropTarget);
+
+                    if (this.canAttachEnergy(energyCardData, targetCardData, this.currentDropTarget)) {
+                        // Valid energy attachment - proceed with local update
+                        console.log('DEBUG: Energy attachment validation passed, proceeding with attachment');
+                        this.handleLocalEnergyAttachment(this.dragging.cardEl, this.currentDropTarget);
+
+                        // Then update game state
+                        this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+
+                        // Visual feedback for energy attachment
+                        this.showEnergyAttachmentFeedback(this.currentDropTarget);
+                    } else {
+                        // Invalid energy attachment - rollback
+                        console.log('Energy attachment not allowed - rolling back');
+                        this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                        this.dragging.cardEl.classList.remove('empty');
+
+                        // Show error message
+                        if (window.showGameMessage) {
+                            window.showGameMessage('Cannot attach energy: Already attached energy this turn or invalid target', 3000);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error during energy attachment handling:', err, {
+                        dragging: this.dragging,
+                        currentDropTarget: this.currentDropTarget
+                    });
+                    // Attempt to rollback visual state
+                    try {
+                        this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                        this.dragging.cardEl.classList.remove('empty');
+                    } catch (e2) {
+                        console.warn('Rollback failed after energy attach error', e2);
                     }
                 }
             } else if (this.currentDropTarget.dropType === 'evolve') {

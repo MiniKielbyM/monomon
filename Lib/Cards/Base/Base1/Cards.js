@@ -1002,24 +1002,30 @@ class Arcanine extends Card {
     }
     
     async Flamethrower(){
-        // Check if Arcanine has at least one Fire Energy attached
-        const attachedEnergy = this.attachedEnergy || [];
-        const fireEnergy = attachedEnergy.find(energy => energy.energyType === 'fire' || energy.type === 'fire');
-        
+        // Ensure the pokemon's attachedEnergy array exists and is the authoritative array
+        if (!this.attachedEnergy) this.attachedEnergy = [];
+        const attachedEnergy = this.attachedEnergy;
+        const fireEnergy = attachedEnergy.find(energy => energy && (energy.energyType === 'fire' || energy.type === 'fire'));
+
         if (!fireEnergy) {
             // This should be prevented by game rules, but add safety check
             console.log('No Fire Energy attached to discard for Flamethrower');
             return;
         }
-        
+
         // Remove the fire energy from attached energy
         const energyIndex = attachedEnergy.indexOf(fireEnergy);
         if (energyIndex > -1) {
             attachedEnergy.splice(energyIndex, 1);
         }
-        
-        // Add the discarded energy to owner's discard pile
-        this.owner.discardPile.push(fireEnergy);
+
+        // Ensure owner's discard pile exists and add the discarded energy
+        if (this.owner && !this.owner.discardPile) this.owner.discardPile = [];
+        if (this.owner && Array.isArray(this.owner.discardPile)) {
+            this.owner.discardPile.push(fireEnergy);
+        } else {
+            console.log('Warning: owner.discardPile not available to receive discarded energy');
+        }
         
         // Update visual energy display
         if (this.owner.guiHook && this.owner.guiHook.updateAttachedEnergyDisplay) {
