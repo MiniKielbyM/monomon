@@ -206,12 +206,38 @@ function parseSuperParameters(superParams) {
     const cardName = params[2]?.replace(/['"`]/g, '');
     const type = convertTypeToString(params[3]);
     const hp = parseInt(params[4]) || 0;
-    
+
+    // Additional parameters (optional)
+    // params[5] => pokemon (species name)
+    // params[6] => evolvesFrom (string or null)
+    // params[7] => canEvolve (boolean)
+    let pokemon = params[5] ? params[5].replace(/['"`]/g, '') : cardName;
+
+    let evolvesFrom = null;
+    if (params[6]) {
+        const raw = params[6].trim();
+        if (raw !== 'null' && raw !== '') {
+            evolvesFrom = raw.replace(/['"`]/g, '');
+        }
+    }
+
+    let canEvolve = true;
+    if (params[7]) {
+        const raw = params[7].trim();
+        // accept true/false literals
+        if (raw === 'false' || raw === '0') canEvolve = false;
+        if (raw === 'true' || raw === '1') canEvolve = true;
+    }
+
     return {
         name: cardName,
         type: type,
         hp: hp,
-        imgUrl: imgUrl
+        imgUrl: imgUrl,
+        pokemon: pokemon,
+        evolvesFrom: evolvesFrom,
+        canEvolve: canEvolve,
+        isEvolution: evolvesFrom !== null && evolvesFrom !== undefined && evolvesFrom !== ''
     };
 }
 

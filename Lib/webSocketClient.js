@@ -164,6 +164,18 @@ class WebSocketClient {
             case 'action_error':
                 this.triggerCallback('action_error', data);
                 break;
+            case 'card_selection_request':
+                // Forward card selection requests to the GUI system
+                this.triggerCallback('card_selection_request', data);
+                break;
+            case 'coin_flip_show':
+                // Show coin flip animation to all clients
+                this.triggerCallback('coin_flip_show', data);
+                break;
+            case 'pokemon_knockout':
+                // Handle Pokemon knockout events
+                this.triggerCallback('pokemon_knockout', data);
+                break;
             case 'game_ended':
                 this.triggerCallback('game_ended', data);
                 break;

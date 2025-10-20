@@ -48,6 +48,9 @@ class GameServer {
             case 'card_move':
                 this.handleCardMove(ws, data);
                 break;
+            case 'evolve_pokemon':
+                this.handleEvolution(ws, data);
+                break;
             case 'attack_action':
                 this.handleAttackAction(ws, data);
                 break;
@@ -68,6 +71,12 @@ class GameServer {
                 break;
             case 'player_ready':
                 this.handlePlayerReady(ws, data);
+                break;
+            case 'card_selection_response':
+                this.handleCardSelectionResponse(ws, data);
+                break;
+            case 'test_knockout':
+                this.handleTestKnockout(ws, data);
                 break;
             default:
                 console.log('Unknown message type:', type);
@@ -104,8 +113,8 @@ class GameServer {
     }
 
     createGame(player1, player2) {
-        // Create new server-side game instance
-        const game = new ServerGame(player1, player2);
+        // Create new server-side game instance with GameServer reference for abilities
+        const game = new ServerGame(player1, player2, this);
         
         this.games.set(game.id, game);
         
@@ -180,6 +189,32 @@ class GameServer {
         }
     }
 
+    handleCardSelectionResponse(ws, data) {
+        const client = this.clients.get(ws);
+        if (!client || !client.gameId) {
+            console.log('Card selection response: No client or gameId found');
+            return;
+        }
+        
+        const game = this.games.get(client.gameId);
+        if (!game) {
+            console.log('Card selection response: No game found for ID:', client.gameId);
+            return;
+        }
+        
+        console.log(`Received card selection response from player ${client.playerNumber}:`, data);
+        
+        // Forward the response to the game's SocketManager event handlers
+        if (game.socketManager && game.socketManager.gameServer._socketManagerHandlers) {
+            const handler = game.socketManager.gameServer._socketManagerHandlers.get('card_selection_response');
+            if (handler) {
+                handler(data);
+            } else {
+                console.log('No handler registered for card_selection_response');
+            }
+        }
+    }
+
     sendGameStateToPlayers(game) {
         console.log('Sending game state update to players');
         
@@ -241,6 +276,39 @@ class GameServer {
             // Send error message to the moving player
             ws.send(JSON.stringify({
                 type: 'move_error',
+                message: result.error
+            }));
+        }
+    }
+
+    handleEvolution(ws, data) {
+        const client = this.clients.get(ws);
+        if (!client || !client.gameId) return;
+        
+        const game = this.games.get(client.gameId);
+        if (!game || game.state !== 'playing') return;
+
+        // Use ServerGame's evolveCard method
+        const result = game.evolveCard(
+            client.playerNumber,
+            data.evolutionCardIndex,
+            data.targetPokemonLocation,
+            data.targetPokemonIndex
+        );
+        
+        if (result.success) {
+            // Send updated game state to both players
+            this.sendGameStateToPlayers(game);
+            
+            // Send success confirmation to the evolving player
+            ws.send(JSON.stringify({
+                type: 'evolution_success',
+                message: 'Pokemon evolved successfully'
+            }));
+        } else {
+            // Send error message to the evolving player
+            ws.send(JSON.stringify({
+                type: 'evolution_error',
                 message: result.error
             }));
         }
@@ -667,7 +735,13 @@ class GameServer {
         // Check if Pokemon is knocked out
         if (defender.health <= 0) {
             // Move to discard pile
-            opponentState.discardPile.push(defender);
+            // Decompose defender into discard entries if possible
+            if (game && typeof game.collectDiscardEntries === 'function') {
+                const entries = game.collectDiscardEntries(defender);
+                entries.forEach(e => opponentState.discardPile.push(e));
+            } else {
+                opponentState.discardPile.push(defender);
+            }
             opponentState.activePokemon = null;
             
             // Award prize card (simplified)
@@ -815,7 +889,7 @@ class GameServer {
         console.log(`Professor Oak: Discarded hand and drew ${Math.min(7, playerState.deck.length)} cards`);
         
         // Broadcast the updated game state
-        this.broadcastGameStateUpdate(game);
+        game.broadcastGameState();
     }
 
     // Execute Bill effect: Draw 2 cards
@@ -833,7 +907,7 @@ class GameServer {
         console.log(`Bill: Drew ${Math.min(2, playerState.deck.length)} cards`);
         
         // Broadcast the updated game state
-        this.broadcastGameStateUpdate(game);
+        game.broadcastGameState();
     }
 
     executePlayerReady(ws, data) {
@@ -921,6 +995,25 @@ class GameServer {
         }
         
         this.clients.delete(ws);
+    }
+    
+    handleTestKnockout(ws, data) {
+        const client = this.clients.get(ws);
+        if (!client || !client.gameId) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Not in a game' }));
+            return;
+        }
+        
+        const game = this.games.get(client.gameId);
+        if (!game) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Game not found' }));
+            return;
+        }
+        
+        console.log('Admin triggered knockout test');
+        game.testKnockout();
+        
+        ws.send(JSON.stringify({ type: 'test_result', message: 'Knockout test executed' }));
     }
 
     broadcastToGame(gameId, message) {

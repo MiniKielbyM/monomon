@@ -3,7 +3,6 @@
 # Start the Pokemon TCG Multiplayer Server and Client
 echo "compiling cards..."
 node Server/buildCardData.js
-sleep 3
 echo "Starting Pokemon TCG Multiplayer System..."
 
 # Start the game server in the background

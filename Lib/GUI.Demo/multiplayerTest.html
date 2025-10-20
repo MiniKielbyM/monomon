@@ -133,6 +133,102 @@
         .deck {
             position: relative;
         }
+        
+        /* Coin Flip Modal */
+        #coin-flip-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        
+        #coin-flip-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        #coin-flip-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        #coin {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 20px auto;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        
+        .coin-side {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            backface-visibility: hidden;
+        }
+        
+        .coin-heads {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            transform: rotateY(0deg);
+        }
+        
+        .coin-tails {
+            background: linear-gradient(45deg, #C0C0C0, #808080);
+            transform: rotateY(180deg);
+        }
+        
+        .coin-spinning {
+            animation: coinSpin 2s ease-in-out;
+        }
+        
+        .coin-result-heads {
+            transform: rotateY(0deg);
+        }
+        
+        .coin-result-tails {
+            transform: rotateY(180deg);
+        }
+        
+        @keyframes coinSpin {
+            0% { transform: rotateY(0deg); }
+            25% { transform: rotateY(450deg); }
+            50% { transform: rotateY(900deg); }
+            75% { transform: rotateY(1350deg); }
+            100% { transform: rotateY(1800deg); }
+        }
+        
+        #coin-result {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 20px;
+            color: #333;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        .result-visible {
+            opacity: 1 !important;
+        }
     </style>
 </head>
 
@@ -144,6 +240,18 @@
             <input type="text" id="username-input" placeholder="Enter your username" maxlength="20">
             <br>
             <button id="join-button">Join Game</button>
+        </div>
+    </div>
+    
+    <!-- Coin Flip Modal -->
+    <div id="coin-flip-modal">
+        <div id="coin-flip-container">
+            <div id="coin-flip-title">Coin Flip</div>
+            <div id="coin">
+                <div class="coin-side coin-heads">HEADS</div>
+                <div class="coin-side coin-tails">TAILS</div>
+            </div>
+            <div id="coin-result"></div>
         </div>
     </div>
 
@@ -337,8 +445,136 @@
             }, duration);
         }
         
+        function updatePrizeCards(gameState) {
+            if (!gameState) return;
+            
+            // Update player prize cards
+            if (gameState.yourState && gameState.yourState.prizeCards) {
+                const playerPrizeCards = document.querySelectorAll('.card.player.prize');
+                const prizeCards = gameState.yourState.prizeCards;
+                const remainingPrizes = prizeCards.filter(card => card !== null).length;
+                
+                // Remove excess card elements if we have more DOM elements than remaining prizes
+                if (playerPrizeCards.length > remainingPrizes) {
+                    const cardsToRemove = playerPrizeCards.length - remainingPrizes;
+                    for (let i = 0; i < cardsToRemove; i++) {
+                        const cardToRemove = playerPrizeCards[playerPrizeCards.length - 1 - i];
+                        if (cardToRemove) {
+                            cardToRemove.remove();
+                        }
+                    }
+                }
+            }
+            
+            // Update opponent prize cards
+            if (gameState.opponentState && gameState.opponentState.prizeCards) {
+                const opponentPrizeCards = document.querySelectorAll('.card.opp.prize');
+                const prizeCards = gameState.opponentState.prizeCards;
+                const remainingPrizes = prizeCards.filter(card => card !== null).length;
+                
+                // Remove excess card elements if we have more DOM elements than remaining prizes
+                if (opponentPrizeCards.length > remainingPrizes) {
+                    const cardsToRemove = opponentPrizeCards.length - remainingPrizes;
+                    for (let i = 0; i < cardsToRemove; i++) {
+                        const cardToRemove = opponentPrizeCards[opponentPrizeCards.length - 1 - i];
+                        if (cardToRemove) {
+                            cardToRemove.remove();
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateDiscardPiles(gameState) {
+            if (!gameState) return;
+            
+            // Update player's discard pile
+            if (gameState.yourState && gameState.yourState.discardPile) {
+                const playerDiscardElement = document.querySelector('.card.discard.player');
+                if (playerDiscardElement && gameState.yourState.discardPile.length > 0) {
+                    const topCard = gameState.yourState.discardPile[gameState.yourState.discardPile.length - 1];
+                    if (topCard) {
+                        playerDiscardElement.classList.remove('empty');
+                        // Use the card's imgUrl property instead of constructing the path
+                        const imageUrl = topCard.imgUrl || topCard.cardImageUrl || `../../Cards/Base/Base Set/${topCard.cardName.replace(/\s+/g, '_')}.png`;
+                        playerDiscardElement.style.backgroundImage = `url('${imageUrl}')`;
+                        playerDiscardElement.setAttribute('data-card-name', topCard.cardName);
+                        playerDiscardElement.setAttribute('data-card-count', gameState.yourState.discardPile.length);
+                    }
+                } else if (playerDiscardElement) {
+                    playerDiscardElement.classList.add('empty');
+                    playerDiscardElement.style.backgroundImage = '';
+                    playerDiscardElement.removeAttribute('data-card-name');
+                    playerDiscardElement.removeAttribute('data-card-count');
+                }
+            }
+            
+            // Update opponent's discard pile
+            if (gameState.opponentState && gameState.opponentState.discardPile) {
+                const oppDiscardElement = document.querySelector('.card.discard.opp');
+                if (oppDiscardElement && gameState.opponentState.discardPile.length > 0) {
+                    const topCard = gameState.opponentState.discardPile[gameState.opponentState.discardPile.length - 1];
+                    if (topCard) {
+                        oppDiscardElement.classList.remove('empty');
+                        // Use the card's imgUrl property instead of constructing the path
+                        const imageUrl = topCard.imgUrl || topCard.cardImageUrl || `../../Cards/Base/Base Set/${topCard.cardName.replace(/\s+/g, '_')}.png`;
+                        oppDiscardElement.style.backgroundImage = `url('${imageUrl}')`;
+                        oppDiscardElement.setAttribute('data-card-name', topCard.cardName);
+                        oppDiscardElement.setAttribute('data-card-count', gameState.opponentState.discardPile.length);
+                    }
+                } else if (oppDiscardElement) {
+                    oppDiscardElement.classList.add('empty');
+                    oppDiscardElement.style.backgroundImage = '';
+                    oppDiscardElement.removeAttribute('data-card-name');
+                    oppDiscardElement.removeAttribute('data-card-count');
+                }
+            }
+        }
+
         // Make showGameMessage globally available
         window.showGameMessage = showGameMessage;
+        
+        function showCoinFlipToAllClients(result, playerName) {
+            const modal = document.getElementById('coin-flip-modal');
+            const coin = document.getElementById('coin');
+            const coinResult = document.getElementById('coin-result');
+            const coinTitle = document.getElementById('coin-flip-title');
+            
+            if (!modal) {
+                console.warn('Coin flip modal not found');
+                return;
+            }
+            
+            // Reset coin state
+            coin.className = '';
+            coinResult.textContent = '';
+            coinResult.classList.remove('result-visible');
+            
+            // Set title to show which player flipped
+            coinTitle.textContent = playerName ? `${playerName} flips a coin` : 'Coin Flip';
+            
+            // Show modal
+            modal.style.display = 'flex';
+            
+            // Start spinning animation
+            coin.classList.add('coin-spinning');
+            
+            // After spinning, show result
+            setTimeout(() => {
+                coin.classList.remove('coin-spinning');
+                coin.classList.add(result ? 'coin-result-heads' : 'coin-result-tails');
+                coinResult.textContent = result ? 'HEADS!' : 'TAILS!';
+                coinResult.classList.add('result-visible');
+                
+                // Hide modal after showing result
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 1500);
+            }, 2000); // Match animation duration
+        }
+        
+        // Make showCoinFlipToAllClients globally available
+        window.showCoinFlipToAllClients = showCoinFlipToAllClients;
         
         // Update turn display
         function updateTurnDisplay(gameInfo) {
@@ -460,6 +696,35 @@
                     document.body.appendChild(abilityBtn);
                 });
             }
+
+            // Add evolution buttons
+            if (window.currentGame && window.currentGame.serverGameState && window.currentGame.serverGameState.yourState) {
+                const hand = window.currentGame.serverGameState.yourState.hand || [];
+                const evolutionCards = hand.filter(card => card.evolvesFrom);
+                
+                if (evolutionCards.length > 0) {
+                    evolutionCards.forEach((evolutionCard, index) => {
+                        // Check if we have valid targets for this evolution
+                        const canEvolve = checkCanEvolve(evolutionCard);
+                        
+                        const evolutionBtn = createActionButton(
+                            `🔄 Evolve to ${evolutionCard.cardName}`,
+                            `Evolve from ${evolutionCard.evolvesFrom} to ${evolutionCard.cardName}${canEvolve ? '' : '\n❌ No valid targets to evolve!'}`,
+                            buttonIndex++,
+                            () => startEvolution(evolutionCard),
+                            'evolution'
+                        );
+                        
+                        // Disable button if can't evolve
+                        if (!canEvolve) {
+                            evolutionBtn.style.opacity = '0.5';
+                            evolutionBtn.style.cursor = 'not-allowed';
+                        }
+                        
+                        document.body.appendChild(evolutionBtn);
+                    });
+                }
+            }
         }
 
         function createActionButton(text, title, index, onClick, type = 'attack') {
@@ -468,7 +733,7 @@
             btn.innerHTML = text; // Use innerHTML to support energy icons
             btn.title = title;
             
-            const bgColor = type === 'attack' ? '#f44336' : '#4CAF50'; // Red for attacks, green for abilities
+            const bgColor = type === 'attack' ? '#f44336' : type === 'ability' ? '#4CAF50' : '#FF9800'; // Red for attacks, green for abilities, orange for evolution
             
             btn.style.cssText = `
                 position: fixed;
@@ -561,6 +826,176 @@
                 showGameMessage(`✨ Using ${abilityName}...`, 2000);
             } else {
                 showGameMessage('❌ Failed to send ability command!', 3000);
+            }
+        }
+
+        // Evolution functions
+        function checkCanEvolve(evolutionCard) {
+            if (!window.currentGame || !window.currentGame.serverGameState || !window.currentGame.serverGameState.yourState) {
+                return false;
+            }
+            
+            const playerState = window.currentGame.serverGameState.yourState;
+            const allPokemon = [playerState.activePokemon, ...playerState.bench].filter(card => card !== null);
+            
+            // Check if we have any Pokemon that this card can evolve from
+            return allPokemon.some(pokemon => pokemon.pokemon === evolutionCard.evolvesFrom);
+        }
+        
+        function startEvolution(evolutionCard) {
+            console.log(`Starting evolution with card: ${evolutionCard.cardName}`);
+            
+            // Check WebSocket connection
+            if (!wsClient.connected) {
+                showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
+                return;
+            }
+            
+            // Check if game is in progress
+            if (!wsClient.gameId) {
+                showGameMessage('❌ Not in a game! Please join a game first.', 3000);
+                return;
+            }
+            
+            // Check if it's the player's turn
+            if (!isMyTurn) {
+                showGameMessage('❌ Not your turn!', 2000);
+                return;
+            }
+            
+            // Find valid targets for evolution
+            const playerState = window.currentGame.serverGameState.yourState;
+            const validTargets = [];
+            
+            // Check active Pokemon
+            if (playerState.activePokemon && playerState.activePokemon.pokemon === evolutionCard.evolvesFrom) {
+                validTargets.push({
+                    pokemon: playerState.activePokemon,
+                    location: 'active',
+                    index: 0,
+                    name: `Active ${playerState.activePokemon.cardName}`
+                });
+            }
+            
+            // Check bench Pokemon
+            playerState.bench.forEach((pokemon, index) => {
+                if (pokemon && pokemon.pokemon === evolutionCard.evolvesFrom) {
+                    validTargets.push({
+                        pokemon: pokemon,
+                        location: 'bench',
+                        index: index,
+                        name: `Bench ${pokemon.cardName} (slot ${index + 1})`
+                    });
+                }
+            });
+            
+            if (validTargets.length === 0) {
+                showGameMessage(`❌ No ${evolutionCard.evolvesFrom} found to evolve!`, 3000);
+                return;
+            }
+            
+            // If only one target, evolve automatically
+            if (validTargets.length === 1) {
+                const target = validTargets[0];
+                performEvolution(evolutionCard, target.location, target.index);
+                return;
+            }
+            
+            // Multiple targets - show selection interface
+            showEvolutionTargetSelection(evolutionCard, validTargets);
+        }
+        
+        function showEvolutionTargetSelection(evolutionCard, validTargets) {
+            // Create selection modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 2000;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                padding: 20px;
+                border-radius: 10px;
+                max-width: 400px;
+                text-align: center;
+            `;
+            
+            content.innerHTML = `
+                <h3>Choose Pokemon to Evolve</h3>
+                <p>Select which ${evolutionCard.evolvesFrom} to evolve into ${evolutionCard.cardName}:</p>
+            `;
+            
+            validTargets.forEach(target => {
+                const btn = document.createElement('button');
+                btn.textContent = target.name;
+                btn.style.cssText = `
+                    display: block;
+                    width: 100%;
+                    margin: 10px 0;
+                    padding: 10px;
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                `;
+                btn.onclick = () => {
+                    modal.remove();
+                    performEvolution(evolutionCard, target.location, target.index);
+                };
+                content.appendChild(btn);
+            });
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.style.cssText = `
+                margin-top: 10px;
+                padding: 10px 20px;
+                background: #f44336;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            `;
+            cancelBtn.onclick = () => modal.remove();
+            content.appendChild(cancelBtn);
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+        
+        function performEvolution(evolutionCard, targetLocation, targetIndex) {
+            console.log(`Evolving ${targetLocation} Pokemon at index ${targetIndex}`);
+            
+            // Find the evolution card index in hand
+            const playerState = window.currentGame.serverGameState.yourState;
+            const handIndex = playerState.hand.findIndex(card => card.id === evolutionCard.id);
+            
+            if (handIndex === -1) {
+                showGameMessage('❌ Evolution card not found in hand!', 3000);
+                return;
+            }
+            
+            const success = wsClient.send('evolve_pokemon', {
+                evolutionCardIndex: handIndex,
+                targetPokemonLocation: targetLocation,
+                targetPokemonIndex: targetIndex
+            });
+            
+            if (success) {
+                showGameMessage(`🔄 Evolving to ${evolutionCard.cardName}...`, 2000);
+            } else {
+                showGameMessage('❌ Failed to send evolution command!', 3000);
             }
         }
 
@@ -679,6 +1114,12 @@
                 // Update deck counts
                 updateDeckCounts(gameState);
                 
+                // Update prize card displays
+                updatePrizeCards(gameState);
+                
+                // Update discard pile displays
+                updateDiscardPiles(gameState);
+                
                 // Show/hide end turn button
                 const endTurnBtn = document.getElementById('end-turn-btn') || addEndTurnButton();
                 if (gameState.isYourTurn) {
@@ -711,6 +1152,7 @@
             // Update deck counts if gameState is provided
             if (data.gameState) {
                 updateDeckCounts(data.gameState);
+                updatePrizeCards(data.gameState);
             }
             
             // Update drag controls when turn changes
@@ -779,6 +1221,68 @@
             showGameMessage('Lost connection to server. Please refresh to reconnect.', 10000);
         });
         
+        wsClient.on('coin_flip_show', (data) => {
+            console.log('Coin flip:', data);
+            showCoinFlipToAllClients(data.result, data.player);
+        });
+        
+        wsClient.on('pokemon_knockout', (data) => {
+            console.log('Pokemon knockout:', data);
+            const winnerText = data.winner === window.playerNumber ? 'You' : 'Your opponent';
+            
+            // Show knockout message
+            showGameMessage(`💥 ${data.knockedOutCard.cardName} was knocked out! ${winnerText} drew ${data.prizeCardsDrawn} prize card(s)!`, 5000);
+            
+            // Animate prize card taking
+            animatePrizeCardTaking(data.winner === window.playerNumber, data.prizeCardsDrawn);
+        });
+
+        // Evolution WebSocket handlers
+        wsClient.on('evolution_success', (data) => {
+            console.log('Evolution successful:', data);
+            showGameMessage(`🔄 ${data.message}`, 3000);
+        });
+
+        wsClient.on('evolution_error', (data) => {
+            console.log('Evolution failed:', data);
+            showGameMessage(`❌ Evolution failed: ${data.message}`, 3000);
+        });
+        
+        function animatePrizeCardTaking(isPlayer, numCards) {
+            // Determine which player's prize cards to animate
+            const prizeSelector = isPlayer ? '.card.player.prize' : '.card.opp.prize';
+            const availablePrizeCards = document.querySelectorAll(prizeSelector);
+            
+            // Animate the taking of prize cards one by one (from the end)
+            for (let i = 0; i < Math.min(numCards, availablePrizeCards.length); i++) {
+                setTimeout(() => {
+                    const card = availablePrizeCards[availablePrizeCards.length - 1 - i];
+                    if (card) {
+                        // Add glow effect before removing
+                        card.style.boxShadow = '0 0 20px #FFD700';
+                        card.style.transform = 'scale(1.1)';
+                        
+                        setTimeout(() => {
+                            // Animate the card flying away and then remove it
+                            card.style.transition = 'all 0.5s ease-out';
+                            card.style.transform = 'translateY(-100px) scale(0)';
+                            card.style.opacity = '0';
+                            
+                            // Remove the element after animation
+                            setTimeout(() => {
+                                card.remove();
+                            }, 500);
+                        }, 300);
+                    }
+                }, i * 200); // Stagger the animations
+            }
+        }
+        
+        wsClient.on('test_result', (data) => {
+            console.log('Test result:', data);
+            showGameMessage(`🧪 ${data.message}`, 3000);
+        });
+        
         // Join game button handler
         joinButton.addEventListener('click', async () => {
             const username = usernameInput.value.trim();
@@ -813,6 +1317,7 @@
         // Set up game based on player number
         function setupGame(pNum) {
             playerNumber = pNum; // Store globally for turn management
+            window.playerNumber = pNum; // Store for WebSocket handlers
             
             // Create minimal client objects (server manages all game state)
             player1 = new Client(currentUsername);
@@ -856,11 +1361,22 @@
                 };
                 
                 console.log('Game setup complete. Type "debugEnergy()" in console to debug energy attachment issues.');
+                console.log('Type "testKnockout()" in console to test the knockout and prize card system.');
 
             } catch (error) {
                 console.error('Error setting up game:', error);
             }
         }
+        
+        // Global test function for knockout system
+        window.testKnockout = function() {
+            if (wsClient && wsClient.socket && wsClient.socket.readyState === WebSocket.OPEN) {
+                console.log('Sending knockout test message to server...');
+                wsClient.send('test_knockout', {});
+            } else {
+                console.log('WebSocket not connected');
+            }
+        };
     </script>
 </body>
 <script src="/Lib/GUI.Demo/BoardDynamicSizing.js"></script>

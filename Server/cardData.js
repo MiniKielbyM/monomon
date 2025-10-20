@@ -1,5 +1,5 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-18T16:13:01.784Z
+// Generated on 2025-10-20T11:42:12.352Z
 
 export const pokemonCards = [
     {
@@ -7,6 +7,10 @@ export const pokemonCards = [
         "type": "psychic",
         "hp": 80,
         "imgUrl": "https://images.pokemontcg.io/base1/1_hires.png",
+        "pokemon": "Alakazam",
+        "evolvesFrom": "Kadabra",
+        "canEvolve": true,
+        "isEvolution": true,
         "abilities": [
             {
                 "name": "Damage Swap",
@@ -30,6 +34,10 @@ export const pokemonCards = [
         "type": "water",
         "hp": 100,
         "imgUrl": "https://images.pokemontcg.io/base1/2_hires.png",
+        "pokemon": "Blastoise",
+        "evolvesFrom": "Wartortle",
+        "canEvolve": true,
+        "isEvolution": true,
         "abilities": [
             {
                 "name": "Rain Dance",
@@ -41,8 +49,12 @@ export const pokemonCards = [
     {
         "name": "Pikachu",
         "type": "lightning",
-        "hp": 60,
+        "hp": 10,
         "imgUrl": "https://images.pokemontcg.io/base1/58_hires.png",
+        "pokemon": "Pikachu",
+        "evolvesFrom": null,
+        "canEvolve": false,
+        "isEvolution": false,
         "abilities": [],
         "attacks": [
             {
@@ -50,6 +62,59 @@ export const pokemonCards = [
                 "description": "Flip a coin. If tails, Pikachu does 10 damage to itself.",
                 "energyCost": [
                     "lightning",
+                    "colorless"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Growlithe",
+        "type": "fire",
+        "hp": 60,
+        "imgUrl": "https://images.pokemontcg.io/base1/28_hires.png",
+        "pokemon": "Growlithe",
+        "evolvesFrom": null,
+        "canEvolve": true,
+        "isEvolution": false,
+        "abilities": [],
+        "attacks": [
+            {
+                "name": "Flare",
+                "description": "Does 20 damage.",
+                "energyCost": [
+                    "fire",
+                    "colorless"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Arcanine",
+        "type": "fire",
+        "hp": 100,
+        "imgUrl": "https://images.pokemontcg.io/base1/23_hires.png",
+        "pokemon": "Arcanine",
+        "evolvesFrom": "Growlithe",
+        "canEvolve": true,
+        "isEvolution": true,
+        "abilities": [],
+        "attacks": [
+            {
+                "name": "Flamethrower",
+                "description": "Discard 1 Fire Energy card attached to Arcanine in order to use this attack.",
+                "energyCost": [
+                    "fire",
+                    "fire",
+                    "colorless"
+                ]
+            },
+            {
+                "name": "Take Down",
+                "description": "Arcanine does 30 damage to itself.",
+                "energyCost": [
+                    "fire",
+                    "fire",
+                    "colorless",
                     "colorless"
                 ]
             }

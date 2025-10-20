@@ -1,18 +1,74 @@
 import { v4 as uuidv4 } from 'uuid';
 import { pokemonCards, energyCards } from './cardData.js';
 import { Card, Energy } from '../Lib/card.js';
-import CardsBase1 from '../Lib/Cards/Base/Base1/Cards.js';
+import CardsBase1, { AbilityRegistry, ServerAbilityContext } from '../Lib/Cards/Base/Base1/Cards.js';
 
-const { Alakazam, Blastoise, Pikachu } = CardsBase1;
+const { Alakazam, Blastoise, Pikachu, Growlithe, Arcanine } = CardsBase1;
+
+// Socket manager for ability system communication
+class SocketManager {
+    constructor(gameServer, gameId) {
+        this.gameServer = gameServer; // Reference to the GameServer instance
+        this.gameId = gameId;
+        this.pendingSelections = new Map();
+    }
+
+    sendToPlayer(playerNumber, event, data) {
+        // Find the player's WebSocket connection through the game server
+        const game = this.gameServer.games.get(this.gameId);
+        if (!game) {
+            console.log(`SocketManager: Game ${this.gameId} not found`);
+            return;
+        }
+
+        const player = playerNumber === 1 ? game.player1 : game.player2;
+        if (!player || !player.ws) {
+            console.log(`SocketManager: Player ${playerNumber} or WebSocket not found`);
+            return;
+        }
+
+        // Send message through the WebSocket connection
+        const message = JSON.stringify({
+            type: event,
+            ...data
+        });
+        
+        console.log(`SocketManager: Sending ${event} to player ${playerNumber}:`, data);
+        
+        if (player.ws.readyState === 1) { // WebSocket.OPEN
+            player.ws.send(message);
+        } else {
+            console.log(`SocketManager: WebSocket not ready for player ${playerNumber}, state:`, player.ws.readyState);
+        }
+    }
+
+    on(event, handler) {
+        // For the ws library, we'll handle events through the game server
+        // This is a simplified implementation
+        if (!this.gameServer._socketManagerHandlers) {
+            this.gameServer._socketManagerHandlers = new Map();
+        }
+        this.gameServer._socketManagerHandlers.set(event, handler);
+    }
+
+    off(event, handler) {
+        if (this.gameServer._socketManagerHandlers) {
+            this.gameServer._socketManagerHandlers.delete(event);
+        }
+    }
+}
 
 // Server-side Game class - handles all game logic and state
 class ServerGame {
-    constructor(player1, player2) {
+    constructor(player1, player2, gameServer = null) {
         this.id = uuidv4();
         this.player1 = { ...player1, playerNumber: 1 };
         this.player2 = { ...player2, playerNumber: 2 };
         this.state = 'waiting_for_ready';
         this.created = new Date();
+        
+        // Socket manager for client communication
+        this.socketManager = gameServer ? new SocketManager(gameServer, this.id) : null;
         
         // Authoritative game state
         this.gameState = {
@@ -50,6 +106,9 @@ class ServerGame {
         };
         
         this.initializeDecks();
+        
+        // Remove automatic test game initialization - let players play normally
+        // this.initializeTestGame();
     }
     
     // Fisher-Yates shuffle algorithm for proper randomization
@@ -161,14 +220,35 @@ class ServerGame {
                     };
                     
                     // Provide server-side guiHook with coin flip functionality
+                    const game = this; // Capture reference to the game instance
                     activePokemon.owner.guiHook = {
                         async coinFlip() {
                             const result = Math.random() < 0.5;
                             console.log(`Server coin flip result: ${result ? 'heads' : 'tails'}`);
+                            
+                            // Broadcast coin flip to all clients
+                            game.broadcastCoinFlip(result, activePokemon.owner.username || activePokemon.cardName);
+                            
                             return result;
                         },
                         damageCardElement(pokemon, damage) {
                             console.log(`Server: ${pokemon.cardName} takes ${damage} damage (GUI update skipped)`);
+                        },
+                        handleKnockout(pokemon) {
+                            // Find which player owns this Pokemon and handle knockout
+                            const playerNumber = activePokemon.owner === game.gameState.player1 ? 1 : 2;
+                            const player = playerNumber === 1 ? game.gameState.player1 : game.gameState.player2;
+                            
+                            // Determine if this is active or bench Pokemon
+                            if (player.activePokemon && player.activePokemon.id === pokemon.id) {
+                                game.handleKnockout(player, 'active', 0);
+                            } else {
+                                // Find on bench
+                                const benchIndex = player.bench.findIndex(p => p && p.id === pokemon.id);
+                                if (benchIndex !== -1) {
+                                    game.handleKnockout(player, 'bench', benchIndex);
+                                }
+                            }
                         },
                         // Store attacking Pokemon type for weakness/resistance calculations
                         attackingPokemonType: activePokemon.type
@@ -255,6 +335,24 @@ class ServerGame {
         
         this.logAction(`Player ${playerNumber}'s ${activePokemon.cardName} used ${attackName}`);
         
+        // Check for knockouts and handle them (attacker self-damage or defender KO)
+        try {
+            // Defender knockout (opponent active Pokemon)
+            if (opponent.activePokemon && typeof opponent.activePokemon.hp === 'number' && opponent.activePokemon.hp <= 0) {
+                console.log('DEBUG: Defender HP <= 0, handling knockout for opponent active');
+                this.handleKnockout(opponent, 'active', 0);
+            }
+
+            // Attacker self-knockout (if attacker damaged itself)
+            if (activePokemon && typeof activePokemon.hp === 'number' && activePokemon.hp <= 0) {
+                console.log('DEBUG: Attacker HP <= 0, handling knockout for current player active');
+                // Note: player variable refers to the attacking player
+                this.handleKnockout(player, 'active', 0);
+            }
+        } catch (err) {
+            console.error('Error while handling knockouts after attack:', err);
+        }
+
         return { success: true, result: attackResult };
     }
 
@@ -277,6 +375,40 @@ class ServerGame {
             isPlayersTurn: this.gameState.currentPlayer === playerNumber
         });
 
+        // Try to use new server callback system first
+        const serverCallback = AbilityRegistry.getServerCallback(abilityName);
+        console.log(`Debug: serverCallback exists: ${!!serverCallback}, socketManager exists: ${!!this.socketManager}`);
+        
+        if (serverCallback && this.socketManager) {
+            try {
+                console.log(`Using new server callback system for ability: ${abilityName}`);
+                
+                // Create ability context
+                const context = new ServerAbilityContext(this.gameState, playerNumber, this.socketManager);
+                
+                // Execute the server callback
+                const result = await serverCallback(context);
+                
+                if (result.success) {
+                    console.log(`Server ability execution successful: ${result.message}`);
+                    
+                    // Broadcast state changes to all players
+                    this.broadcastGameState();
+                    
+                    return result;
+                } else {
+                    console.log(`Server ability execution failed: ${result.error}`);
+                    return result;
+                }
+            } catch (error) {
+                console.error(`Error executing server ability callback for ${abilityName}:`, error);
+                // Fall through to legacy system
+            }
+        }
+
+        // Fall back to legacy ability system
+        console.log(`Using legacy ability system for: ${abilityName}`);
+
         // Validate it's the player's turn
         if (this.gameState.currentPlayer !== playerNumber) {
             return { success: false, error: 'Not your turn' };
@@ -287,34 +419,49 @@ class ServerGame {
             return { success: false, error: 'No active Pokemon' };
         }
 
-        const activePokemon = player.activePokemon;
-        
-        // Debug logging for ability structure
-        console.log('Active Pokemon for ability:', {
-            cardName: activePokemon.cardName,
-            hasAbilities: !!activePokemon.abilities,
-            abilitiesType: typeof activePokemon.abilities,
-            abilitiesKeys: activePokemon.abilities ? Object.keys(activePokemon.abilities) : 'no abilities',
-            abilitiesContent: activePokemon.abilities
-        });
-        console.log('Looking for ability:', abilityName);
-        
-        // Find the ability in the Pokemon's abilities (can be array or object for backward compatibility)
+        // Search for the ability on ALL of the player's Pokemon (active + bench)
+        let abilityPokemon = null;
         let ability = null;
         
-        if (activePokemon.abilities) {
-            if (Array.isArray(activePokemon.abilities)) {
+        // Get all player's Pokemon
+        const allPlayerPokemon = [player.activePokemon, ...(player.bench || [])];
+        
+        console.log('Searching for ability on all Pokemon:', {
+            totalPokemon: allPlayerPokemon.length,
+            pokemonNames: allPlayerPokemon.map(p => p?.cardName).filter(Boolean),
+            searchingFor: abilityName
+        });
+        
+        // Search through all Pokemon for the ability
+        for (const pokemon of allPlayerPokemon) {
+            if (!pokemon || !pokemon.abilities) continue;
+            
+            console.log(`Checking ${pokemon.cardName} for ability:`, {
+                hasAbilities: !!pokemon.abilities,
+                abilitiesType: typeof pokemon.abilities,
+                abilitiesKeys: pokemon.abilities ? Object.keys(pokemon.abilities) : 'no abilities'
+            });
+            
+            let foundAbility = null;
+            
+            if (Array.isArray(pokemon.abilities)) {
                 // New format: abilities are stored as an array
-                ability = activePokemon.abilities.find(a => a.name === abilityName);
-            } else if (typeof activePokemon.abilities === 'object') {
+                foundAbility = pokemon.abilities.find(a => a.name === abilityName);
+            } else if (typeof pokemon.abilities === 'object') {
                 // Old format: abilities stored as object with ability name as key
-                ability = activePokemon.abilities[abilityName];
+                foundAbility = pokemon.abilities[abilityName];
+            }
+            
+            if (foundAbility) {
+                abilityPokemon = pokemon;
+                ability = foundAbility;
+                console.log(`Found ability "${abilityName}" on ${pokemon.cardName}:`, ability);
+                break;
             }
         }
         
-        console.log('Found ability:', ability);
-        
         if (!ability) {
+            console.log('Ability not found on any Pokemon');
             return { success: false, error: 'Ability not found' };
         }
 
@@ -325,34 +472,39 @@ class ServerGame {
         }
 
         // Validate ability would have an effect
-        const effectValidation = this.validateAbilityEffect(playerNumber, abilityName, activePokemon);
+        const effectValidation = this.validateAbilityEffect(playerNumber, abilityName, abilityPokemon);
         if (!effectValidation.valid) {
             return { success: false, error: effectValidation.error };
         }
 
         // Execute the ability directly using the callback
         console.log('Executing ability callback directly:', {
-            pokemon: activePokemon.cardName,
+            pokemon: abilityPokemon.cardName,
             ability: abilityName,
             hasCallback: !!ability.callback
         });
         
-        let abilityResult = { effects: [], message: `${activePokemon.cardName} used ${abilityName}!` };
+        let abilityResult = { effects: [], message: `${abilityPokemon.cardName} used ${abilityName}!` };
         
         if (ability.callback && typeof ability.callback === 'function') {
             try {
                 // Set up the Pokemon's owner and opponent references like in attacks
-                if (activePokemon.owner) {
-                    activePokemon.owner.opponent = {
+                if (abilityPokemon.owner) {
+                    abilityPokemon.owner.opponent = {
                         activePokemon: opponent.activePokemon,
                         bench: opponent.bench || []
                     };
                     
                     // Provide server-side guiHook with necessary functionality
-                    activePokemon.owner.guiHook = {
+                    const game = this; // Capture reference to the game instance
+                    abilityPokemon.owner.guiHook = {
                         async coinFlip() {
                             const result = Math.random() < 0.5;
                             console.log(`Server coin flip result: ${result ? 'heads' : 'tails'}`);
+                            
+                            // Broadcast coin flip to all clients
+                            game.broadcastCoinFlip(result, abilityPokemon.owner.username || abilityPokemon.cardName);
+                            
                             return result;
                         },
                         damageCardElement(pokemon, damage) {
@@ -360,6 +512,22 @@ class ServerGame {
                         },
                         healCardElement(pokemon, amount) {
                             console.log(`Server: ${pokemon.cardName} heals ${amount} HP (GUI update skipped)`);
+                        },
+                        handleKnockout(pokemon) {
+                            // Find which player owns this Pokemon and handle knockout
+                            const playerNumber = abilityPokemon.owner === game.gameState.player1 ? 1 : 2;
+                            const player = playerNumber === 1 ? game.gameState.player1 : game.gameState.player2;
+                            
+                            // Determine if this is active or bench Pokemon
+                            if (player.activePokemon && player.activePokemon.id === pokemon.id) {
+                                game.handleKnockout(player, 'active', 0);
+                            } else {
+                                // Find on bench
+                                const benchIndex = player.bench.findIndex(p => p && p.id === pokemon.id);
+                                if (benchIndex !== -1) {
+                                    game.handleKnockout(player, 'bench', benchIndex);
+                                }
+                            }
                         },
                         async selectFromCards(cards) {
                             // For server-side, just return the first valid card (could be improved with AI logic)
@@ -374,49 +542,49 @@ class ServerGame {
                     };
                     
                     // Make sure the owner has access to current player state
-                    activePokemon.owner.bench = player.bench;
-                    activePokemon.owner.activePokemon = player.activePokemon;
-                    activePokemon.owner.hand = player.hand;
+                    abilityPokemon.owner.bench = player.bench;
+                    abilityPokemon.owner.activePokemon = player.activePokemon;
+                    abilityPokemon.owner.hand = player.hand;
                 }
                 
                 console.log('Calling ability callback...');
-                await ability.callback.call(activePokemon);
+                await ability.callback.call(abilityPokemon);
                 
                 abilityResult = {
-                    effects: activePokemon.statusConditions || [],
-                    message: `${activePokemon.cardName} used ${abilityName} successfully!`
+                    effects: abilityPokemon.statusConditions || [],
+                    message: `${abilityPokemon.cardName} used ${abilityName} successfully!`
                 };
                 
                 console.log('Ability executed successfully:', abilityResult);
                 
                 // Clean up circular references to prevent JSON serialization issues
-                if (activePokemon.owner) {
-                    delete activePokemon.owner.opponent;
-                    delete activePokemon.owner.guiHook;
+                if (abilityPokemon.owner) {
+                    delete abilityPokemon.owner.opponent;
+                    delete abilityPokemon.owner.guiHook;
                 }
                 
             } catch (error) {
                 console.error('Error executing ability callback:', error);
-                abilityResult.message = `${activePokemon.cardName} tried to use ${abilityName} but something went wrong.`;
+                abilityResult.message = `${abilityPokemon.cardName} tried to use ${abilityName} but something went wrong.`;
                 
                 // Clean up circular references even on error
-                if (activePokemon.owner) {
-                    delete activePokemon.owner.opponent;
-                    delete activePokemon.owner.guiHook;
+                if (abilityPokemon.owner) {
+                    delete abilityPokemon.owner.opponent;
+                    delete abilityPokemon.owner.guiHook;
                 }
             }
         } else {
             // Fallback for abilities without callbacks
             abilityResult = {
                 effects: [],
-                message: `${activePokemon.cardName} used ${abilityName}!`
+                message: `${abilityPokemon.cardName} used ${abilityName}!`
             };
         }
         
         // Track ability usage for timing constraints
-        this.trackAbilityUsage(playerNumber, abilityName, activePokemon.cardName);
+        this.trackAbilityUsage(playerNumber, abilityName, abilityPokemon.cardName);
         
-        this.logAction(`Player ${playerNumber}'s ${activePokemon.cardName} used ability ${abilityName}`);
+        this.logAction(`Player ${playerNumber}'s ${abilityPokemon.cardName} used ability ${abilityName}`);
         
         return { success: true, result: abilityResult };
     }
@@ -694,15 +862,36 @@ class ServerGame {
             };
             
             // Provide server-side guiHook with coin flip functionality
+            const game = this; // Capture reference to the game instance
             attackingPokemon.owner.guiHook = {
                 async coinFlip() {
                     const result = Math.random() < 0.5;
                     console.log(`Server coin flip result: ${result ? 'heads' : 'tails'}`);
+                    
+                    // Broadcast coin flip to all clients
+                    game.broadcastCoinFlip(result, attackingPokemon.owner.username || attackingPokemon.cardName);
+                    
                     return result;
                 },
                 damageCardElement(pokemon, damage) {
                     // Server-side damage is handled by the game state, no UI updates needed
                     console.log(`Server: ${pokemon.cardName} takes ${damage} damage`);
+                },
+                handleKnockout(pokemon) {
+                    // Find which player owns this Pokemon and handle knockout
+                    const playerNumber = attackingPokemon.owner === game.gameState.player1 ? 1 : 2;
+                    const player = playerNumber === 1 ? game.gameState.player1 : game.gameState.player2;
+                    
+                    // Determine if this is active or bench Pokemon
+                    if (player.activePokemon && player.activePokemon.id === pokemon.id) {
+                        game.handleKnockout(player, 'active', 0);
+                    } else {
+                        // Find on bench
+                        const benchIndex = player.bench.findIndex(p => p && p.id === pokemon.id);
+                        if (benchIndex !== -1) {
+                            game.handleKnockout(player, 'bench', benchIndex);
+                        }
+                    }
                 }
             };
         }
@@ -813,7 +1002,9 @@ class ServerGame {
         const cardClassMap = {
             'Alakazam': Alakazam,
             'Blastoise': Blastoise,
-            'Pikachu': Pikachu
+            'Pikachu': Pikachu,
+            'Growlithe': Growlithe,
+            'Arcanine': Arcanine
         };
         
         // Use imported card data from cardData.js
@@ -827,12 +1018,33 @@ class ServerGame {
             const deck = [];
             
             // Create a mock owner for server-side cards
+            const game = this; // Capture reference to the game instance
             const mockOwner = {
                 uuid: `server-player-${playerNumber}`,
                 guiHook: {
-                    coinFlip: () => Math.random() < 0.5,
+                    coinFlip: () => {
+                        const result = Math.random() < 0.5;
+                        // Broadcast coin flip to all clients (note: this is synchronous)
+                        game.broadcastCoinFlip(result, `Player ${playerNumber}`);
+                        return result;
+                    },
                     damageCardElement: (card, damage) => {},
                     healCardElement: (card, amount) => {},
+                    handleKnockout: (pokemon) => {
+                        // Find which player owns this Pokemon and handle knockout
+                        const player = playerNumber === 1 ? game.gameState.player1 : game.gameState.player2;
+                        
+                        // Determine if this is active or bench Pokemon
+                        if (player.activePokemon && player.activePokemon.id === pokemon.id) {
+                            game.handleKnockout(player, 'active', 0);
+                        } else {
+                            // Find on bench
+                            const benchIndex = player.bench.findIndex(p => p && p.id === pokemon.id);
+                            if (benchIndex !== -1) {
+                                game.handleKnockout(player, 'bench', benchIndex);
+                            }
+                        }
+                    },
                     selectFromCards: async (cards) => cards[0] // Default to first card
                 },
                 opponent: null // Will be set after both players are created
@@ -900,10 +1112,52 @@ class ServerGame {
         this.gameState.player1.hand = this.gameState.player1.deck.splice(0, 7);
         this.gameState.player2.hand = this.gameState.player2.deck.splice(0, 7);
         
-        this.logAction('Game initialized with shuffled decks and hands');
+        // Set up prize cards (6 cards each)
+        for (let i = 0; i < 6; i++) {
+            if (this.gameState.player1.deck.length > 0) {
+                this.gameState.player1.prizeCards[i] = this.gameState.player1.deck.splice(0, 1)[0];
+            }
+            if (this.gameState.player2.deck.length > 0) {
+                this.gameState.player2.prizeCards[i] = this.gameState.player2.deck.splice(0, 1)[0];
+            }
+        }
+        
+        this.logAction('Game initialized with shuffled decks, hands, and prize cards');
+        
+        // Debug: Log initial prize cards
+        console.log('DEBUG: Initial prize cards for player 1:', this.gameState.player1.prizeCards.map(card => card ? card.cardName : 'null'));
+        console.log('DEBUG: Initial prize cards for player 2:', this.gameState.player2.prizeCards.map(card => card ? card.cardName : 'null'));
         
         // Start the first turn (Player 1 draws their first card)
         this.startTurn();
+    }
+    
+    // TEST METHOD: Manually damage a Pokemon to test knockout logic
+    testKnockout() {
+        console.log('DEBUG: Testing knockout logic...');
+        
+        // Find the first Pokemon in player 1's active or bench
+        let targetPokemon = this.gameState.player1.activePokemon;
+        if (!targetPokemon && this.gameState.player1.bench.length > 0) {
+            targetPokemon = this.gameState.player1.bench.find(p => p !== null);
+        }
+        
+        if (targetPokemon) {
+            console.log(`DEBUG: Found test target: ${targetPokemon.cardName} with ${targetPokemon.hp} HP`);
+            console.log(`DEBUG: Prize cards value on target: ${targetPokemon.prizeCards}`);
+            
+            // Manually set HP to 0 to trigger knockout
+            targetPokemon.hp = 0;
+            
+            // Manually trigger the knockout handler
+            if (targetPokemon.owner && targetPokemon.owner.guiHook && targetPokemon.owner.guiHook.handleKnockout) {
+                targetPokemon.owner.guiHook.handleKnockout(targetPokemon);
+            } else {
+                console.log('DEBUG: No handleKnockout method available on target Pokemon owner');
+            }
+        } else {
+            console.log('DEBUG: No target Pokemon found for knockout test');
+        }
     }
     
     // Set up opponent references for all card instances
@@ -1037,24 +1291,20 @@ class ServerGame {
         // Handle energy attachment
         if (card.type === 'energy' && toType === 'attach') {
             // Remove energy from hand
-            player.hand.splice(fromIndex, 1);
+            const energyCard = player.hand.splice(fromIndex, 1)[0];
             
             // Attach to target Pokemon
             const targetPokemon = toIndex === 'active' ? player.activePokemon : player.bench[parseInt(toIndex)];
             if (!targetPokemon.attachedEnergy) {
                 targetPokemon.attachedEnergy = [];
             }
-            targetPokemon.attachedEnergy.push({
-                id: card.id,
-                energyType: card.energyType,
-                cardName: card.cardName,
-                imgUrl: card.imgUrl
-            });
+            // Store the full energy card object
+            targetPokemon.attachedEnergy.push(energyCard);
             
             // Mark that player has attached energy this turn
             player.energyAttachedThisTurn = true;
             
-            this.logAction(`Player ${playerNumber} attached ${card.cardName} to ${targetPokemon.cardName}`);
+            this.logAction(`Player ${playerNumber} attached ${energyCard.cardName} to ${targetPokemon.cardName}`);
             return;
         }
         
@@ -1084,9 +1334,63 @@ class ServerGame {
                 player.bench[toIndex] = actualCard;
                 break;
             case 'discard':
-                player.discardPile.push(actualCard);
+                // If discarding a Pokemon, decompose into separate discard entries
+                if (actualCard && actualCard.type === 'pokemon') {
+                    const discardEntries = this.collectDiscardEntries(actualCard);
+                    discardEntries.forEach(entry => player.discardPile.push(entry));
+                } else {
+                    player.discardPile.push(actualCard);
+                }
                 break;
         }
+    }
+
+    // Collect discardable entries when a Pokemon is discarded (attached energy and evolution stack)
+    collectDiscardEntries(pokemonCard) {
+        const entries = [];
+
+        if (!pokemonCard) return entries;
+
+        // If the pokemon has an evolutionStack, push each previous evolution as its own discard entry
+        if (pokemonCard.evolutionStack && Array.isArray(pokemonCard.evolutionStack)) {
+            // Push in order from oldest to newest
+            pokemonCard.evolutionStack.forEach(prev => {
+                if (prev) entries.push(prev);
+                // Also if previous forms had attached energy arrays, push those energies separately
+                if (prev && prev.attachedEnergy && Array.isArray(prev.attachedEnergy)) {
+                    prev.attachedEnergy.forEach(en => entries.push(en));
+                    prev.attachedEnergy = [];
+                }
+            });
+            // Clear the evolution stack from the card to avoid duplication
+            pokemonCard.evolutionStack = [];
+        }
+
+        // Push the top form itself as a discard entry
+        entries.push(pokemonCard);
+
+        // If the top form has attachedEnergy, push each energy as its own discard entry
+        if (pokemonCard.attachedEnergy && Array.isArray(pokemonCard.attachedEnergy)) {
+            pokemonCard.attachedEnergy.forEach(energyCard => entries.push(energyCard));
+            pokemonCard.attachedEnergy = [];
+        }
+
+        // Backwards compatibility: old 'energy' array
+        if (pokemonCard.energy && Array.isArray(pokemonCard.energy)) {
+            pokemonCard.energy.forEach(energyType => {
+                const energyCard = {
+                    cardName: `${energyType} Energy`,
+                    type: 'Energy',
+                    energyType: energyType,
+                    id: this.generateUUID ? this.generateUUID() : uuidv4(),
+                    imgUrl: `../../Cards/Base/Base Set/${energyType}_Energy.png`
+                };
+                entries.push(energyCard);
+            });
+            pokemonCard.energy = [];
+        }
+
+        return entries;
     }
     
     // Attack execution
@@ -1155,6 +1459,8 @@ class ServerGame {
     handleKnockout(player, cardType, cardIndex) {
         let knockedOutCard = null;
         
+        console.log(`DEBUG: handleKnockout called for ${cardType} at index ${cardIndex}`);
+        
         if (cardType === 'active') {
             knockedOutCard = player.activePokemon;
             player.activePokemon = null;
@@ -1164,9 +1470,223 @@ class ServerGame {
         }
         
         if (knockedOutCard) {
-            player.discardPile.push(knockedOutCard);
-            this.logAction(`${knockedOutCard.cardName} was knocked out`);
+            console.log(`DEBUG: Knocked out Pokemon: ${knockedOutCard.cardName}, prizeCards value: ${knockedOutCard.prizeCards}`);
+            
+            // Decompose the knocked out Pokemon and push separate discard entries (previous evolutions + top form + attached energies)
+            const discardEntries = this.collectDiscardEntries(knockedOutCard);
+            discardEntries.forEach(entry => player.discardPile.push(entry));
+            this.logAction(`Discarded ${discardEntries.length} entries from knocked out ${knockedOutCard.cardName}`);
+            
+            // Handle prize card drawing for the opponent
+            const opponent = player === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
+            const prizeCardsToTake = knockedOutCard.prizeCards || 1;
+            
+            console.log(`DEBUG: Opponent should draw ${prizeCardsToTake} prize cards`);
+            console.log(`DEBUG: Opponent prize cards before:`, opponent.prizeCards.map(card => card ? card.cardName : 'null'));
+            
+            this.drawPrizeCards(opponent, prizeCardsToTake);
+            
+            this.logAction(`${knockedOutCard.cardName} was knocked out! Opponent draws ${prizeCardsToTake} prize card(s)`);
+            
+            // Broadcast the knockout event to all clients
+            this.broadcastKnockout(knockedOutCard, opponent, prizeCardsToTake);
+            
+            // Broadcast updated game state to show cards in discard pile
+            this.broadcastGameState();
+        } else {
+            console.log(`DEBUG: No knocked out card found for ${cardType} at index ${cardIndex}`);
         }
+    }
+    
+    // Draw prize cards for a player
+    drawPrizeCards(player, numCards) {
+        let cardsDrawn = 0;
+        
+        console.log(`DEBUG: Attempting to draw ${numCards} prize cards`);
+        console.log(`DEBUG: Prize cards array length: ${player.prizeCards.length}`);
+        console.log(`DEBUG: Prize cards content:`, player.prizeCards.map(card => card ? card.cardName : 'null'));
+        
+        for (let i = 0; i < player.prizeCards.length && cardsDrawn < numCards; i++) {
+            if (player.prizeCards[i] !== null) {
+                const prizeCard = player.prizeCards[i];
+                player.hand.push(prizeCard);
+                player.prizeCards[i] = null;
+                cardsDrawn++;
+                this.logAction(`Player drew prize card: ${prizeCard.cardName}`);
+            }
+        }
+        
+        if (cardsDrawn > 0) {
+            this.logAction(`Player drew ${cardsDrawn} prize card(s)`);
+        } else {
+            console.log(`DEBUG: No prize cards were drawn - all slots were null`);
+        }
+        
+        return cardsDrawn;
+    }
+
+    // Evolution system
+    evolveCard(playerNumber, evolutionCardIndex, targetPokemonLocation, targetPokemonIndex) {
+        const player = playerNumber === 1 ? this.gameState.player1 : this.gameState.player2;
+        
+        // Validate it's the player's turn
+        if (this.gameState.currentPlayer !== playerNumber) {
+            return { success: false, error: 'Not your turn' };
+        }
+        
+        // Get the evolution card from hand
+        const evolutionCard = player.hand[evolutionCardIndex];
+        if (!evolutionCard) {
+            return { success: false, error: 'Evolution card not found in hand' };
+        }
+        
+        // Get the target Pokemon to evolve
+        let targetPokemon = null;
+        if (targetPokemonLocation === 'active') {
+            targetPokemon = player.activePokemon;
+        } else if (targetPokemonLocation === 'bench') {
+            targetPokemon = player.bench[targetPokemonIndex];
+        } else {
+            return { success: false, error: 'Invalid target location' };
+        }
+        
+        if (!targetPokemon) {
+            return { success: false, error: 'No Pokemon at target location' };
+        }
+        
+        // Check if evolution is valid
+        const validation = this.validateEvolution(evolutionCard, targetPokemon);
+        if (!validation.valid) {
+            return { success: false, error: validation.error };
+        }
+        
+        // Execute the evolution
+        this.executeEvolution(player, evolutionCard, targetPokemon, targetPokemonLocation, targetPokemonIndex);
+        
+        this.logAction(`Player ${playerNumber} evolved ${targetPokemon.cardName} into ${evolutionCard.cardName}`);
+        
+        return { success: true };
+    }
+    
+    validateEvolution(evolutionCard, targetPokemon) {
+        // Check if the evolution card can evolve from the target Pokemon
+        if (!evolutionCard.evolvesFrom) {
+            return { valid: false, error: 'This card cannot evolve from any Pokemon' };
+        }
+        
+        if (evolutionCard.evolvesFrom !== targetPokemon.pokemon) {
+            return { 
+                valid: false, 
+                error: `${evolutionCard.cardName} can only evolve from ${evolutionCard.evolvesFrom}, not ${targetPokemon.pokemon}` 
+            };
+        }
+        
+        return { valid: true };
+    }
+    
+    executeEvolution(player, evolutionCard, targetPokemon, targetLocation, targetIndex) {
+        // Remove evolution card from hand
+        const handIndex = player.hand.indexOf(evolutionCard);
+        player.hand.splice(handIndex, 1);
+        
+        // Preserve important state from the target Pokemon
+        const currentHp = targetPokemon.hp;
+        const currentDamage = targetPokemon.maxHp - currentHp;
+        const attachedEnergy = targetPokemon.attachedEnergy || [];
+        const statusConditions = targetPokemon.statusConditions || [];
+        
+        // Create the evolved Pokemon with preserved state and evolution stack
+        const evolvedPokemon = {
+            ...evolutionCard,
+            hp: evolutionCard.hp - currentDamage, // Preserve damage taken
+            maxHp: evolutionCard.hp,
+            attachedEnergy: attachedEnergy, // Preserve attached energy
+            statusConditions: statusConditions, // Preserve status conditions
+            evolutionStack: [
+                ...(targetPokemon.evolutionStack || []), // Preserve any existing evolution stack
+                targetPokemon // Add the current Pokemon to the stack
+            ]
+        };
+        
+        // Make sure HP doesn't go below 0 or above max
+        evolvedPokemon.hp = Math.max(0, Math.min(evolvedPokemon.hp, evolvedPokemon.maxHp));
+        
+        // Place the evolved Pokemon in the target location
+        if (targetLocation === 'active') {
+            player.activePokemon = evolvedPokemon;
+        } else if (targetLocation === 'bench') {
+            player.bench[targetIndex] = evolvedPokemon;
+        }
+        
+        // Note: Pre-evolution Pokemon is now stored in evolutionStack, not discarded
+    }
+    
+    // Helper method to get evolution stack for a Pokemon
+    getEvolutionStack(pokemon) {
+        return pokemon.evolutionStack || [];
+    }
+    
+    // Helper method to devolve a Pokemon (for future devolution cards)
+    devolvePokemon(pokemon, stages = 1) {
+        if (!pokemon.evolutionStack || pokemon.evolutionStack.length === 0) {
+            return null; // Cannot devolve - no evolution stack
+        }
+        
+        let devolvedPokemon = pokemon;
+        const discardedEvolutions = [];
+        
+        // Devolve the specified number of stages
+        for (let i = 0; i < stages && devolvedPokemon.evolutionStack.length > 0; i++) {
+            // Store the current evolution for discard
+            const currentForm = {
+                ...devolvedPokemon,
+                evolutionStack: undefined // Don't include stack in discarded card
+            };
+            discardedEvolutions.push(currentForm);
+            
+            // Revert to previous evolution
+            devolvedPokemon = devolvedPokemon.evolutionStack.pop();
+            
+            // Preserve current damage and energy
+            const currentDamage = currentForm.maxHp - currentForm.hp;
+            devolvedPokemon.hp = Math.max(0, devolvedPokemon.maxHp - currentDamage);
+            devolvedPokemon.attachedEnergy = currentForm.attachedEnergy;
+            devolvedPokemon.statusConditions = currentForm.statusConditions;
+        }
+        
+        return {
+            devolvedPokemon: devolvedPokemon,
+            discardedEvolutions: discardedEvolutions
+        };
+    }
+
+    // Broadcast knockout event to all clients
+    broadcastKnockout(knockedOutCard, winner, prizeCardsDrawn) {
+        if (!this.socketManager) return;
+        
+        const knockoutData = {
+            knockedOutCard: {
+                cardName: knockedOutCard.cardName,
+                prizeCards: knockedOutCard.prizeCards || 1
+            },
+            winner: winner === this.gameState.player1 ? 1 : 2,
+            prizeCardsDrawn: prizeCardsDrawn
+        };
+        
+        // Send to both players
+        this.socketManager.sendToPlayer(1, 'pokemon_knockout', knockoutData);
+        this.socketManager.sendToPlayer(2, 'pokemon_knockout', knockoutData);
+        
+        console.log(`Broadcasting Pokemon knockout: ${knockedOutCard.cardName}, winner draws ${prizeCardsDrawn} prize cards`);
+    }
+    
+    // Generate UUID helper method
+    generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
     
     // Draw a card from deck to hand
@@ -1266,7 +1786,9 @@ class ServerGame {
             return {
                 id: card.id,
                 cardName: card.cardName,
+                name: card.name,
                 type: card.type,
+                energyType: card.energyType,
                 maxHp: card.maxHp,
                 hp: card.hp,
                 imgUrl: card.imgUrl,
@@ -1343,6 +1865,101 @@ class ServerGame {
             action: action
         });
         console.log(`[Game ${this.id}] ${action}`);
+    }
+
+    // Broadcast current game state to all connected players
+    broadcastGameState() {
+        if (!this.socketManager) return;
+        
+        // Send to player 1
+        const player1State = this.getGameStateForPlayer(1);
+        this.socketManager.sendToPlayer(1, 'game_state_update', {
+            gameState: player1State
+        });
+        
+        // Send to player 2
+        const player2State = this.getGameStateForPlayer(2);
+        this.socketManager.sendToPlayer(2, 'game_state_update', {
+            gameState: player2State
+        });
+    }
+    
+    // Broadcast coin flip result to all connected players
+    broadcastCoinFlip(result, playerName = 'A player') {
+        if (!this.socketManager) return;
+        
+        const coinFlipData = {
+            result: result,
+            player: playerName
+        };
+        
+        // Send to both players
+        this.socketManager.sendToPlayer(1, 'coin_flip_show', coinFlipData);
+        this.socketManager.sendToPlayer(2, 'coin_flip_show', coinFlipData);
+        
+        console.log(`Broadcasting coin flip: ${result ? 'heads' : 'tails'} by ${playerName}`);
+    }
+
+    // Handle client selection response
+    handleCardSelectionResponse(playerNumber, data) {
+        if (this.socketManager) {
+            // Emit the response for the ability context to handle
+            this.socketManager.io.emit('card_selection_response', data);
+        }
+    }
+
+    // Initialize a test game with some Pokemon for testing abilities
+    initializeTestGame() {
+        try {
+            // Create test Pokemon instances for both players
+            const alakazam1 = new Alakazam({ playerNumber: 1 });
+            const blastoise1 = new Blastoise({ playerNumber: 1 });
+            const pikachu1 = new Pikachu({ playerNumber: 1 });
+            
+            const alakazam2 = new Alakazam({ playerNumber: 2 });
+            const blastoise2 = new Blastoise({ playerNumber: 2 });
+            
+            // Set up player 1
+            this.gameState.player1.activePokemon = alakazam1;
+            this.gameState.player1.bench[0] = blastoise1;
+            this.gameState.player1.bench[1] = pikachu1;
+            
+            // Add some damage for testing Damage Swap
+            alakazam1.hp = alakazam1.maxHp - 20; // 20 damage
+            blastoise1.hp = blastoise1.maxHp - 10; // 10 damage
+            
+            // Set up player 2
+            this.gameState.player2.activePokemon = alakazam2;
+            this.gameState.player2.bench[0] = blastoise2;
+            
+            // Add some Water Energy to hand for Rain Dance testing
+            const waterEnergy1 = { 
+                id: 'water-energy-1', 
+                name: 'Water Energy', 
+                type: 'energy', 
+                energyType: 'water',
+                imgUrl: 'https://images.pokemontcg.io/base1/102_hires.png'
+            };
+            const waterEnergy2 = { 
+                id: 'water-energy-2', 
+                name: 'Water Energy', 
+                type: 'energy', 
+                energyType: 'water',
+                imgUrl: 'https://images.pokemontcg.io/base1/102_hires.png'
+            };
+            
+            this.gameState.player1.hand.push(waterEnergy1);
+            this.gameState.player2.hand.push(waterEnergy2);
+            
+            // Set game to main phase so abilities can be used
+            this.gameState.phase = 'main';
+            this.gameState.currentPlayer = 1; // Player 1 starts
+            
+            console.log('Test game initialized with Pokemon and abilities ready');
+            
+        } catch (error) {
+            console.error('Error initializing test game:', error);
+        }
     }
 }
 

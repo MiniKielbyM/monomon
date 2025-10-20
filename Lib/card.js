@@ -1,6 +1,16 @@
 import enums from "./enums.js";
 const { PokemonType, CardModifiers, AbilityEventListeners } = enums;
 import Pokemon from "./PokemonList.js";
+
+// Generate a UUID for unique card identification
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 class Card {
     // Check if the card has the required energy for an attack
     hasRequiredEnergy(attackName) {
@@ -34,6 +44,9 @@ class Card {
     statusConditions = [];
     //Constructor
     constructor(owner, imgUrl, cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance = null, retreatCost = 0, prizeCards = 1, cardMod = CardModifiers.Base) {
+        // Generate unique ID for this card instance
+        this.id = generateUUID();
+        
         this.owner = owner;
         // Owner validation removed to avoid circular dependency
         this.imgUrl = imgUrl;
@@ -111,6 +124,14 @@ class Card {
             this.hp = 0;
         }
         this.owner.guiHook.damageCardElement(this, finalDamage);
+        
+        // Check if Pokemon was knocked out
+        if (this.hp === 0) {
+            // Notify the owner about the knockout so they can handle prize cards and discard
+            if (this.owner.guiHook.handleKnockout) {
+                this.owner.guiHook.handleKnockout(this);
+            }
+        }
     }
     heal(amount) {
         if (typeof amount !== 'number' || amount < 0) {
@@ -233,6 +254,9 @@ class Attachment {
 class Energy extends Attachment {
     constructor(energyType) {
         super();
+        // Generate unique ID for this energy instance
+        this.id = generateUUID();
+        
         if (!Object.values(PokemonType).includes(energyType)) {
             throw new Error(`Invalid energy type: ${energyType}`);
         }

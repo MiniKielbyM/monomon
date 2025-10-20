@@ -19,6 +19,13 @@ class GUIHookUtils {
         // Store last move for potential rollback
         this.lastMove = null;
         
+        // Initialize ability handler registry
+        this.clientSideAbilityHandlers = new Map();
+        this.abilityComponents = new Map();
+        
+        // Load default ability handlers
+        this.loadDefaultAbilityHandlers();
+        
         console.log('GUIHookUtils initialized with server-data driven architecture');
     }
 
@@ -74,10 +81,50 @@ class GUIHookUtils {
         document.addEventListener('mouseup', (e) => this.onMouseUp(e));
         document.addEventListener('mouseleave', (e) => this.onMouseLeave(e));
         
-        // Touch events for mobile support
-        document.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: true });
-        document.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: true });
-        document.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: true });
+        // Inject CSS to ensure touch gestures don't interfere with dragging on touch devices
+        // This sets touch-action to none for card elements so browser panning/zooming won't block
+        // pointer/touch event handling.
+        try {
+            if (!document.getElementById('guihook-touch-style')) {
+                const s = document.createElement('style');
+                s.id = 'guihook-touch-style';
+                s.textContent = `
+                    .card { touch-action: none; -ms-touch-action: none; }
+                    #PlayerHand .card { touch-action: none; }
+                `;
+                document.head.appendChild(s);
+            }
+        } catch (err) {
+            console.warn('Could not inject touch-action CSS', err);
+        }
+
+        // Use Pointer Events if available (preferred: unified API for mouse/touch/stylus)
+        if (window.PointerEvent) {
+            document.addEventListener('pointerdown', (e) => this.onMouseDown(e));
+            document.addEventListener('pointermove', (e) => this.onMouseMove(e));
+            document.addEventListener('pointerup', (e) => this.onMouseUp(e));
+        } else {
+            // Prefer Pointer Events (unified for mouse/touch/stylus) when available.
+            if (window.PointerEvent) {
+                document.addEventListener('pointerdown', (e) => {
+                    try { console.log('pointerdown', e.pointerType, e.clientX, e.clientY); } catch (err) {}
+                    this.onMouseDown(e);
+                });
+                document.addEventListener('pointermove', (e) => {
+                    try { /* reduce noise in console */ } catch (err) {}
+                    this.onMouseMove(e);
+                });
+                document.addEventListener('pointerup', (e) => {
+                    try { console.log('pointerup', e.pointerType); } catch (err) {}
+                    this.onMouseUp(e);
+                });
+            } else {
+                // Touch events for mobile support (non-passive so we can call preventDefault())
+                document.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
+                document.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
+                document.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false });
+            }
+        }
         
         // Set up discard pile viewing functionality
         this.setupDiscardPileViewing();
@@ -402,83 +449,158 @@ class GUIHookUtils {
             }
         });
         
-        // Get the card data to determine if it's an energy card
+        // Get the card data to determine card type
         const draggedCardData = this.getCardDataFromElement(this.dragging.cardEl);
         const isEnergyCard = draggedCardData && draggedCardData.type === 'energy';
+        
+        // Use server-provided isEvolution field, or fallback to known evolution Pokemon
+        let isEvolutionCard = draggedCardData?.isEvolution;
+        if (isEvolutionCard === undefined) {
+            // Fallback: check if it's a known evolution Pokemon by name
+            const knownEvolutionPokemon = ['Alakazam', 'Blastoise', 'Arcanine', 'Charizard', 'Venusaur', 'Wartortle', 'Ivysaur', 'Charmeleon', 'Kadabra'];
+            isEvolutionCard = knownEvolutionPokemon.includes(draggedCardData?.cardName);
+        }
+        isEvolutionCard = draggedCardData && isEvolutionCard;
         
         console.log(`🔍 Collision detection for drag:`, {
             cardData: draggedCardData,
             cardType: draggedCardData?.type,
+            pokemon: draggedCardData?.pokemon,
+            evolvesFrom: draggedCardData?.evolvesFrom,
+            isEvolution: isEvolutionCard,
             isEnergyCard: isEnergyCard,
+            isEvolutionCard: isEvolutionCard,
             cardName: draggedCardData?.cardName
         });
         
-        if (isEnergyCard) {
-            console.log(`⚡ Running energy collision detection`);
-            // For energy cards, check collision with Pokemon (both empty and occupied slots)
-            document.querySelectorAll('.card.player:not(.discard):not(.hand .card)').forEach(slot => {
-                const s = slot.getBoundingClientRect();
-                const colliding = !(
-                    dragRect.right < s.left ||
-                    dragRect.left > s.right ||
-                    dragRect.bottom < s.top ||
-                    dragRect.top > s.bottom
-                );
-                
-                // Only highlight Pokemon slots (active/bench) that have Pokemon in them - not empty slots
-                const isActiveOrBench = slot.classList.contains('active') || slot.classList.contains('benched');
-                const isEmpty = slot.classList.contains('empty');
-                const isPokemonSlot = isActiveOrBench && !isEmpty;
-                
-                console.log(`Energy collision check:`, {
-                    element: slot,
-                    id: slot.id,
-                    classes: slot.className,
-                    isActiveOrBench,
-                    isEmpty,
-                    isPokemonSlot,
-                    colliding
-                });
-                
-                if (isPokemonSlot) {
-                    if (colliding) {
-                        console.log(`⚡ Setting energy attachment target:`, slot);
-                        this.currentDropTarget = slot;
-                        this.currentDropTarget.dropType = 'attach'; // Mark as energy attachment
-                    }
-                }
-            });
-        } else {
-            // For non-energy cards, check regular empty slots
-            const emptySlots = document.querySelectorAll('.card.player.empty');
-            console.log(`🎯 Checking ${emptySlots.length} empty slots for collision`);
+        // New approach: Check all potential drop targets and validate based on what we're dropping onto
+        console.log(`🎯 Checking all potential drop targets with target-based validation`);
+        
+        // Check all active/bench slots (both empty and occupied)
+        document.querySelectorAll('.card.player:not(.discard):not(.hand .card)').forEach(slot => {
+            const s = slot.getBoundingClientRect();
+            const colliding = !(
+                dragRect.right < s.left ||
+                dragRect.left > s.right ||
+                dragRect.bottom < s.top ||
+                dragRect.top > s.bottom
+            );
             
-            emptySlots.forEach((slot, index) => {
-                const s = slot.getBoundingClientRect();
-                const colliding = !(
-                    dragRect.right < s.left ||
-                    dragRect.left > s.right ||
-                    dragRect.bottom < s.top ||
-                    dragRect.top > s.bottom
-                );
+            if (!colliding) return; // Skip non-colliding slots
+            
+            const isActiveOrBench = slot.classList.contains('active') || slot.classList.contains('benched');
+            const isEmpty = slot.classList.contains('empty');
+            
+            if (!isActiveOrBench) return; // Skip non-playable slots
+            
+            console.log(`🎯 Evaluating drop target:`, {
+                element: slot,
+                id: slot.id,
+                classes: slot.className,
+                isEmpty: isEmpty,
+                draggedCard: draggedCardData?.cardName,
+                draggedType: draggedCardData?.type
+            });
+            
+            if (isEmpty) {
+                // RULE: Empty slot - only allow basic Pokemon (not evolution Pokemon)
+                const cardType = draggedCardData?.type;
+                const isPokemonType = cardType === 'pokemon' || cardType === 'fire' || cardType === 'water' || 
+                                    cardType === 'grass' || cardType === 'lightning' || cardType === 'psychic' || 
+                                    cardType === 'fighting' || cardType === 'colorless';
                 
-                console.log(`Empty slot ${index + 1}:`, {
-                    element: slot,
-                    id: slot.id,
-                    classes: slot.className,
-                    hasCardData: !!(slot.cardData || slot._cardData),
-                    hasBackgroundImage: !!slot.style.backgroundImage,
-                    colliding: colliding,
-                    rect: s
+                // Use server-provided isEvolution field, or fallback to known evolution Pokemon
+                let isEvolution = draggedCardData?.isEvolution;
+                if (isEvolution === undefined) {
+                    // Fallback: check if it's a known evolution Pokemon by name
+                    const knownEvolutionPokemon = ['Alakazam', 'Blastoise', 'Arcanine', 'Charizard', 'Venusaur', 'Wartortle', 'Ivysaur', 'Charmeleon', 'Kadabra'];
+                    isEvolution = knownEvolutionPokemon.includes(draggedCardData?.cardName);
+                }
+                const isBasicPokemon = draggedCardData && isPokemonType && !isEvolution;
+                
+                console.log(`🎯 Empty slot check:`, {
+                    cardName: draggedCardData?.cardName,
+                    type: cardType,
+                    isPokemonType: isPokemonType,
+                    isEvolution: isEvolution,
+                    evolvesFrom: draggedCardData?.evolvesFrom,
+                    isBasicPokemon: isBasicPokemon,
+                    draggedCardData: draggedCardData
                 });
                 
-                if (colliding) {
-                    console.log(`✅ Setting drop target to empty slot:`, slot);
+                if (!isEvolution && isPokemonType) {
+                    console.log(`✅ Basic Pokemon can be played on empty slot`);
                     this.currentDropTarget = slot;
-                    this.currentDropTarget.dropType = 'normal'; // Explicitly set as normal card placement
+                    this.currentDropTarget.dropType = 'normal';
+                } else {
+                    console.log(`🚫 Evolution Pokemon cannot be played on empty slot`);
                 }
-            });
-        }
+            } else {
+                // RULE: Occupied slot - check if it's energy attachment or evolution
+                const slotCardData = this.getCardDataFromElement(slot);
+                const isEnergyCard = draggedCardData && draggedCardData.type === 'energy';
+                
+                // Use same fallback logic for evolution detection
+                let isEvolutionCard = draggedCardData?.isEvolution;
+                if (isEvolutionCard === undefined) {
+                    // Fallback: check if it's a known evolution Pokemon by name
+                    const knownEvolutionPokemon = ['Alakazam', 'Blastoise', 'Arcanine', 'Charizard', 'Venusaur', 'Wartortle', 'Ivysaur', 'Charmeleon', 'Kadabra'];
+                    isEvolutionCard = knownEvolutionPokemon.includes(draggedCardData?.cardName);
+                }
+                isEvolutionCard = draggedCardData && isEvolutionCard;
+                
+                console.log(`🎯 Occupied slot check:`, {
+                    slotPokemon: slotCardData?.pokemon,
+                    draggedCard: draggedCardData?.cardName,
+                    isEnergyCard: isEnergyCard,
+                    isEvolutionCard: isEvolutionCard,
+                    draggedIsEvolution: isEvolutionCard,
+                    evolvesFrom: draggedCardData?.evolvesFrom
+                });
+                
+                if (isEnergyCard) {
+                    // RULE: Energy attachment to Pokemon
+                    console.log(`⚡ Energy attachment check`);
+                    this.currentDropTarget = slot;
+                    this.currentDropTarget.dropType = 'attach';
+                } else if (isEvolutionCard && slotCardData) {
+                    // RULE: Evolution check - use server-provided evolvesFrom field or fallback mapping
+                    let evolvesFrom = draggedCardData.evolvesFrom;
+                    if (!evolvesFrom) {
+                        // Fallback: hardcoded evolution mapping
+                        const evolutionMap = {
+                            'Alakazam': 'Kadabra',
+                            'Blastoise': 'Wartortle', 
+                            'Arcanine': 'Growlithe',
+                            'Charizard': 'Charmeleon',
+                            'Venusaur': 'Ivysaur'
+                        };
+                        evolvesFrom = evolutionMap[draggedCardData.cardName];
+                    }
+                    // Get the Pokemon species from slot - try multiple properties
+                    const slotSpecies = slotCardData.pokemon || slotCardData.cardName || slotCardData.name;
+                    const canEvolve = slotSpecies === evolvesFrom;
+                    
+                    console.log(`� Evolution check:`, {
+                        canEvolve: canEvolve,
+                        slotSpecies: slotSpecies,
+                        requiredSpecies: evolvesFrom,
+                        draggedCard: draggedCardData.cardName,
+                        slotCardData: slotCardData
+                    });
+                    
+                    if (canEvolve) {
+                        console.log(`✅ Evolution is valid`);
+                        this.currentDropTarget = slot;
+                        this.currentDropTarget.dropType = 'evolve';
+                    } else {
+                        console.log(`🚫 Evolution is not valid`);
+                    }
+                } else {
+                    console.log(`🚫 Cannot drop this card type on occupied slot`);
+                }
+            }
+        });
 
         // Special handling for discard pile - always accepts cards
         const discardPile = document.querySelector('.card.discard.player');
@@ -589,13 +711,60 @@ class GUIHookUtils {
                         window.showGameMessage('Cannot attach energy: Already attached energy this turn or invalid target', 3000);
                     }
                 }
+            } else if (this.currentDropTarget.dropType === 'evolve') {
+                // Evolution - handle the evolution drop
+                console.log('Evolution drop detected');
+                
+                const evolutionCardData = this.getCardDataFromElement(this.dragging.cardEl);
+                const targetPokemonData = this.getCardDataFromElement(this.currentDropTarget);
+                
+                if (this.canEvolve(evolutionCardData, targetPokemonData)) {
+                    console.log('Evolution validation passed, triggering evolution');
+                    console.log('Target Pokemon before evolution:', targetPokemonData);
+                    
+                    // Clear the source card since it's being used for evolution
+                    this.dragging.cardEl.style.backgroundImage = '';
+                    this.dragging.cardEl.classList.add('empty');
+                    this.dragging.cardEl.removeAttribute('data-card-name');
+                    
+                    // Trigger evolution through the game system
+                    this.handleEvolutionDrop(evolutionCardData, this.currentDropTarget);
+                } else {
+                    // Invalid evolution - rollback
+                    console.log('Evolution not allowed - rolling back');
+                    this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                    this.dragging.cardEl.classList.remove('empty');
+                    
+                    // Show error message
+                    if (window.showGameMessage) {
+                        window.showGameMessage('Cannot evolve: Invalid evolution target', 3000);
+                    }
+                }
+            } else if (this.currentDropTarget.dropType === 'discard') {
+                // Discard pile drop - do not modify client state locally. Send request to server and wait for authoritative update.
+                console.log('Dropping card to discard pile (requesting server to discard)');
+
+                // Show a temporary pending state on the source card to indicate the request is in-flight
+                this.dragging.cardEl.classList.add('pending-discard');
+
+                // Send move request to server; server will return updated game state which will update the UI
+                this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
             } else {
                 // Regular card placement
-                this.currentDropTarget.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
-                this.currentDropTarget.classList.remove('empty');
-                
-                // Update game state
-                this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+                // Check if dropping on the same slot
+                if (this.currentDropTarget === this.dragging.cardEl) {
+                    console.log('Dropping card on same slot - restoring original state');
+                    // Just restore the original state without updating game state
+                    this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                    this.dragging.cardEl.classList.remove('empty');
+                } else {
+                    // Different slot - proceed with normal placement
+                    this.currentDropTarget.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                    this.currentDropTarget.classList.remove('empty');
+                    
+                    // Update game state
+                    this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+                }
             }
         } else {
             console.log('❌ No drop target found - returning card to origin');
@@ -643,79 +812,60 @@ class GUIHookUtils {
 
     // Touch event handlers for mobile support
     onTouchStart(e) {
-        e.preventDefault(); // Prevent scrolling/zooming on touch
-        if (e.touches.length === 1) { // Only handle single finger touches
+        // Prevent scrolling/zooming on touch when possible. Listeners are non-passive so this works.
+        console.log('onTouchStart invoked', { touches: e.touches && e.touches.length });
+        if (e.cancelable) e.preventDefault();
+
+        if (e.touches && e.touches.length === 1) { // Only handle single finger touches
             const touch = e.touches[0];
-            
+
             // Find the actual target element under the touch point
-            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-            
-            // Create a synthetic mouse event
-            const mouseEvent = new MouseEvent('mousedown', {
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY) || e.target;
+
+            // Create a minimal synthetic event object compatible with onMouseDown
+            const synthetic = {
                 clientX: touch.clientX,
                 clientY: touch.clientY,
-                bubbles: true,
-                cancelable: true
-            });
-            
-            // Set the target manually for better compatibility
-            Object.defineProperty(mouseEvent, 'target', {
-                value: targetElement || e.target,
-                enumerable: true
-            });
-            
-            console.log('Touch start on:', targetElement || e.target);
-            this.onMouseDown(mouseEvent);
+                target: targetElement
+            };
+
+            console.log('Touch start on:', targetElement);
+            this.onMouseDown(synthetic);
         }
     }
 
     onTouchMove(e) {
-        e.preventDefault(); // Prevent scrolling during drag
-        if (e.touches.length === 1 && this.dragging) {
+        console.log('onTouchMove invoked', { touches: e.touches && e.touches.length, dragging: !!this.dragging });
+        // Prevent scrolling during drag when possible
+        if (e.cancelable) e.preventDefault();
+        if (e.touches && e.touches.length === 1 && this.dragging) {
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
+            const synthetic = {
                 clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            this.onMouseMove(mouseEvent);
+                clientY: touch.clientY,
+                target: document.elementFromPoint(touch.clientX, touch.clientY)
+            };
+            this.onMouseMove(synthetic);
         }
     }
 
     onTouchEnd(e) {
-        e.preventDefault();
-        if (this.dragging) {
-            // Use the last known touch position from changedTouches
-            const touch = e.changedTouches[0];
-            let mouseEvent;
-            
-            if (touch) {
-                // Find the element under the touch end point for proper drop detection
-                const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-                
-                mouseEvent = new MouseEvent('mouseup', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                    bubbles: true,
-                    cancelable: true
-                });
-                
-                // Set target for drop detection
-                Object.defineProperty(mouseEvent, 'target', {
-                    value: targetElement,
-                    enumerable: true
-                });
-                
-                console.log('Touch end on:', targetElement);
-            } else {
-                // Fallback for when touch info is not available
-                mouseEvent = new MouseEvent('mouseup', {
-                    clientX: 0,
-                    clientY: 0
-                });
-            }
-            
-            this.onMouseUp(mouseEvent);
-        }
+        console.log('onTouchEnd invoked', { changedTouches: e.changedTouches && e.changedTouches.length });
+        if (e.cancelable) e.preventDefault();
+        // Use the last known touch position from changedTouches
+        const touch = (e.changedTouches && e.changedTouches[0]) || null;
+        const synthetic = touch ? {
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+            target: document.elementFromPoint(touch.clientX, touch.clientY)
+        } : {
+            clientX: 0,
+            clientY: 0,
+            target: document.elementFromPoint(0, 0)
+        };
+
+        // Forward to mouseup logic for drop handling
+        this.onMouseUp(synthetic);
     }
 
     // Update game state when card is successfully dropped
@@ -1012,6 +1162,119 @@ class GUIHookUtils {
         console.log('Energy attachment flag manually reset to:', this.player1 ? this.player1.attachedEnergyThisTurn : false);
     }
 
+    // Evolution validation methods
+    canEvolve(evolutionCardData, targetPokemonData) {
+        // Get evolvesFrom with fallback logic
+        let evolvesFrom = evolutionCardData?.evolvesFrom;
+        if (!evolvesFrom) {
+            // Fallback: hardcoded evolution mapping
+            const evolutionMap = {
+                'Alakazam': 'Kadabra',
+                'Blastoise': 'Wartortle', 
+                'Arcanine': 'Growlithe',
+                'Charizard': 'Charmeleon',
+                'Venusaur': 'Ivysaur'
+            };
+            evolvesFrom = evolutionMap[evolutionCardData?.cardName];
+        }
+        
+        // Get target Pokemon species with fallback
+        const targetSpecies = targetPokemonData?.pokemon || targetPokemonData?.cardName || targetPokemonData?.name;
+        
+        console.log('DEBUG: Starting evolution validation', {
+            evolutionCard: evolutionCardData?.cardName,
+            evolvesFrom: evolvesFrom,
+            targetPokemon: targetPokemonData?.cardName,
+            targetSpecies: targetSpecies
+        });
+
+        // Basic validation checks
+        if (!evolutionCardData || !targetPokemonData) {
+            console.log('Evolution failed: Missing card data');
+            return false;
+        }
+
+        // Check if the evolution card can evolve from something
+        if (!evolvesFrom) {
+            console.log('Evolution failed: Evolution card does not evolve from anything');
+            return false;
+        }
+
+        // Check if the target Pokemon matches the evolution requirement
+        if (targetSpecies !== evolvesFrom) {
+            console.log(`Evolution failed: ${evolutionCardData.cardName} cannot evolve from ${targetSpecies} (needs ${evolvesFrom})`);
+            return false;
+        }
+
+        // Check if it's the player's turn
+        if (!this.isMyTurn()) {
+            console.log('Evolution failed: Not your turn');
+            return false;
+        }
+
+        // All validation checks passed
+        console.log('Evolution validation passed');
+        return true;
+    }
+
+    handleEvolutionDrop(evolutionCardData, targetPokemonEl) {
+        console.log('Handling evolution drop', {
+            evolutionCard: evolutionCardData?.cardName,
+            targetElement: targetPokemonEl
+        });
+
+        // Determine the target location and index
+        let targetLocation = 'active';
+        let targetIndex = 0;
+
+        if (targetPokemonEl.classList.contains('benched')) {
+            targetLocation = 'bench';
+            // Find the bench index
+            const benchCards = Array.from(document.querySelectorAll('.bench .card.player.benched'));
+            targetIndex = benchCards.indexOf(targetPokemonEl);
+        }
+
+        // Find the evolution card index in hand
+        const handCards = Array.from(document.querySelectorAll('#PlayerHand .card'));
+        let handIndex = -1;
+        
+        handCards.forEach((card, index) => {
+            const cardData = this.getCardDataFromElement(card);
+            if (cardData && cardData.id === evolutionCardData.id) {
+                handIndex = index;
+            }
+        });
+
+        if (handIndex === -1) {
+            console.log('Evolution failed: Could not find evolution card in hand');
+            if (window.showGameMessage) {
+                window.showGameMessage('❌ Evolution card not found in hand!', 3000);
+            }
+            return;
+        }
+
+        console.log(`Evolution drop: card at hand index ${handIndex} to ${targetLocation} ${targetIndex}`);
+
+        // Send evolution request to server
+        if (window.wsClient && window.wsClient.send) {
+            const success = window.wsClient.send('evolve_pokemon', {
+                evolutionCardIndex: handIndex,
+                targetPokemonLocation: targetLocation,
+                targetPokemonIndex: targetIndex
+            });
+
+            if (success) {
+                if (window.showGameMessage) {
+                    window.showGameMessage(`🔄 Evolving to ${evolutionCardData.cardName}...`, 2000);
+                }
+            } else {
+                if (window.showGameMessage) {
+                    window.showGameMessage('❌ Failed to send evolution command!', 3000);
+                }
+            }
+        }
+    }
+
     // Force reset energy flag when turn changes
     onTurnStart() {
         console.log('DEBUG: onTurnStart called - forcing energy flag reset');
@@ -1156,8 +1419,55 @@ class GUIHookUtils {
         // prompt user for input
     }
     coinFlip() {
-        // animate coin flip
+        return new Promise((resolve) => {
+            // Generate coin flip result
+            const result = Math.random() < 0.5;
+            
+            // Show coin flip animation to user
+            this.showCoinFlip(result);
+            
+            // Wait for animation to complete before resolving
+            setTimeout(() => {
+                resolve(result);
+            }, 3000); // Animation takes about 3 seconds
+        });
     }
+    
+    showCoinFlip(result) {
+        const modal = document.getElementById('coin-flip-modal');
+        const coin = document.getElementById('coin');
+        const coinResult = document.getElementById('coin-result');
+        
+        if (!modal) {
+            console.warn('Coin flip modal not found');
+            return;
+        }
+        
+        // Reset coin state
+        coin.className = '';
+        coinResult.textContent = '';
+        coinResult.classList.remove('result-visible');
+        
+        // Show modal
+        modal.style.display = 'flex';
+        
+        // Start spinning animation
+        coin.classList.add('coin-spinning');
+        
+        // After spinning, show result
+        setTimeout(() => {
+            coin.classList.remove('coin-spinning');
+            coin.classList.add(result ? 'coin-result-heads' : 'coin-result-tails');
+            coinResult.textContent = result ? 'HEADS!' : 'TAILS!';
+            coinResult.classList.add('result-visible');
+            
+            // Hide modal after showing result
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 1500);
+        }, 2000); // Match animation duration
+    }
+    
     playCard(cardElement, location) {
         // animate play card
     }
@@ -1725,6 +2035,70 @@ class GUIHookUtils {
                 this.game.handleInitialOpponentState(data.opponentState);
             }
         });
+
+        // Handle server ability system card selection requests
+        this.webSocketClient.on('card_selection_request', (data) => {
+            this.handleCardSelectionRequest(data);
+        });
+
+        this.webSocketClient.on('game_state_update', (data) => {
+            this.handleGameStateUpdate(data);
+        });
+    }
+
+    // Handle card selection request from server
+    async handleCardSelectionRequest(data) {
+        console.log('Received card selection request:', data);
+        
+        try {
+            // Convert server card data to format expected by selectCardFromPlayer
+            const cards = data.cards.map(card => ({
+                ...card,
+                cardName: card.cardName || card.name // Ensure compatibility
+            }));
+
+            // Show the selection UI
+            const selectedCard = await this.selectCardFromPlayer(cards, {
+                title: data.options.title,
+                subtitle: data.options.subtitle,
+                cardDisplayFunction: data.options.cardDisplayFunction ? 
+                    eval(`(${data.options.cardDisplayFunction})`) : undefined
+            });
+
+            // Send response back to server
+            this.webSocketClient.send('card_selection_response', {
+                selectionId: data.selectionId,
+                selectedCardId: selectedCard ? selectedCard.id : null,
+                cancelled: !selectedCard
+            });
+
+        } catch (error) {
+            console.error('Error handling card selection request:', error);
+            
+            // Send error response
+            this.webSocketClient.send('card_selection_response', {
+                selectionId: data.selectionId,
+                selectedCardId: null,
+                cancelled: true,
+                error: error.message
+            });
+        }
+    }
+
+    // Handle game state updates from server
+    handleGameStateUpdate(data) {
+        console.log('Received game state update:', data);
+        
+        // Update the local game state
+        if (this.game && this.game.displayState) {
+            // Merge the update with current state
+            Object.assign(this.game.displayState, data);
+            
+            // Trigger UI refresh
+            if (this.game.updateDisplay) {
+                this.game.updateDisplay();
+            }
+        }
     }
 
     // Handle opponent's card moves
@@ -2917,13 +3291,19 @@ class GUIHookUtils {
 
     // Check if Rain Dance would have an effect (client-side)
     checkRainDanceEffect(playerState) {
+        // Debug: Log hand cards
+        console.log('Rain Dance check - Hand cards:', playerState.hand.map(card => ({
+            name: card?.name,
+            type: card?.type,
+            energyType: card?.energyType
+        })));
+
         // Check for Water Energy in hand
         const waterEnergyInHand = playerState.hand.filter(card => {
-            return card && (
-                (card.type === 'water' || card.type === 'WATER') && 
-                (card.cardName && card.cardName.toLowerCase().includes('water energy'))
-            );
+            return card && card.type === 'energy' && card.energyType === 'water';
         });
+
+        console.log('Rain Dance check - Water energy found:', waterEnergyInHand.length);
 
         if (waterEnergyInHand.length === 0) {
             return { 
@@ -3069,13 +3449,7 @@ class GUIHookUtils {
         // Close the modal first
         modalOverlay.remove();
         
-        // Check if this ability has a registered client-side handler
-        if (this.hasClientSideAbilityHandler(abilityName)) {
-            this.executeClientSideAbility(abilityName);
-            return;
-        }
-        
-        // Use the ability via WebSocket if available
+        // Try server-side execution first if connected
         if (this.webSocketClient && this.webSocketClient.send) {
             console.log(`Using ability from modal: ${abilityName}`);
             
@@ -3172,14 +3546,128 @@ class GUIHookUtils {
 
     // Client-side ability handlers registry
     getClientSideAbilityHandlers() {
-        return {
-            'Damage Swap': async () => {
-                return await this.handleDamageSwapClientSide();
-            },
-            'Rain Dance': async () => {
-                return await this.handleRainDanceClientSide();
+        const handlers = {};
+        for (const [abilityName, handler] of this.clientSideAbilityHandlers) {
+            handlers[abilityName] = async () => {
+                return await this.executeGenericAbility(abilityName, handler);
+            };
+        }
+        // Fallback to legacy handlers if no registered handlers exist
+        if (this.clientSideAbilityHandlers.size === 0) {
+            return {
+                'Damage Swap': async () => {
+                    return await this.handleDamageSwapClientSide();
+                },
+                'Rain Dance': async () => {
+                    return await this.handleRainDanceClientSide();
+                }
+            };
+        }
+        return handlers;
+    }
+
+    // Load default ability handlers (can be moved to external files later)
+    loadDefaultAbilityHandlers() {
+        // Try to import and register abilities from Cards.js
+        this.loadCardAbilities();
+        
+        // Fallback: Register legacy abilities if card abilities aren't available
+        if (this.clientSideAbilityHandlers.size === 0) {
+            this.registerLegacyAbilities();
+        }
+    }
+
+    async loadCardAbilities() {
+        try {
+            // Dynamic import to avoid circular dependencies
+            const { AbilityRegistry } = await import('./Cards/Base/Base1/Cards.js');
+            // Set this instance as the GUIHookUtils for the registry
+            AbilityRegistry.setGUIHookUtils(this);
+            console.log('Successfully loaded abilities from Cards.js');
+        } catch (error) {
+            console.warn('Could not load abilities from Cards.js:', error);
+            // Fall back to legacy system
+        }
+    }
+
+    registerLegacyAbilities() {
+        // Legacy fallback abilities (can be removed once card-based system is stable)
+        this.registerAbilityHandler('Damage Swap', {
+            validator: async (gameState) => this.validateDamageSwapAbility(gameState),
+            executor: async (gameState, context) => this.executeDamageSwapAbility(gameState, context),
+            components: {
+                targetSelector: (targets) => this.selectCardFromPlayer(targets, {
+                    title: 'Damage Swap',
+                    subtitle: 'Choose Pokémon to swap damage between:',
+                    cardDisplayFunction: (card) => {
+                        const damage = card.maxHp - card.hp;
+                        return damage > 0 ? `${damage} damage` : 'No damage';
+                    }
+                })
             }
-        };
+        });
+
+        this.registerAbilityHandler('Rain Dance', {
+            validator: async (gameState) => this.validateRainDanceAbility(gameState),
+            executor: async (gameState, context) => this.executeRainDanceAbility(gameState, context),
+            components: {
+                energyFilter: (hand) => hand.filter(card => card && card.type === 'energy' && card.energyType === 'water'),
+                pokemonFilter: (allPokemon, sourceId) => allPokemon.filter(card => {
+                    if (!card || !(card.type === 'water' || card.pokemonType === 'water')) return false;
+                    return card.id !== sourceId;
+                }),
+                targetSelector: (targets) => this.selectCardFromPlayer(targets, {
+                    title: 'Rain Dance - Attach Water Energy',
+                    subtitle: 'Choose a Water Pokémon to attach a Water Energy card to:',
+                    cardDisplayFunction: (card) => {
+                        const energyCount = card.attachedEnergy ? card.attachedEnergy.length : 0;
+                        return `Currently has ${energyCount} energy card${energyCount !== 1 ? 's' : ''}`;
+                    }
+                })
+            }
+        });
+    }
+
+    // Register a new ability handler
+    registerAbilityHandler(abilityName, handler) {
+        if (!handler.validator || !handler.executor) {
+            throw new Error(`Ability handler for '${abilityName}' must have validator and executor functions`);
+        }
+        this.clientSideAbilityHandlers.set(abilityName, handler);
+        if (handler.components) {
+            this.abilityComponents.set(abilityName, handler.components);
+        }
+    }
+
+    // Generic ability execution framework
+    async executeGenericAbility(abilityName, handler) {
+        try {
+            // Get current game state
+            const gameState = this.game?.displayState;
+            if (!gameState || !gameState.yourState) {
+                return { success: false, error: 'Cannot get game state' };
+            }
+
+            // Validate the ability can be used
+            const validation = await handler.validator(gameState);
+            if (!validation.valid) {
+                return { success: false, error: validation.reason };
+            }
+
+            // Execute the ability with context
+            const context = {
+                gameState,
+                components: this.abilityComponents.get(abilityName) || {},
+                webSocketClient: this.webSocketClient,
+                isMultiplayer: this.isMultiplayer
+            };
+
+            return await handler.executor(gameState, context);
+
+        } catch (error) {
+            console.error(`Error in generic ability execution for ${abilityName}:`, error);
+            return { success: false, error: 'Unexpected error during ability execution' };
+        }
     }
 
     // Check if an ability has a client-side handler
@@ -3311,28 +3799,62 @@ class GUIHookUtils {
     async handleRainDanceClientSide() {
         try {
             // Get current game state
-            const gameState = this.getCurrentGameState();
+            const gameState = this.game?.displayState;
             if (!gameState || !gameState.yourState) {
                 return { success: false, error: 'Cannot get game state' };
             }
+
+            // Debug: Log hand cards
+            console.log('Rain Dance execution - Hand cards:', gameState.yourState.hand.map(card => ({
+                name: card?.name,
+                type: card?.type,
+                energyType: card?.energyType
+            })));
 
             // Find Water Energy in hand
             const waterEnergyInHand = gameState.yourState.hand.filter(card => 
                 card && card.type === 'energy' && card.energyType === 'water'
             );
 
+            console.log('Rain Dance execution - Water energy found:', waterEnergyInHand.length);
+
             if (waterEnergyInHand.length === 0) {
                 return { success: false, error: 'No Water Energy cards in hand' };
             }
 
-            // Find Water Pokemon
+            // Find Water Pokemon (excluding the specific Pokemon using the ability)
             const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
-            const waterPokemon = allPokemon.filter(card => 
-                card && (card.type === 'water' || card.pokemonType === 'water')
-            );
+            
+            console.log('Rain Dance - All Pokemon:', allPokemon.map(card => ({
+                id: card?.id,
+                name: card?.name,
+                cardName: card?.cardName,
+                type: card?.type,
+                pokemonType: card?.pokemonType
+            })));
+            
+            // For now, assume the active Pokemon is using Rain Dance (abilities are typically used by active Pokemon)
+            // In the future, we could pass the source Pokemon ID to the ability handler
+            const sourcePokemanId = gameState.yourState.activePokemon?.id;
+            
+            const waterPokemon = allPokemon.filter(card => {
+                if (!card || !(card.type === 'water' || card.pokemonType === 'water')) {
+                    return false;
+                }
+                
+                // Exclude the specific Pokemon using the ability by UUID
+                if (card.id === sourcePokemanId) {
+                    console.log(`Rain Dance - Excluding source Pokemon: ${card.name || card.cardName} (ID: ${card.id})`);
+                    return false;
+                }
+                
+                return true;
+            });
+
+            console.log('Rain Dance - Valid Water Pokemon targets:', waterPokemon.length);
 
             if (waterPokemon.length === 0) {
-                return { success: false, error: 'No Water Pokemon to attach energy to' };
+                return { success: false, error: 'No other Water Pokemon to attach energy to' };
             }
 
             // Select target Pokemon
@@ -3349,25 +3871,58 @@ class GUIHookUtils {
                 return { success: false, error: 'No target selected' };
             }
 
-            // Attach the energy locally
+            // Send the energy attachment to the server
             const energyCard = waterEnergyInHand[0];
-            
-            // Remove from hand
             const handIndex = gameState.yourState.hand.indexOf(energyCard);
-            if (handIndex !== -1) {
+            
+            if (handIndex === -1) {
+                return { success: false, error: 'Could not find energy card in hand' };
+            }
+
+            // Find the target Pokemon's position
+            let targetIndex;
+            if (target === gameState.yourState.activePokemon) {
+                targetIndex = 'active';
+            } else {
+                const benchIndex = gameState.yourState.bench.indexOf(target);
+                if (benchIndex !== -1) {
+                    targetIndex = benchIndex.toString();
+                } else {
+                    return { success: false, error: 'Could not find target Pokemon position' };
+                }
+            }
+
+            // Send the card move to the server if we're in multiplayer
+            if (this.isMultiplayer && this.webSocketClient) {
+                const cardData = {
+                    id: energyCard.id,
+                    name: energyCard.name,
+                    cardName: energyCard.name,
+                    type: energyCard.type,
+                    energyType: energyCard.energyType,
+                    imgUrl: energyCard.imgUrl
+                };
+                
+                this.webSocketClient.sendCardMove('hand', handIndex, 'attach', targetIndex, cardData);
+                
+                return { 
+                    success: true, 
+                    message: `Rain Dance: Attaching Water Energy to ${target.name || target.cardName}` 
+                };
+            } else {
+                // Local game mode - modify the state directly
                 gameState.yourState.hand.splice(handIndex, 1);
+                
+                if (!target.attachedEnergy) {
+                    target.attachedEnergy = [];
+                }
+                target.attachedEnergy.push(energyCard);
+                
+                return { 
+                    success: true, 
+                    message: `Attached Water Energy to ${target.name || target.cardName}` 
+                };
             }
-
-            // Add to target Pokemon
-            if (!target.attachedEnergy) {
-                target.attachedEnergy = [];
-            }
-            target.attachedEnergy.push(energyCard);
-
-            return { 
-                success: true, 
-                message: `Attached Water Energy to ${target.cardName}` 
-            };
 
         } catch (error) {
             console.error('Error in client-side Rain Dance:', error);
@@ -4134,6 +4689,145 @@ class GUIHookUtils {
         this.lastMove = null;
         
         console.log('Move rollback completed');
+    }
+
+    // === GENERIC ABILITY IMPLEMENTATIONS ===
+    
+    // Damage Swap validation
+    async validateDamageSwapAbility(gameState) {
+        const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
+        const damagedPokemon = allPokemon.filter(card => card && card.hp < card.maxHp);
+        
+        if (damagedPokemon.length === 0) {
+            return { valid: false, reason: 'No damaged Pokemon to move damage from' };
+        }
+        
+        return { valid: true };
+    }
+
+    // Damage Swap execution
+    async executeDamageSwapAbility(gameState, context) {
+        const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
+        const damagedPokemon = allPokemon.filter(card => card && card.hp < card.maxHp);
+
+        // Select Pokemon to move damage from
+        const sourceTarget = await context.components.targetSelector(damagedPokemon);
+        if (!sourceTarget) {
+            return { success: false, error: 'No source Pokemon selected' };
+        }
+
+        // Select Pokemon to move damage to
+        const destinationTarget = await context.components.targetSelector(allPokemon.filter(p => p !== sourceTarget));
+        if (!destinationTarget) {
+            return { success: false, error: 'No destination Pokemon selected' };
+        }
+
+        // For now, this is a simplified implementation
+        // In a full implementation, you'd send this to the server
+        console.log(`Damage Swap: Moving damage from ${sourceTarget.name || sourceTarget.cardName} to ${destinationTarget.name || destinationTarget.cardName}`);
+        
+        return { 
+            success: true, 
+            message: `Damage Swap used between ${sourceTarget.name || sourceTarget.cardName} and ${destinationTarget.name || destinationTarget.cardName}` 
+        };
+    }
+
+    // Rain Dance validation
+    async validateRainDanceAbility(gameState) {
+        const waterEnergyInHand = gameState.yourState.hand.filter(card => 
+            card && card.type === 'energy' && card.energyType === 'water'
+        );
+
+        if (waterEnergyInHand.length === 0) {
+            return { valid: false, reason: 'No Water Energy in hand' };
+        }
+
+        const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
+        const sourceId = gameState.yourState.activePokemon?.id;
+        const validTargets = allPokemon.filter(card => {
+            if (!card || !(card.type === 'water' || card.pokemonType === 'water')) return false;
+            return card.id !== sourceId;
+        });
+
+        if (validTargets.length === 0) {
+            return { valid: false, reason: 'No other Water Pokemon to attach energy to' };
+        }
+
+        return { valid: true };
+    }
+
+    // Rain Dance execution
+    async executeRainDanceAbility(gameState, context) {
+        const waterEnergyInHand = context.components.energyFilter(gameState.yourState.hand);
+        if (waterEnergyInHand.length === 0) {
+            return { success: false, error: 'No Water Energy cards in hand' };
+        }
+
+        const allPokemon = [gameState.yourState.activePokemon, ...gameState.yourState.bench].filter(card => card !== null);
+        const sourceId = gameState.yourState.activePokemon?.id;
+        const waterPokemon = context.components.pokemonFilter(allPokemon, sourceId);
+
+        if (waterPokemon.length === 0) {
+            return { success: false, error: 'No other Water Pokemon to attach energy to' };
+        }
+
+        // Select target Pokemon
+        const target = await context.components.targetSelector(waterPokemon);
+        if (!target) {
+            return { success: false, error: 'No target selected' };
+        }
+
+        // Execute the energy attachment
+        const energyCard = waterEnergyInHand[0];
+        const handIndex = gameState.yourState.hand.indexOf(energyCard);
+        
+        if (handIndex === -1) {
+            return { success: false, error: 'Could not find energy card in hand' };
+        }
+
+        // Find target position
+        let targetIndex;
+        if (target === gameState.yourState.activePokemon) {
+            targetIndex = 'active';
+        } else {
+            const benchIndex = gameState.yourState.bench.indexOf(target);
+            if (benchIndex !== -1) {
+                targetIndex = benchIndex.toString();
+            } else {
+                return { success: false, error: 'Could not find target Pokemon position' };
+            }
+        }
+
+        // Send to server or execute locally
+        if (context.isMultiplayer && context.webSocketClient) {
+            const cardData = {
+                id: energyCard.id,
+                name: energyCard.name,
+                cardName: energyCard.name,
+                type: energyCard.type,
+                energyType: energyCard.energyType,
+                imgUrl: energyCard.imgUrl
+            };
+            
+            context.webSocketClient.sendCardMove('hand', handIndex, 'attach', targetIndex, cardData);
+            
+            return { 
+                success: true, 
+                message: `Rain Dance: Attaching Water Energy to ${target.name || target.cardName}` 
+            };
+        } else {
+            // Local execution
+            gameState.yourState.hand.splice(handIndex, 1);
+            if (!target.attachedEnergy) {
+                target.attachedEnergy = [];
+            }
+            target.attachedEnergy.push(energyCard);
+            
+            return { 
+                success: true, 
+                message: `Attached Water Energy to ${target.name || target.cardName}` 
+            };
+        }
     }
 }
 export default GUIHookUtils;
