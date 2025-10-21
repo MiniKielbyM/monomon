@@ -1046,8 +1046,36 @@ class Arcanine extends Card {
         this.owner.guiHook.damageCardElement(this.owner.opponent.activePokemon, 80);
         
         // Deal 30 self-damage
-        this.damage(30); // Self-damage without weakness/resistance calculation
-        this.owner.guiHook.damageCardElement(this, 30);
+        const beforeHp = this.hp;
+        // Primary method - call Card.damage if available (applies weakness/resistance if provided)
+        if (typeof this.damage === 'function') {
+            try {
+                this.damage(30);
+            } catch (err) {
+                console.error('Error calling this.damage in TakeDown for', this.cardName, err);
+            }
+        } else {
+            // Defensive fallback: directly subtract HP
+            console.warn(`TakeDown: this.damage not available for ${this.cardName}, applying manual HP subtraction.`);
+            this.hp = Math.max(0, (this.hp || 0) - 30);
+        }
+
+        // If hp didn't change via damage(), apply manual subtraction (fallback)
+        if (typeof beforeHp === 'number' && this.hp === beforeHp) {
+            console.warn(`TakeDown fallback: HP unchanged after damage() for ${this.cardName}, applying manual subtraction.`);
+            this.hp = Math.max(0, (this.hp || 0) - 30);
+        }
+
+        // Update visual display for self-damage
+        const actualDamage = Math.max(0, beforeHp - this.hp);
+        if (actualDamage > 0 && this.owner && this.owner.guiHook && this.owner.guiHook.damageCardElement) {
+            this.owner.guiHook.damageCardElement(this, actualDamage);
+        }
+
+        // Trigger knockout handler if necessary
+        if (this.hp === 0 && this.owner && this.owner.guiHook && this.owner.guiHook.handleKnockout) {
+            this.owner.guiHook.handleKnockout(this);
+        }
     }
 }
 
@@ -1057,5 +1085,74 @@ Alakazam.registerDamageSwapAbility();
 Blastoise.registerRainDanceAbility();
 console.log('Server callbacks registration complete');
 
+// Register common trainer cards as server callbacks so Cards.js is the single source of truth
+AbilityRegistry.registerServerCallback('Bill', async (context) => {
+    // Draw 2 cards for the player
+    const playerState = context.player;
+    let drawn = 0;
+    for (let i = 0; i < 2 && playerState.deck.length > 0; i++) {
+        const drawnCard = playerState.deck.pop();
+        playerState.hand.push(drawnCard);
+        drawn++;
+    }
+
+    context.gameState.gameLog.push({
+        turn: context.gameState.turn,
+        player: context.playerNumber,
+        action: 'play_trainer',
+        trainer: 'Bill',
+        drawn
+    });
+
+    return { success: true, message: `Bill: Drew ${drawn} card(s)` };
+});
+
+AbilityRegistry.registerServerCallback('Professor Oak', async (context) => {
+    const playerState = context.player;
+
+    // Discard entire hand
+    playerState.discardPile.push(...playerState.hand);
+    playerState.hand = [];
+
+    // Draw up to 7 cards
+    let drawn = 0;
+    for (let i = 0; i < 7 && playerState.deck.length > 0; i++) {
+        const drawnCard = playerState.deck.pop();
+        playerState.hand.push(drawnCard);
+        drawn++;
+    }
+
+    context.gameState.gameLog.push({
+        turn: context.gameState.turn,
+        player: context.playerNumber,
+        action: 'play_trainer',
+        trainer: 'Professor Oak',
+        drawn
+    });
+
+    return { success: true, message: `Professor Oak: Discarded hand and drew ${drawn} card(s)` };
+});
+
 export default { Alakazam, Blastoise, Pikachu, Growlithe, Arcanine };
 export { AbilityRegistry, ServerAbilityContext };
+
+// Trainer card definitions (SSoT for trainers as well)
+// Export trainer templates as inline array literal so the build script can extract them safely
+export const trainerCards = [
+    {
+        cardName: 'Bill',
+        name: 'Bill',
+        type: 'trainer',
+        trainerType: 'supporter',
+        imgUrl: 'https://images.pokemontcg.io/base1/91_hires.png',
+        trainerEffect: 'Draw 2 cards.'
+    },
+    {
+        cardName: 'Professor Oak',
+        name: 'Professor Oak',
+        type: 'trainer',
+        trainerType: 'supporter',
+        imgUrl: 'https://images.pokemontcg.io/base1/88_hires.png',
+        trainerEffect: 'Discard your hand and draw 7 cards.'
+    }
+];

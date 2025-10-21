@@ -35,13 +35,10 @@ fi
 echo ""
 echo "📋 To test multiplayer:"
 if [ -n "$CODESPACE_NAME" ]; then
-    echo "1. Open https://$CODESPACE_NAME-3000.app.github.dev/Lib/GUI.Demo/multiplayerTest.html in two different browser windows/tabs"
+    echo "Open https://$CODESPACE_NAME-3000.app.github.dev/Lib/GUI.Demo/multiplayerTest.html in two different browser windows/tabs"
 else
-    echo "1. Open http://localhost:3000/Lib/GUI.Demo/multiplayerTest.html in two different browser windows/tabs"
+    echo "Open http://localhost:3000/Lib/GUI.Demo/multiplayerTest.html in two different browser windows/tabs"
 fi
-echo "2. Enter different usernames for each player"
-echo "3. Both players will be matched automatically"
-echo "4. Start moving cards and watch them sync between players!"
 echo ""
 sleep 5
 if [ -n "$CODESPACE_NAME" ]; then

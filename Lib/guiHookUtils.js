@@ -26,6 +26,10 @@ class GUIHookUtils {
         // Load default ability handlers
         this.loadDefaultAbilityHandlers();
         
+        // Feature gate: allow manual discards from the GUI (false by default)
+        // Set to true only for debugging or developer tools where manual discard is required.
+        this.allowManualDiscard = false;
+
         console.log('GUIHookUtils initialized with server-data driven architecture');
     }
 
@@ -89,8 +93,10 @@ class GUIHookUtils {
                 const s = document.createElement('style');
                 s.id = 'guihook-touch-style';
                 s.textContent = `
+                    /* Prevent browser panning/zooming on most card elements to allow dragging */
                     .card { touch-action: none; -ms-touch-action: none; }
-                    #PlayerHand .card { touch-action: none; }
+                    /* Allow horizontal scrolling inside the player's hand */
+                    #PlayerHand, #PlayerHand .hand-inner, #PlayerHand .card { touch-action: pan-x; -ms-touch-action: pan-x; }
                 `;
                 document.head.appendChild(s);
             }
@@ -518,6 +524,18 @@ class GUIHookUtils {
                 }
                 const isBasicPokemon = draggedCardData && isPokemonType && !isEvolution;
                 
+                // Additional rule: allow moving already-evolved Pokemon (on-board) to empty slots.
+                // Determine if the dragged element came from the player's hand
+                const handCards = Array.from(document.querySelectorAll('#PlayerHand .card'));
+                const sourceIsHand = handCards.indexOf(this.dragging.cardEl) !== -1;
+
+                // If dragged card came from the board (active/bench), we should allow moving it to empty
+                // slots regardless of whether it's marked as an evolution. This preserves the rule that
+                // evolution cards cannot be played onto empty slots from hand, while allowing board-placed
+                // evolved Pokemon to be repositioned by the player.
+                const sourceIsBoard = !sourceIsHand;
+                const isEvolvedOnBoard = sourceIsBoard && !!draggedCardData && Array.isArray(draggedCardData.evolutionStack) && draggedCardData.evolutionStack.length > 0;
+
                 console.log(`🎯 Empty slot check:`, {
                     cardName: draggedCardData?.cardName,
                     type: cardType,
@@ -525,10 +543,27 @@ class GUIHookUtils {
                     isEvolution: isEvolution,
                     evolvesFrom: draggedCardData?.evolvesFrom,
                     isBasicPokemon: isBasicPokemon,
+                    sourceIsHand: sourceIsHand,
+                    sourceIsBoard: sourceIsBoard,
+                    isEvolvedOnBoard: isEvolvedOnBoard,
                     draggedCardData: draggedCardData
                 });
-                
-                if (!isEvolution && isPokemonType) {
+
+                // Special-case: allow trainer cards from hand to be played by dropping anywhere on the field
+                const isTrainerFromHandSlot = sourceIsHand && draggedCardData && draggedCardData.type === 'trainer';
+
+                if (isTrainerFromHandSlot) {
+                    console.log(`✅ Trainer card from hand can be played by dropping onto empty slot`);
+                    this.currentDropTarget = slot;
+                    this.currentDropTarget.dropType = 'play_trainer';
+                } else if (sourceIsBoard) {
+                    // Any card being dragged from the board (active/bench) should be movable to empty slots.
+                    // This includes evolved pokemon, unevolved pokemon, and safely handles legacy metadata cases.
+                    console.log(`✅ Moving on-board Pokemon allowed onto empty slot (source came from board)`);
+                    this.currentDropTarget = slot;
+                    this.currentDropTarget.dropType = 'normal';
+                } else if (!isEvolution && isPokemonType) {
+                    // Basic Pokemon being played (from hand) can go to empty slot
                     console.log(`✅ Basic Pokemon can be played on empty slot`);
                     this.currentDropTarget = slot;
                     this.currentDropTarget.dropType = 'normal';
@@ -657,6 +692,45 @@ class GUIHookUtils {
         console.log('Completing drag operation');
 
         // Handle completed drag operation
+        // New behavior: If the dragged card came from the player's hand and is a trainer,
+        // activate it regardless of where it was dropped. This simplifies UX: drop anywhere
+        // and the trainer resolves immediately (client sends `play_card` and removes the card locally).
+        try {
+            const draggedCardData = this.getCardDataFromElement(this.dragging.cardEl);
+            const handCards = Array.from(document.querySelectorAll('#PlayerHand .card'));
+            const sourceIsHand = handCards.indexOf(this.dragging.cardEl) !== -1;
+            const handIndex = sourceIsHand ? handCards.indexOf(this.dragging.cardEl) : -1;
+
+            // If trainer from hand, always attempt to play it
+            if (sourceIsHand && draggedCardData && draggedCardData.type === 'trainer') {
+                let sent = false;
+                if (this.isMultiplayer && this.webSocketClient) {
+                    sent = this.webSocketClient.sendPlayCard(handIndex, 'trainer', null, { cardName: draggedCardData.cardName });
+                } else {
+                    sent = true; // offline/local
+                }
+
+                if (sent) {
+                    // Optimistically remove from hand for immediate UX
+                    this.removeCardFromSource('hand', handIndex);
+                    window.showGameMessage?.(`Played ${draggedCardData.cardName} (Trainer)`, 1500);
+                } else {
+                    window.showGameMessage?.('Failed to play trainer (not connected)', 2500);
+                }
+
+                // Cleanup drag visuals and state
+                if (this.dragging.dragEl) this.dragging.dragEl.remove();
+                this.dragging = null;
+                this.dragPrepared = null;
+                this.inspectionPrepared = null;
+                this.currentDropTarget = null;
+                this.lastMove = null;
+                return;
+            }
+        } catch (err) {
+            console.warn('Error handling trainer play-anywhere path:', err);
+        }
+
         if (this.currentDropTarget) {
             console.log('🎯 Found drop target:', {
                 element: this.currentDropTarget,
@@ -755,14 +829,23 @@ class GUIHookUtils {
                     }
                 }
             } else if (this.currentDropTarget.dropType === 'discard') {
-                // Discard pile drop - do not modify client state locally. Send request to server and wait for authoritative update.
-                console.log('Dropping card to discard pile (requesting server to discard)');
+                // Discard pile drop - manual discards are not allowed by rules. Only allow if GUI debug flag set.
+                if (!this.allowManualDiscard) {
+                    console.log('Manual discard attempt blocked by client policy');
 
-                // Show a temporary pending state on the source card to indicate the request is in-flight
-                this.dragging.cardEl.classList.add('pending-discard');
+                    // Rollback visual state and inform user
+                    this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                    this.dragging.cardEl.classList.remove('empty');
 
-                // Send move request to server; server will return updated game state which will update the UI
-                this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+                    if (window.showGameMessage) {
+                        window.showGameMessage('You cannot manually discard cards. Use attacks/abilities that discard.', 3000);
+                    }
+                } else {
+                    // Allowed (debug) path: send request to server and mark pending
+                    console.log('Manual discard allowed (debug mode) - sending discard request');
+                    this.dragging.cardEl.classList.add('pending-discard');
+                    this.updateGameStateOnDrop(this.dragging.cardEl, this.currentDropTarget);
+                }
             } else {
                 // Regular card placement
                 // Check if dropping on the same slot
@@ -996,6 +1079,38 @@ class GUIHookUtils {
         let targetType = '';
         let targetIndex = -1;
         
+        // Special-case: if this is a trainer card from hand, allow dropping anywhere on field to play it
+        const draggedCardData = this.getCardDataFromElement(sourceEl);
+        const isTrainerFromHand = draggedCardData && draggedCardData.type === 'trainer' && sourceType === 'hand';
+
+        if (isTrainerFromHand) {
+            // Send play_card to server first (so server uses correct cardIndex)
+            let sent = false;
+            if (this.isMultiplayer && this.webSocketClient) {
+                sent = this.webSocketClient.sendPlayCard(sourceIndex, 'trainer', null, { cardName: draggedCardData.cardName });
+            } else {
+                // Offline/local play - treat as sent
+                sent = true;
+            }
+
+            if (sent) {
+                // Remove from hand locally for immediate UX feedback
+                this.removeCardFromSource(sourceType, sourceIndex);
+
+                // Show quick discard visual (if discard pile element exists)
+                const discardEl = document.querySelector(`#DiscardPile.player${this.playerNumber}`) || document.querySelector('.card.discard.player');
+                if (discardEl) {
+                    window.showGameMessage?.(`Played ${draggedCardData.cardName} (Trainer)`, 1500);
+                }
+
+                console.log(`Played trainer ${draggedCardData.cardName} from hand`);
+            } else {
+                window.showGameMessage?.('Failed to play trainer (not connected)', 2500);
+            }
+
+            return;
+        }
+
         if (targetEl.id === 'ActivePokemon') {
             // Moving to active position
             this.player1.activePokemon = sourceCard;
@@ -2057,6 +2172,61 @@ class GUIHookUtils {
 
         this.webSocketClient.on('game_state_update', (data) => {
             this.handleGameStateUpdate(data);
+        });
+
+        // If the server returns an action_error (e.g., rejected play_card), perform rollback
+        this.webSocketClient.on('action_error', (err) => {
+            console.warn('Server action_error received:', err);
+            try {
+                // If we have a stored lastMove and it was a trainer play removed from hand, restore it
+                if (this.lastMove && this.lastMove.cardData && (this.lastMove.moveType === 'play_trainer' || (this.lastMove.cardData.type === 'trainer' || this.lastMove.cardData.cardType === 'trainer'))) {
+                    console.log('Rolling back trainer play to hand:', this.lastMove.cardData.cardName);
+
+                    // Attempt to restore logical player state if game object exists
+                    if (this.game && this.player1 && Array.isArray(this.player1.hand)) {
+                        // Insert back at original index if present, otherwise push to end
+                        const handIndex = this.lastMove.cardData.handIndex !== undefined ? this.lastMove.cardData.handIndex : null;
+                        if (handIndex !== null && handIndex >= 0 && handIndex <= this.player1.hand.length) {
+                            this.player1.hand.splice(handIndex, 0, this.lastMove.cardData);
+                        } else {
+                            this.player1.hand.push(this.lastMove.cardData);
+                        }
+
+                        // Re-render hand DOM: create a new card element for the restored card if needed
+                        const handEl = document.querySelector('#PlayerHand');
+                        if (handEl) {
+                            const cardEl = document.createElement('div');
+                            cardEl.className = 'card player hand-card';
+                            cardEl.setAttribute('data-card-name', this.lastMove.cardData.cardName || this.lastMove.cardData.name || 'Unknown');
+                            cardEl.style.backgroundImage = `url(${this.lastMove.cardData.imgUrl || ''})`;
+                            this.setCardInstance(cardEl, this.lastMove.cardData);
+                            handEl.appendChild(cardEl);
+                        }
+                    } else {
+                        // DOM-only fallback: re-create the removed card element using stored sourceEl info
+                        try {
+                            const handEl = document.querySelector('#PlayerHand');
+                            if (handEl) {
+                                const cardEl = document.createElement('div');
+                                cardEl.className = 'card player hand-card';
+                                cardEl.setAttribute('data-card-name', this.lastMove.cardData.cardName || this.lastMove.cardData.name || 'Unknown');
+                                cardEl.style.backgroundImage = `url(${this.lastMove.cardData.imgUrl || ''})`;
+                                this.setCardInstance(cardEl, this.lastMove.cardData);
+                                handEl.appendChild(cardEl);
+                            }
+                        } catch (domErr) {
+                            console.warn('Failed to restore card DOM during rollback', domErr);
+                        }
+                    }
+
+                    // Clear lastMove after rollback
+                    this.lastMove = null;
+
+                    if (window.showGameMessage) window.showGameMessage('Play rejected by server, card returned to hand', 3000);
+                }
+            } catch (errRollback) {
+                console.error('Error during rollback handling:', errRollback);
+            }
         });
     }
 

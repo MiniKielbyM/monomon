@@ -1113,12 +1113,17 @@ class ServerGame {
                         // Override the ID for server tracking
                         cardInstance.id = uuidv4();
                         deck.push(cardInstance);
-                    } else {
+                        } else {
                         // Fallback to plain object if class not found
+                        // Ensure trainer metadata (trainerType/trainerEffect) is preserved so server validation can detect supporters/tools/stadiums
                         deck.push({
                             id: uuidv4(),
                             cardName: template.name,
+                            // Provide both `type` and `cardType` shapes to remain compatible with various checks
                             type: template.type,
+                            cardType: template.type,
+                            trainerType: template.trainerType || null,
+                            trainerEffect: template.trainerEffect || null,
                             maxHp: template.hp,
                             hp: template.hp,
                             imgUrl: template.imgUrl,
@@ -1675,21 +1680,73 @@ class ServerGame {
         const statusConditions = targetPokemon.statusConditions || [];
         
         // Create the evolved Pokemon with preserved state and evolution stack
-        const evolvedPokemon = {
-            ...evolutionCard,
-            hp: evolutionCard.hp - currentDamage, // Preserve damage taken
-            maxHp: evolutionCard.hp,
-            attachedEnergy: attachedEnergy, // Preserve attached energy
-            statusConditions: statusConditions, // Preserve status conditions
-            evolutionStack: [
-                ...(targetPokemon.evolutionStack || []), // Preserve any existing evolution stack
-                targetPokemon // Add the current Pokemon to the stack
-            ]
-        };
+        // Move attached energy from the target Pokemon to the evolved Pokemon to avoid shared references
+        const movedAttachedEnergy = attachedEnergy && Array.isArray(attachedEnergy) ? attachedEnergy : [];
+
+        // Try to instantiate a proper Card class for the evolved form so methods like damage() exist
+        let evolvedPokemon = null;
+        try {
+            const className = evolutionCard.cardName || evolutionCard.name || null;
+            const CardClass = className && CardsBase1 && CardsBase1[className] ? CardsBase1[className] : null;
+            if (CardClass && typeof CardClass === 'function') {
+                // Use the same owner as the targetPokemon so guiHook and references remain valid
+                const ownerForNew = targetPokemon.owner || player;
+                const instance = new CardClass(ownerForNew);
+                // Assign a stable id and preserve HP/damage
+                instance.id = uuidv4();
+                instance.maxHp = instance.maxHp || (evolutionCard.hp || instance.maxHp);
+                // Apply preserved damage
+                instance.hp = Math.max(0, instance.maxHp - currentDamage);
+                // Transfer attached energy objects
+                instance.attachedEnergy = movedAttachedEnergy;
+                // Preserve status conditions
+                instance.statusConditions = statusConditions || [];
+                // Build evolution stack: copy prior stack and include the previous form object
+                instance.evolutionStack = [ ...(targetPokemon.evolutionStack || []), targetPokemon ];
+
+                // Clear evolution markers on the top form so it behaves like a normal placed Pokemon
+                instance.isEvolution = false;
+                instance.evolvesFrom = null;
+                instance.canEvolve = false;
+                evolvedPokemon = instance;
+            }
+        } catch (err) {
+            console.warn('Could not instantiate Card class for evolution, falling back to plain object:', err);
+            evolvedPokemon = null;
+        }
+
+        // Fallback to plain object if we couldn't create a class instance
+        if (!evolvedPokemon) {
+            evolvedPokemon = {
+                ...evolutionCard,
+                hp: (evolutionCard.hp || 0) - currentDamage, // Preserve damage taken
+                maxHp: evolutionCard.hp || evolutionCard.maxHp || 0,
+                attachedEnergy: movedAttachedEnergy, // Transfer attached energy to evolved form
+                statusConditions: statusConditions, // Preserve status conditions
+                evolutionStack: [ ...(targetPokemon.evolutionStack || []), targetPokemon ]
+            };
+            // Clear evolution markers on the plain-object fallback too
+            evolvedPokemon.isEvolution = false;
+            evolvedPokemon.evolvesFrom = null;
+            evolvedPokemon.canEvolve = false;
+            evolvedPokemon.hp = Math.max(0, Math.min(evolvedPokemon.hp, evolvedPokemon.maxHp));
+        }
         
         // Make sure HP doesn't go below 0 or above max
         evolvedPokemon.hp = Math.max(0, Math.min(evolvedPokemon.hp, evolvedPokemon.maxHp));
         
+        // After transferring energies to the evolved form, clear them from the original pokemon object
+        try {
+            targetPokemon.attachedEnergy = [];
+        } catch (e) {
+            // If targetPokemon doesn't support property assignment for some reason, ignore
+            console.warn('Could not clear attachedEnergy on targetPokemon during evolution', e);
+        }
+        // Also clear old 'energy' legacy field if present
+        if (targetPokemon.energy && Array.isArray(targetPokemon.energy)) {
+            targetPokemon.energy = [];
+        }
+
         // Place the evolved Pokemon in the target location
         if (targetLocation === 'active') {
             player.activePokemon = evolvedPokemon;

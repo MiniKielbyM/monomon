@@ -1,6 +1,7 @@
 import WebSocket, { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import ServerGame from './ServerGame.js';
+import CardsBase1, { AbilityRegistry, ServerAbilityContext } from '../Lib/Cards/Base/Base1/Cards.js';
 
 class GameServer {
     constructor(port = 8080) {
@@ -254,6 +255,13 @@ class GameServer {
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
 
+        // Reject manual discard attempts from clients - discarding should only occur via attacks/abilities
+        if (data.targetType === 'discard') {
+            console.log('Blocked client discard attempt from player', client.playerNumber);
+            ws.send(JSON.stringify({ type: 'move_error', message: 'Manual discard is not allowed' }));
+            return;
+        }
+
         // Use ServerGame's moveCard method for validation and execution
         const result = game.moveCard(
             client.playerNumber,
@@ -495,7 +503,15 @@ class GameServer {
             return { valid: false, error: 'Card is not a Trainer card' };
         }
 
-        // Trainer-specific validation would go here
+        // Trainer-specific validation: enforce one Supporter per turn
+        // Trainer objects may use `trainerType` or other shapes; normalize lookup
+        const trainerType = card.trainerType || (card.type === 'trainer' ? card.trainerType : null);
+        if (trainerType === 'supporter') {
+            if (playerState.supporterPlayedThisTurn) {
+                return { valid: false, error: 'You may only play one Supporter card per turn' };
+            }
+        }
+
         return { valid: true };
     }
 
@@ -518,7 +534,9 @@ class GameServer {
     }
 
     isTrainerCard(card) {
-        return card.cardType === 'trainer';
+        // Accept multiple shapes: some generated templates use `type: 'trainer'`,
+        // older code may use `cardType`, and trainer templates may have `trainerType`.
+        return (card && (card.cardType === 'trainer' || card.type === 'trainer' || card.trainerType === 'supporter' || card.trainerType === 'item' || card.trainerType === 'stadium' || card.trainerType === 'tool'));
     }
 
     hasRequiredEnergy(pokemon, energyCost) {
@@ -768,6 +786,16 @@ class GameServer {
             }
         } else if (cardType === 'trainer') {
             // Execute trainer effect and discard
+            // If this trainer is a Supporter, mark that the player has played their supporter this turn
+            try {
+                const tType = card.trainerType || (card.type === 'trainer' ? card.trainerType : null);
+                if (tType === 'supporter') {
+                    playerState.supporterPlayedThisTurn = true;
+                }
+            } catch (e) {
+                // ignore if shape unexpected
+            }
+
             this.executeTrainerEffect(game, playerNumber, card);
             playerState.discardPile.push(card);
         }
@@ -857,57 +885,29 @@ class GameServer {
         });
     }
 
-    executeTrainerEffect(game, playerNumber, trainerCard) {
-        // Simplified trainer effects
-        switch (trainerCard.cardName) {
-            case 'Professor Oak':
-                this.executeProfessorOak(game, playerNumber);
-                break;
-            case 'Bill':
-                this.executeBill(game, playerNumber);
-                break;
-            // Add more trainer effects as needed
+    async executeTrainerEffect(game, playerNumber, trainerCard) {
+        // Delegate trainer effects to Cards.js registered server callbacks via AbilityRegistry
+        const abilityName = trainerCard.cardName;
+        const serverCallback = AbilityRegistry.getServerCallback(abilityName);
+        if (!serverCallback) {
+            console.log(`No server callback registered for trainer: ${abilityName}`);
+            return { success: false, error: 'Trainer effect not implemented' };
         }
-    }
 
-    // Execute Professor Oak effect: Discard hand, then draw 7 cards
-    executeProfessorOak(game, playerNumber) {
-        const playerState = game.gameState[`player${playerNumber}`];
-        
-        console.log(`Executing Professor Oak for Player ${playerNumber}`);
-        
-        // Discard entire hand
-        playerState.discardPile.push(...playerState.hand);
-        playerState.hand = [];
-        
-        // Draw 7 new cards
-        for (let i = 0; i < 7 && playerState.deck.length > 0; i++) {
-            const drawnCard = playerState.deck.pop();
-            playerState.hand.push(drawnCard);
-        }
-        
-        console.log(`Professor Oak: Discarded hand and drew ${Math.min(7, playerState.deck.length)} cards`);
-        
-        // Broadcast the updated game state
-        game.broadcastGameState();
-    }
+        try {
+            const context = new ServerAbilityContext(game.gameState, playerNumber, game.socketManager);
+            const result = await serverCallback(context);
 
-    // Execute Bill effect: Draw 2 cards
-    executeBill(game, playerNumber) {
-        const playerState = game.gameState[`player${playerNumber}`];
-        
-        console.log(`Executing Bill for Player ${playerNumber}`);
-        
-        // Draw 2 cards
-        for (let i = 0; i < 2 && playerState.deck.length > 0; i++) {
-            const drawnCard = playerState.deck.pop();
-            playerState.hand.push(drawnCard);
+            // Broadcast game state if callback succeeded
+            if (result && result.success) {
+                game.broadcastGameState();
+            }
+
+            return result;
+        } catch (err) {
+            console.error(`Error executing trainer ${abilityName}:`, err);
+            return { success: false, error: 'Error executing trainer effect' };
         }
-        
-        console.log(`Bill: Drew ${Math.min(2, playerState.deck.length)} cards`);
-        
-        // Broadcast the updated game state
-        game.broadcastGameState();
     }
 
     executePlayerReady(ws, data) {

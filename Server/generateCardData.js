@@ -56,6 +56,30 @@ function extractCardData() {
         // Parse the file to extract card data
         const cardData = parseCardsFile(cardsFileContent);
         pokemonCards.push(...cardData);
+
+        // Also attempt to extract exported trainerCards arrays (simple JSON-ish extraction)
+        const trainerExportMatch = cardsFileContent.match(/export\s+const\s+trainerCards\s*=\s*(\[([\s\S]*?)\]);/m);
+        if (trainerExportMatch) {
+            try {
+                // Eval the array safely by wrapping in parentheses and using Function
+                const trainerArraySource = trainerExportMatch[1];
+                const trainers = (new Function('return ' + trainerArraySource))();
+                if (Array.isArray(trainers)) {
+                    trainers.forEach(t => {
+                        // Normalize keys to match generator output
+                        pokemonCards.push({
+                            name: t.name || t.cardName,
+                            type: t.type || 'trainer',
+                            trainerType: t.trainerType || null,
+                            imgUrl: t.imgUrl || null,
+                            trainerEffect: t.trainerEffect || null
+                        });
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to parse trainerCards export:', err.message);
+            }
+        }
         
     } catch (error) {
         console.error('Error reading Cards.js file:', error.message);

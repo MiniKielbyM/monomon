@@ -1,5 +1,5 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-20T15:27:01.355Z
+// Generated on 2025-10-21T00:34:25.141Z
 
 export const pokemonCards = [
     {
@@ -119,6 +119,20 @@ export const pokemonCards = [
                 ]
             }
         ]
+    },
+    {
+        "name": "Bill",
+        "type": "trainer",
+        "trainerType": "supporter",
+        "imgUrl": "https://images.pokemontcg.io/base1/91_hires.png",
+        "trainerEffect": "Draw 2 cards."
+    },
+    {
+        "name": "Professor Oak",
+        "type": "trainer",
+        "trainerType": "supporter",
+        "imgUrl": "https://images.pokemontcg.io/base1/88_hires.png",
+        "trainerEffect": "Discard your hand and draw 7 cards."
     }
 ];
 
