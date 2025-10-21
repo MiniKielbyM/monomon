@@ -711,6 +711,19 @@ class GUIHookUtils {
                 }
 
                 if (sent) {
+                    // Store lastMove so we can rollback if server rejects the play
+                    try {
+                        this.lastMove = {
+                            sourceEl: this.dragging.cardEl,
+                            sourceBackground: window.getComputedStyle(this.dragging.dragEl).backgroundImage,
+                            sourceWasEmpty: this.dragging.cardEl.classList.contains('empty'),
+                            moveType: 'play_trainer',
+                            cardData: Object.assign({}, draggedCardData, { handIndex })
+                        };
+                    } catch (errLastMove) {
+                        console.warn('Failed to record lastMove for trainer play', errLastMove);
+                    }
+
                     // Optimistically remove from hand for immediate UX
                     this.removeCardFromSource('hand', handIndex);
                     window.showGameMessage?.(`Played ${draggedCardData.cardName} (Trainer)`, 1500);
@@ -718,13 +731,12 @@ class GUIHookUtils {
                     window.showGameMessage?.('Failed to play trainer (not connected)', 2500);
                 }
 
-                // Cleanup drag visuals and state
+                // Cleanup drag visuals and state (keep lastMove so client can rollback if server rejects)
                 if (this.dragging.dragEl) this.dragging.dragEl.remove();
                 this.dragging = null;
                 this.dragPrepared = null;
                 this.inspectionPrepared = null;
                 this.currentDropTarget = null;
-                this.lastMove = null;
                 return;
             }
         } catch (err) {

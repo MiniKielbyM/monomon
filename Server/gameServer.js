@@ -638,7 +638,7 @@ class GameServer {
         this.sendGameStateToPlayers(game);
     }
 
-    handlePlayCard(ws, data) {
+    async handlePlayCard(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
 
@@ -658,9 +658,22 @@ class GameServer {
             return;
         }
 
-        // Execute card play
-        this.executePlayCard(game, client.playerNumber, data);
-        
+        // Execute card play (may be async for trainer effects)
+        try {
+            const execResult = await this.executePlayCard(game, client.playerNumber, data);
+
+            // If execution failed (e.g., trainer effect failed), notify player
+            if (!execResult.success) {
+                ws.send(JSON.stringify({
+                    type: 'action_error',
+                    message: execResult.error || 'Card play failed'
+                }));
+            }
+        } catch (err) {
+            console.error('Error executing play card:', err);
+            ws.send(JSON.stringify({ type: 'action_error', message: 'Server error executing card play' }));
+        }
+
         // Send updated state
         this.sendGameStateToPlayers(game);
     }
@@ -769,13 +782,18 @@ class GameServer {
         console.log(`Player ${playerNumber} attacked for ${damage} damage`);
     }
 
-    executePlayCard(game, playerNumber, cardData) {
+    async executePlayCard(game, playerNumber, cardData) {
         const playerState = game.gameState[`player${playerNumber}`];
         const { cardIndex, cardType, targetSlot } = cardData;
-        
-        // Remove card from hand
-        const card = playerState.hand.splice(cardIndex, 1)[0];
-        
+
+    // Snapshot hand for safe rollback (do not remove trainer cards until effect succeeds)
+    const handSnapshot = playerState.hand.slice();
+    console.log(`DEBUG: Player ${playerNumber} hand before play: [${handSnapshot.map(c=>c.cardName||c.name||c.id).join(', ')}]`);
+    // Remember original index for logging if needed
+    const originalIndex = cardIndex;
+    const card = playerState.hand[cardIndex];
+    console.log(`DEBUG: Player ${playerNumber} looked up card ${card?.cardName || card?.name || card?.id} at hand index ${cardIndex}`);
+
         if (cardType === 'pokemon') {
             // Place Pokemon
             if (targetSlot === 'active') {
@@ -784,23 +802,69 @@ class GameServer {
                 const benchIndex = parseInt(targetSlot.split('_')[1]);
                 playerState.bench[benchIndex] = card;
             }
+
+            console.log(`Player ${playerNumber} played ${card.cardName}`);
+            return { success: true };
         } else if (cardType === 'trainer') {
-            // Execute trainer effect and discard
-            // If this trainer is a Supporter, mark that the player has played their supporter this turn
+            // Execute trainer effect and discard (only if effect succeeds)
+            // Do NOT remove the card from hand until the effect succeeds — this mirrors energy semantics
+            let markedSupporter = false;
+            let tType = null;
             try {
-                const tType = card.trainerType || (card.type === 'trainer' ? card.trainerType : null);
+                tType = card.trainerType || (card.type === 'trainer' ? card.trainerType : null);
+            } catch (e) {
+                // ignore shape issues
+            }
+
+            const result = await this.executeTrainerEffect(game, playerNumber, card);
+
+            if (!result || !result.success) {
+                // Trainer effect failed: restore player's hand from snapshot (defensive) and ensure supporter flag not set
+                try {
+                    playerState.hand = handSnapshot;
+                    if (tType === 'supporter') {
+                        playerState.supporterPlayedThisTurn = false;
+                    }
+                } catch (restoreErr) {
+                    console.error('Error restoring hand after trainer failure:', restoreErr);
+                }
+
+                console.log(`DEBUG: Player ${playerNumber} trainer ${card?.cardName || card?.name || card?.id} failed - hand restored to: [${playerState.hand.map(c=>c.cardName||c.name||c.id).join(', ')}]`);
+                return { success: false, error: result ? result.error : 'Trainer effect failed' };
+            }
+
+            // Effect succeeded: now remove the card from hand and discard it. Also mark supporter if applicable.
+            try {
+                // Remove the card from hand at the original index (re-find because previous operations may have mutated hand)
+                const currentIndex = playerState.hand.findIndex(c => (c && c.id) ? c.id === card.id : c === card);
+                if (currentIndex !== -1) {
+                    const removed = playerState.hand.splice(currentIndex, 1)[0];
+                    playerState.discardPile.push(removed);
+                } else {
+                    // Fallback: if not found by id, attempt to remove by matching name at original index
+                    if (playerState.hand[originalIndex] && (playerState.hand[originalIndex].cardName === (card.cardName || card.name))) {
+                        const removed = playerState.hand.splice(originalIndex, 1)[0];
+                        playerState.discardPile.push(removed);
+                    } else {
+                        // As a last resort, just push the card to discard (avoid losing it)
+                        playerState.discardPile.push(card);
+                    }
+                }
+
                 if (tType === 'supporter') {
                     playerState.supporterPlayedThisTurn = true;
                 }
-            } catch (e) {
-                // ignore if shape unexpected
+            } catch (finalizeErr) {
+                console.error('Error finalizing trainer discard after success:', finalizeErr);
             }
 
-            this.executeTrainerEffect(game, playerNumber, card);
-            playerState.discardPile.push(card);
+            console.log(`Player ${playerNumber} played ${card?.cardName || card?.name || card?.id} (trainer)`);
+            return { success: true };
         }
-        
-        console.log(`Player ${playerNumber} played ${card.cardName}`);
+
+        // Unknown card type - treat as failure and put back into hand
+        playerState.hand.push(card);
+        return { success: false, error: 'Unknown card type' };
     }
 
     executeRetreat(game, playerNumber, retreatData) {
@@ -894,9 +958,89 @@ class GameServer {
             return { success: false, error: 'Trainer effect not implemented' };
         }
 
+        // Snapshot key mutable parts of the game state to allow rollback on failure.
+        const gs = game.gameState;
+        const snapshot = {
+            player1: {
+                hand: gs.player1.hand.slice(),
+                deck: gs.player1.deck.slice(),
+                discardPile: gs.player1.discardPile.slice(),
+                bench: gs.player1.bench.slice(),
+                activePokemon: gs.player1.activePokemon,
+                prizeCards: gs.player1.prizeCards.slice(),
+                energyAttachedThisTurn: gs.player1.energyAttachedThisTurn,
+                supporterPlayedThisTurn: gs.player1.supporterPlayedThisTurn,
+                stadiumPlayedThisTurn: gs.player1.stadiumPlayedThisTurn,
+                abilitiesUsedThisTurn: new Set(gs.player1.abilitiesUsedThisTurn)
+            },
+            player2: {
+                hand: gs.player2.hand.slice(),
+                deck: gs.player2.deck.slice(),
+                discardPile: gs.player2.discardPile.slice(),
+                bench: gs.player2.bench.slice(),
+                activePokemon: gs.player2.activePokemon,
+                prizeCards: gs.player2.prizeCards.slice(),
+                energyAttachedThisTurn: gs.player2.energyAttachedThisTurn,
+                supporterPlayedThisTurn: gs.player2.supporterPlayedThisTurn,
+                stadiumPlayedThisTurn: gs.player2.stadiumPlayedThisTurn,
+                abilitiesUsedThisTurn: new Set(gs.player2.abilitiesUsedThisTurn)
+            },
+            turn: gs.turn,
+            currentPlayer: gs.currentPlayer,
+            phase: gs.phase,
+            drewCard: gs.drewCard,
+            attackedThisTurn: gs.attackedThisTurn,
+            winner: gs.winner,
+            gameLog: gs.gameLog.slice()
+        };
+
         try {
             const context = new ServerAbilityContext(game.gameState, playerNumber, game.socketManager);
             const result = await serverCallback(context);
+
+            if (!result || !result.success) {
+                // Restore snapshot
+                try {
+                    gs.turn = snapshot.turn;
+                    gs.currentPlayer = snapshot.currentPlayer;
+                    gs.phase = snapshot.phase;
+                    gs.drewCard = snapshot.drewCard;
+                    gs.attackedThisTurn = snapshot.attackedThisTurn;
+                    gs.winner = snapshot.winner;
+                    gs.gameLog = snapshot.gameLog.slice();
+
+                    const p1 = gs.player1;
+                    p1.hand = snapshot.player1.hand.slice();
+                    p1.deck = snapshot.player1.deck.slice();
+                    p1.discardPile = snapshot.player1.discardPile.slice();
+                    p1.bench = snapshot.player1.bench.slice();
+                    p1.activePokemon = snapshot.player1.activePokemon;
+                    p1.prizeCards = snapshot.player1.prizeCards.slice();
+                    p1.energyAttachedThisTurn = snapshot.player1.energyAttachedThisTurn;
+                    p1.supporterPlayedThisTurn = snapshot.player1.supporterPlayedThisTurn;
+                    p1.stadiumPlayedThisTurn = snapshot.player1.stadiumPlayedThisTurn;
+                    p1.abilitiesUsedThisTurn = new Set(snapshot.player1.abilitiesUsedThisTurn);
+
+                    const p2 = gs.player2;
+                    p2.hand = snapshot.player2.hand.slice();
+                    p2.deck = snapshot.player2.deck.slice();
+                    p2.discardPile = snapshot.player2.discardPile.slice();
+                    p2.bench = snapshot.player2.bench.slice();
+                    p2.activePokemon = snapshot.player2.activePokemon;
+                    p2.prizeCards = snapshot.player2.prizeCards.slice();
+                    p2.energyAttachedThisTurn = snapshot.player2.energyAttachedThisTurn;
+                    p2.supporterPlayedThisTurn = snapshot.player2.supporterPlayedThisTurn;
+                    p2.stadiumPlayedThisTurn = snapshot.player2.stadiumPlayedThisTurn;
+                    p2.abilitiesUsedThisTurn = new Set(snapshot.player2.abilitiesUsedThisTurn);
+                } catch (restoreErr) {
+                    console.error('Error restoring game state after trainer failure:', restoreErr);
+                }
+
+                // Broadcast restored state
+                game.broadcastGameState();
+
+                return result || { success: false, error: 'Trainer effect failed' };
+            }
 
             // Broadcast game state if callback succeeded
             if (result && result.success) {
@@ -906,6 +1050,45 @@ class GameServer {
             return result;
         } catch (err) {
             console.error(`Error executing trainer ${abilityName}:`, err);
+
+            // Restore snapshot on error
+            try {
+                gs.turn = snapshot.turn;
+                gs.currentPlayer = snapshot.currentPlayer;
+                gs.phase = snapshot.phase;
+                gs.drewCard = snapshot.drewCard;
+                gs.attackedThisTurn = snapshot.attackedThisTurn;
+                gs.winner = snapshot.winner;
+                gs.gameLog = snapshot.gameLog.slice();
+
+                const p1 = gs.player1;
+                p1.hand = snapshot.player1.hand.slice();
+                p1.deck = snapshot.player1.deck.slice();
+                p1.discardPile = snapshot.player1.discardPile.slice();
+                p1.bench = snapshot.player1.bench.slice();
+                p1.activePokemon = snapshot.player1.activePokemon;
+                p1.prizeCards = snapshot.player1.prizeCards.slice();
+                p1.energyAttachedThisTurn = snapshot.player1.energyAttachedThisTurn;
+                p1.supporterPlayedThisTurn = snapshot.player1.supporterPlayedThisTurn;
+                p1.stadiumPlayedThisTurn = snapshot.player1.stadiumPlayedThisTurn;
+                p1.abilitiesUsedThisTurn = new Set(snapshot.player1.abilitiesUsedThisTurn);
+
+                const p2 = gs.player2;
+                p2.hand = snapshot.player2.hand.slice();
+                p2.deck = snapshot.player2.deck.slice();
+                p2.discardPile = snapshot.player2.discardPile.slice();
+                p2.bench = snapshot.player2.bench.slice();
+                p2.activePokemon = snapshot.player2.activePokemon;
+                p2.prizeCards = snapshot.player2.prizeCards.slice();
+                p2.energyAttachedThisTurn = snapshot.player2.energyAttachedThisTurn;
+                p2.supporterPlayedThisTurn = snapshot.player2.supporterPlayedThisTurn;
+                p2.stadiumPlayedThisTurn = snapshot.player2.stadiumPlayedThisTurn;
+                p2.abilitiesUsedThisTurn = new Set(snapshot.player2.abilitiesUsedThisTurn);
+            } catch (restoreErr) {
+                console.error('Error restoring game state after trainer exception:', restoreErr);
+            }
+
+            game.broadcastGameState();
             return { success: false, error: 'Error executing trainer effect' };
         }
     }
