@@ -281,6 +281,10 @@ class Game {
         if (this.guiHook && this.guiHook.updatePokemonEnergyDisplay) {
             this.guiHook.updatePokemonEnergyDisplay(element);
         }
+        // Update attached trainer items display if present
+        if (this.guiHook && this.guiHook.updateAttachedTrainersDisplay) {
+            this.guiHook.updateAttachedTrainersDisplay(element, card);
+        }
     }
     
     // Clear a card's visual representation
@@ -298,6 +302,9 @@ class Game {
         element.classList.add('empty');
         element.cardData = null;
         element.cardInstance = null; // Clear the card class pointer
+        // Remove attached trainers display when clearing a card
+        const trainersDisplay = element.querySelector('.attached-trainers-display');
+        if (trainersDisplay) trainersDisplay.remove();
     }
 
     // Update discard pile visual to show stacked cards effect

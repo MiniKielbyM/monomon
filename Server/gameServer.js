@@ -563,21 +563,28 @@ class GameServer {
             gameConstructor: game?.constructor?.name
         });
 
+        // Accept either attackName (string) or attackIndex (number) from clients
+        const attackParam = (data.attackName !== undefined && data.attackName !== null)
+            ? data.attackName
+            : (data.attackIndex !== undefined ? data.attackIndex : data.attack);
+
+        console.log('handleAttackAction: attackParam resolved to', attackParam);
+
         // Use ServerGame's attack method (now async)
-        const result = await game.useAttack(client.playerNumber, data.attackName);
+        const result = await game.useAttack(client.playerNumber, attackParam);
         
-        if (!result.success) {
+        if (!result || !result.success) {
             ws.send(JSON.stringify({
                 type: 'action_error',
-                message: result.error
+                message: result ? result.error : 'Unknown attack error'
             }));
             return;
         }
 
-        // Send success response
+        // Send success response including the resolved attack name from the ServerGame result
         ws.send(JSON.stringify({
             type: 'attack_used',
-            attackName: data.attackName,
+            attackName: result.attackNameResolved || data.attackName,
             result: result.result
         }));
         
@@ -712,7 +719,7 @@ class GameServer {
         this.sendGameStateToPlayers(game);
     }
 
-    handleRetreatAction(ws, data) {
+    async handleRetreatAction(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
 
@@ -739,11 +746,72 @@ class GameServer {
             return;
         }
 
-        // Execute retreat
-        this.executeRetreat(game, client.playerNumber, data);
-        
-        // Send updated state
-        this.sendGameStateToPlayers(game);
+        // If retreat has a cost, ask the player to select which attached energy cards to discard
+        const playerState = game.gameState[`player${client.playerNumber}`];
+        const activePokemon = playerState.activePokemon;
+        const retreatCost = activePokemon && activePokemon.retreatCost ? activePokemon.retreatCost : 0;
+
+        try {
+            if (retreatCost > 0 && activePokemon && Array.isArray(activePokemon.attachedEnergy) && activePokemon.attachedEnergy.length > 0) {
+                // Build minimal payload of attached energies
+                const cards = activePokemon.attachedEnergy.map(e => ({ id: e.id, cardName: e.cardName || e.name, type: e.type || 'energy', imgUrl: e.imgUrl || null }));
+
+                // Create a promise that resolves when selection response is received
+                const selectionId = `retreat_${Date.now()}_${Math.random()}`;
+
+                const selectionPromise = new Promise((resolve) => {
+                    const handler = (response) => {
+                        if (response.selectionId !== selectionId) return;
+                        // Unregister handler
+                        if (game.socketManager) game.socketManager.off('card_selection_response', handler);
+                        if (response.cancelled) return resolve(null);
+                        // Response may contain selectedCardIds or selectedIds array
+                        const selected = response.selectedCardIds || response.selectedIds || (response.selectedCardId ? [response.selectedCardId] : []);
+                        resolve(selected || null);
+                    };
+
+                    if (game.socketManager) game.socketManager.on('card_selection_response', handler);
+                });
+
+                // Send request to client to choose exactly retreatCost energies
+                game.socketManager && game.socketManager.sendToPlayer(client.playerNumber, 'card_selection_request', {
+                    selectionId,
+                    cards,
+                    options: {
+                        title: 'Pay retreat cost',
+                        subtitle: `Select ${retreatCost} energy card(s) to discard from ${activePokemon.cardName}`,
+                        allowCancel: false,
+                        maxSelections: retreatCost,
+                        minSelections: retreatCost
+                    }
+                });
+
+                const selectedIds = await selectionPromise;
+                if (!selectedIds || selectedIds.length < retreatCost) {
+                    ws.send(JSON.stringify({ type: 'action_error', message: 'Retreat cancelled or insufficient energies selected' }));
+                    return;
+                }
+
+                // Remove selected energies from activePokemon and move to discardPile
+                if (!Array.isArray(playerState.discardPile)) playerState.discardPile = [];
+                for (const sid of selectedIds.slice(0, retreatCost)) {
+                    const idx = activePokemon.attachedEnergy.findIndex(e => e && (e.id === sid || e.cardName === sid));
+                    if (idx !== -1) {
+                        const [removed] = activePokemon.attachedEnergy.splice(idx, 1);
+                        playerState.discardPile.push(removed);
+                    }
+                }
+            }
+
+            // Execute retreat (swap active and bench)
+            this.executeRetreat(game, client.playerNumber, data);
+
+            // Send updated state
+            this.sendGameStateToPlayers(game);
+        } catch (errRet) {
+            console.error('Error during retreat flow:', errRet);
+            ws.send(JSON.stringify({ type: 'action_error', message: 'Retreat failed: ' + (errRet && errRet.message) }));
+        }
     }
 
     // =================== ACTION EXECUTION ===================
@@ -809,9 +877,19 @@ class GameServer {
             // Execute trainer effect and discard (only if effect succeeds)
             // Do NOT remove the card from hand until the effect succeeds — this mirrors energy semantics
             let markedSupporter = false;
+            // Robustly determine trainerType from various possible card shapes
             let tType = null;
             try {
-                tType = card.trainerType || (card.type === 'trainer' ? card.trainerType : null);
+                tType = card.trainerType || card.trainer_type || card.trainerType || null;
+                if (!tType) {
+                    if (card.cardType === 'trainer' && card.trainerType) tType = card.trainerType;
+                    else if (card.type === 'trainer' && card.trainerType) tType = card.trainerType;
+                }
+                // Last-resort heuristics: name-based detection for well-known items
+                if (!tType && card.cardName) {
+                    const low = (card.cardName || '').toLowerCase();
+                    if (low.includes('pluspower') || low.includes('plus power')) tType = 'item';
+                }
             } catch (e) {
                 // ignore shape issues
             }
@@ -836,20 +914,43 @@ class GameServer {
             // Effect succeeded: now remove the card from hand and discard it. Also mark supporter if applicable.
             try {
                 // Remove the card from hand at the original index (re-find because previous operations may have mutated hand)
+                let removedCard = null;
                 const currentIndex = playerState.hand.findIndex(c => (c && c.id) ? c.id === card.id : c === card);
                 if (currentIndex !== -1) {
-                    const removed = playerState.hand.splice(currentIndex, 1)[0];
-                    playerState.discardPile.push(removed);
+                    removedCard = playerState.hand.splice(currentIndex, 1)[0];
+                } else if (playerState.hand[originalIndex] && (playerState.hand[originalIndex].cardName === (card.cardName || card.name))) {
+                    removedCard = playerState.hand.splice(originalIndex, 1)[0];
                 } else {
-                    // Fallback: if not found by id, attempt to remove by matching name at original index
-                    if (playerState.hand[originalIndex] && (playerState.hand[originalIndex].cardName === (card.cardName || card.name))) {
-                        const removed = playerState.hand.splice(originalIndex, 1)[0];
-                        playerState.discardPile.push(removed);
+                    // As a last resort, try to remove by reference
+                    const idxRef = playerState.hand.indexOf(card);
+                    if (idxRef !== -1) removedCard = playerState.hand.splice(idxRef, 1)[0];
+                }
+
+                // Decide whether to place the removed card into the discard pile.
+                // Items/tools (trainerType 'item' or 'tool') attach to Pokémon and should NOT be placed into discard immediately.
+                // Also respect a server callback hint `keepInPlay` if provided by the trainer effect implementation.
+                const trainerTypeNow = tType || (result && result.keepInPlay ? 'item' : null);
+                console.log(`DEBUG: finalize trainer discard: trainerTypeNow=${trainerTypeNow}, removedCardExists=${!!removedCard}`);
+                if (removedCard) console.log('DEBUG: removedCard snapshot:', {
+                    id: removedCard.id,
+                    cardName: removedCard.cardName || removedCard.name,
+                    trainerType: removedCard.trainerType || removedCard.type
+                });
+                console.log('DEBUG: discardPile before finalize:', (playerState.discardPile || []).map(c => c && (c.cardName || c.name || c.id)));
+                if (removedCard) {
+                    if (trainerTypeNow === 'item' || trainerTypeNow === 'tool') {
+                        // Do not push to discard; the server callback should have attached a representation to the Pokémon.
+                        this.logAction && this.logAction(`Attached trainer item ${removedCard.cardName || removedCard.name} for Player ${playerNumber} (kept off-discard until end of turn)`);
                     } else {
-                        // As a last resort, just push the card to discard (avoid losing it)
+                        playerState.discardPile.push(removedCard);
+                    }
+                } else {
+                    // removedCard not found; fallback behavior
+                    if (!(trainerTypeNow === 'item' || trainerTypeNow === 'tool')) {
                         playerState.discardPile.push(card);
                     }
                 }
+                console.log('DEBUG: discardPile after finalize:', (playerState.discardPile || []).map(c => c && (c.cardName || c.name || c.id)));
 
                 if (tType === 'supporter') {
                     playerState.supporterPlayedThisTurn = true;
@@ -874,10 +975,43 @@ class GameServer {
         // Switch active Pokemon with bench Pokemon
         const activePokemon = playerState.activePokemon;
         const benchPokemon = playerState.bench[benchIndex];
-        
+
+        // Prevent retreat if active Pokemon is Asleep or Paralyzed
+        if (activePokemon && activePokemon.statusConditions && (activePokemon.statusConditions.includes('asleep') || activePokemon.statusConditions.includes('paralyzed'))) {
+            console.log(`Retreat prevented: ${activePokemon.cardName} is affected by a status condition and cannot retreat`);
+            return { success: false, error: `${activePokemon.cardName} cannot retreat due to status condition` };
+        }
+
+        // Check if enough energy to pay retreat cost
+        const retreatCost = activePokemon.retreatCost || 0;
+        if (retreatCost > 0) {
+            if (!Array.isArray(activePokemon.attachedEnergy) || activePokemon.attachedEnergy.length < retreatCost) {
+                console.log(`Retreat prevented: Not enough energy to pay retreat cost for ${activePokemon.cardName}`);
+                return { success: false, error: `${activePokemon.cardName} does not have enough energy to retreat (needs ${retreatCost})` };
+            }
+        }
+
+        // Remove retreat cost energies from the retiring Pokemon and send to discard
+        try {
+            if (retreatCost > 0 && activePokemon.attachedEnergy && Array.isArray(activePokemon.attachedEnergy)) {
+                // Ensure player's discard pile exists
+                if (!Array.isArray(playerState.discardPile)) playerState.discardPile = [];
+
+                // Remove exactly retreatCost energy cards (prefer to remove from the end)
+                for (let i = 0; i < retreatCost; i++) {
+                    const removedEnergy = activePokemon.attachedEnergy.pop();
+                    playerState.discardPile.push(removedEnergy);
+                }
+                this.logAction(`Player ${playerNumber} paid retreat cost by discarding ${retreatCost} energy card(s) from ${activePokemon.cardName}`);
+            }
+        } catch (errRetreat) {
+            console.warn('Error applying retreat cost energy removal:', errRetreat);
+        }
+
+        // Now switch the Pokemon
         playerState.activePokemon = benchPokemon;
         playerState.bench[benchIndex] = activePokemon;
-        
+
         console.log(`Player ${playerNumber} retreated ${activePokemon.cardName} for ${benchPokemon.cardName}`);
     }
 
@@ -900,17 +1034,63 @@ class GameServer {
             stadiumPlayedThisTurn: currentPlayerState.stadiumPlayedThisTurn,
             abilitiesUsedThisTurn: Array.from(currentPlayerState.abilitiesUsedThisTurn)
         });
-        
+        console.log('active pokemon before end:', currentPlayerState.activePokemon);
         // Reset global turn flags
         gameState.drewCard = false;
         gameState.playedEnergy = false;
         gameState.attackedThisTurn = false;
-        
+
+        // Discard any temporary attached trainers (like PlusPower) from the player who is ending their turn
+        try {
+            const endingPlayer = currentPlayerState;
+            const attachmentsToDiscard = [];
+            // Check active pokemon
+            if (endingPlayer.activePokemon && Array.isArray(endingPlayer.activePokemon.attachedTrainers)) {
+                attachmentsToDiscard.push(...endingPlayer.activePokemon.attachedTrainers);
+                endingPlayer.activePokemon.attachedTrainers = [];
+            }
+            // Check bench
+            endingPlayer.bench.forEach((p, idx) => {
+                if (p && Array.isArray(p.attachedTrainers) && p.attachedTrainers.length > 0) {
+                    attachmentsToDiscard.push(...p.attachedTrainers);
+                    p.attachedTrainers = [];
+                }
+            });
+
+            if (attachmentsToDiscard.length > 0) {
+                // Ensure discard pile exists
+                if (!Array.isArray(endingPlayer.discardPile)) endingPlayer.discardPile = [];
+                attachmentsToDiscard.forEach(att => endingPlayer.discardPile.push(att));
+                this.logAction(`Discarded ${attachmentsToDiscard.length} attached trainer(s) from end of Player ${currentPlayerNumber}'s turn`);
+            }
+        } catch (errDiscard) {
+            console.warn('Error discarding attached trainers at end of turn:', errDiscard);
+        }
         // Switch active player
         gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
         gameState.turn++;
         gameState.phase = 'draw'; // Start new turn with draw phase
-        
+        //Update any turn-based effects
+        try {
+            // Check active pokemon
+            if (currentPlayerState.activePokemon && currentPlayerState.activePokemon.paralyzed > 0) {
+                currentPlayerState.activePokemon.paralyzed = Math.max(0, (currentPlayerState.activePokemon.paralyzed || 0) - 1);
+                if (currentPlayerState.activePokemon.paralyzed === 0) {
+                    currentPlayerState.activePokemon.removeStatusCondition('paralyzed');
+                }
+            }
+            // Check bench
+            currentPlayerState.bench.forEach((p, idx) => {
+                if (p && p.paralyzed > 0) {
+                    p.paralyzed = Math.max(0, p.paralyzed - 1);
+                }
+                else if (p && p.statusConditions && p.statusConditions.includes('paralyzed') && p.paralyzed === 0) {
+                    p.removeStatusCondition('paralyzed');
+                }
+            });
+        } catch (errEffects) {
+            console.warn('Error updating effects at start of turn:', errEffects);
+        }
         // Get new current player and reset their flags too
         const newPlayerState = gameState[`player${gameState.currentPlayer}`];
         newPlayerState.energyAttachedThisTurn = false;

@@ -1,5 +1,5 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-21T13:07:59.427Z
+// Generated on 2025-10-22T03:46:07.660Z
 
 export const pokemonCards = [
     {
@@ -49,14 +49,21 @@ export const pokemonCards = [
     {
         "name": "Pikachu",
         "type": "lightning",
-        "hp": 10,
+        "hp": 40,
         "imgUrl": "https://images.pokemontcg.io/base1/58_hires.png",
         "pokemon": "Pikachu",
         "evolvesFrom": null,
-        "canEvolve": false,
+        "canEvolve": true,
         "isEvolution": false,
         "abilities": [],
         "attacks": [
+            {
+                "name": "Gnaw",
+                "description": "Does 10 damage.",
+                "energyCost": [
+                    "colorless"
+                ]
+            },
             {
                 "name": "Thunder Jolt",
                 "description": "Flip a coin. If tails, Pikachu does 10 damage to itself.",
@@ -121,6 +128,26 @@ export const pokemonCards = [
         ]
     },
     {
+        "name": "Abra",
+        "type": "psychic",
+        "hp": 30,
+        "imgUrl": "https://images.pokemontcg.io/base1/43_hires.png",
+        "pokemon": "Abra",
+        "evolvesFrom": null,
+        "canEvolve": true,
+        "isEvolution": false,
+        "abilities": [],
+        "attacks": [
+            {
+                "name": "Psyshock",
+                "description": "Flip a coin. If heads, the Defending Pokémon is now Paralyzed.",
+                "energyCost": [
+                    "psychic"
+                ]
+            }
+        ]
+    },
+    {
         "name": "Bill",
         "type": "trainer",
         "trainerType": "supporter",
@@ -133,6 +160,13 @@ export const pokemonCards = [
         "trainerType": "supporter",
         "imgUrl": "https://images.pokemontcg.io/base1/88_hires.png",
         "trainerEffect": "Discard your hand and draw 7 cards."
+    },
+    {
+        "name": "PlusPower",
+        "type": "trainer",
+        "trainerType": "item",
+        "imgUrl": "https://images.pokemontcg.io/base1/84_hires.png",
+        "trainerEffect": "Attach PlusPower to your Active Pokémon. At the end of your turn, discard PlusPower. If this Pokémon's attack does damage to the Defending Pokémon, that attack does 10 more damage."
     }
 ];
 

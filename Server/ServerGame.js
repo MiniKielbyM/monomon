@@ -3,7 +3,7 @@ import { pokemonCards, energyCards } from './cardData.js';
 import { Card, Energy } from '../Lib/card.js';
 import CardsBase1, { AbilityRegistry, ServerAbilityContext } from '../Lib/Cards/Base/Base1/Cards.js';
 
-const { Alakazam, Blastoise, Pikachu, Growlithe, Arcanine } = CardsBase1;
+const { Alakazam, Blastoise, Pikachu, Growlithe, Arcanine, Abra } = CardsBase1;
 
 // Socket manager for ability system communication
 class SocketManager {
@@ -168,24 +168,81 @@ class ServerGame {
         }
 
         const activePokemon = player.activePokemon;
+        // Allow callers to pass an attack index (number) instead of name.
+        // If attackName is a number or numeric string, map it to the actual attack name.
+        console.log('useAttack called with raw attackName param:', attackName);
+        if ((typeof attackName === 'number' || (typeof attackName === 'string' && /^\d+$/.test(attackName))) && activePokemon && activePokemon.attacks) {
+            try {
+                const keys = Array.isArray(activePokemon.attacks) ? activePokemon.attacks.map(a => a && (a.name || a.cardName || a.title)) : Object.keys(activePokemon.attacks);
+                const idx = typeof attackName === 'string' ? parseInt(attackName, 10) : attackName;
+                const resolved = keys[idx];
+                console.log('Attack keys derived from activePokemon.attacks:', keys);
+                console.log(`Resolved numeric attack index ${idx} to attack name: ${resolved}`);
+                attackName = resolved;
+            } catch (errResolve) {
+                console.warn('Failed to resolve numeric attack index to name:', errResolve);
+            }
+        }
+        // Check confusion: if active Pokemon is confused, flip a coin and fail the attack on tails
+        if (activePokemon.statusConditions && activePokemon.statusConditions.includes('confused')) {
+            try {
+                const coinResult = await activePokemon.owner.guiHook.coinFlip();
+                if (!coinResult) {
+                    // Attack fails due to confusion
+                    this.logAction(`${activePokemon.cardName}'s attack failed due to confusion`);
+                    return { damage: 0, targetHp: opponent.activePokemon ? opponent.activePokemon.hp : null, effects: ['confusion_failed'], message: `${activePokemon.cardName} is confused and its attack failed!` };
+                }
+                // If coin flip is heads, attack proceeds normally
+            } catch (errFlip) {
+                console.warn('Coin flip failed during confusion check:', errFlip);
+            }
+        }
+
+        // PARALYSIS: cannot attack while paralyzed
+        if (activePokemon.statusConditions && activePokemon.statusConditions.includes('paralyzed')) {
+            this.logAction(`${activePokemon.cardName} is paralyzed and cannot attack`);
+            return { success: false, error: `${activePokemon.cardName} is paralyzed and cannot attack` };
+        }
         
         // Debug logging for attack structure
-        console.log('Active Pokemon:', {
+        console.log('Active Pokemon attack diagnostics:', {
             cardName: activePokemon.cardName,
             hasAttacks: !!activePokemon.attacks,
             attacksType: typeof activePokemon.attacks,
-            attacksKeys: activePokemon.attacks ? Object.keys(activePokemon.attacks) : 'no attacks',
+            attacksKeys: activePokemon.attacks ? (Array.isArray(activePokemon.attacks) ? activePokemon.attacks.map(a => a && (a.name || a.cardName)) : Object.keys(activePokemon.attacks)) : 'no attacks',
             attacksArray: Array.isArray(activePokemon.attacks),
-            attacksContent: activePokemon.attacks
+            attacksContentSample: activePokemon.attacks ? (Array.isArray(activePokemon.attacks) ? activePokemon.attacks.slice(0,3) : Object.keys(activePokemon.attacks).slice(0,3)) : null
         });
         console.log('Looking for attack:', attackName);
         
         // Find the attack in the Pokemon's attack list
         let attack = null;
-        
-        // Attacks are stored as object with attack name as key (from Card class)
+
+        // Attacks may be stored as an array (each attack object has a name) or as an object keyed by name
         if (activePokemon.attacks && typeof activePokemon.attacks === 'object') {
-            attack = activePokemon.attacks[attackName];
+            if (Array.isArray(activePokemon.attacks)) {
+                // Prefer finding by name property first
+                attack = activePokemon.attacks.find(a => a && (a.name === attackName || a.name === String(attackName)));
+
+                // If not found, the attacks array may have named properties (e.g., this.attacks['Psyshock'] = {...})
+                if (!attack && activePokemon.attacks[attackName]) {
+                    attack = activePokemon.attacks[attackName];
+                }
+
+                // As a last resort, iterate enumerable properties (including non-index keys)
+                if (!attack) {
+                    for (const key in activePokemon.attacks) {
+                        if (!Object.prototype.hasOwnProperty.call(activePokemon.attacks, key)) continue;
+                        const candidate = activePokemon.attacks[key];
+                        if (candidate && (candidate.name === attackName || key === attackName)) {
+                            attack = candidate;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                attack = activePokemon.attacks[attackName];
+            }
         }
         
         console.log('Found attack:', attack);
@@ -240,6 +297,24 @@ class ServerGame {
                             get id() { return cardRef ? cardRef.id : undefined; },
                             get hp() { return cardRef ? cardRef.hp : undefined; },
                             set hp(v) { if (cardRef) cardRef.hp = v; },
+                            get statusConditions() { return cardRef ? (cardRef.statusConditions || []) : []; },
+                            addStatusCondition(status) {
+                                if (!cardRef) return;
+                                if (!cardRef.statusConditions) cardRef.statusConditions = [];
+                                if (!cardRef.statusConditions.includes(status)) {
+                                    cardRef.statusConditions.push(status);
+
+                                    // If paralysis is applied, initialize timer to last through the affected player's upcoming turn
+                                    if (status === 'paralyzed') {
+                                        cardRef.paralyzed = 1;
+                                    }
+                                }
+                            },
+                            removeStatusCondition(status) {
+                                if (!cardRef || !cardRef.statusConditions) return;
+                                const idx = cardRef.statusConditions.indexOf(status);
+                                if (idx !== -1) cardRef.statusConditions.splice(idx, 1);
+                            },
                             damage(amount, attackingType = null) {
                                 if (!cardRef) return;
                                 let finalDamage = amount;
@@ -374,6 +449,22 @@ class ServerGame {
                 effects: [],
                 message: `${activePokemon.cardName} used ${attackName} dealing ${fallbackDamage} damage!`
             };
+        }
+
+        // Apply PlusPower effect: if attacker has PlusPower attached and dealt damage, add +10
+        try {
+            const attached = activePokemon.attachedTrainers || [];
+            const hasPlus = attached.some(t => t && (t.cardName === 'PlusPower' || (t.name && t.name.toLowerCase() === 'pluspower')));
+            if (hasPlus && attackResult && attackResult.damage > 0 && opponent.activePokemon) {
+                const extra = 10;
+                opponent.activePokemon.hp = Math.max(0, opponent.activePokemon.hp - extra);
+                attackResult.damage += extra;
+                attackResult.defenderHp = opponent.activePokemon.hp;
+                attackResult.message = `${attackResult.message} (+${extra} from PlusPower)`;
+                this.logAction(`PlusPower applied: +${extra} damage to ${opponent.activePokemon.cardName}`);
+            }
+        } catch (errPlus) {
+            console.warn('Error applying PlusPower effect:', errPlus);
         }
         
         // Mark that player has attacked this turn
@@ -1008,10 +1099,14 @@ class ServerGame {
         }
 
         return {
-            damage: damage,
-            targetHp: defendingPokemon.hp,
-            effects: effects,
-            message: `${attackingPokemon.cardName} used ${attack.name}${damage > 0 ? ` dealing ${damage} damage` : ''}!`
+            success: true,
+            result: {
+                damage: damage,
+                targetHp: defendingPokemon.hp,
+                effects: effects,
+                message: `${attackingPokemon.cardName} used ${attack ? attack.name : attackName}${damage > 0 ? ` dealing ${damage} damage` : ''}!`
+            },
+            attackNameResolved: attack ? attack.name : attackName
         };
     }
     
@@ -1050,7 +1145,8 @@ class ServerGame {
             'Blastoise': Blastoise,
             'Pikachu': Pikachu,
             'Growlithe': Growlithe,
-            'Arcanine': Arcanine
+            'Arcanine': Arcanine,
+            'Abra': Abra
         };
         
         // Use imported card data from cardData.js
@@ -1303,6 +1399,13 @@ class ServerGame {
     }
     
     validateMove(playerNumber, fromType, fromIndex, toType, toIndex, card) {
+        // Prevent direct swaps between active and bench except via retreat or special effect
+        const isActiveToBench = (fromType === 'active' && toType === 'bench');
+        const isBenchToActive = (fromType === 'bench' && toType === 'active');
+        // TODO: Allow special effect moves (e.g., Switch card) by passing a flag or context
+        if (isActiveToBench || isBenchToActive) {
+            return { valid: false, error: 'You must use the Retreat action to switch Active and Benched Pokémon.' };
+        }
         const player = playerNumber === 1 ? this.gameState.player1 : this.gameState.player2;
         
         // Energy attachment validation
@@ -1857,7 +1960,6 @@ class ServerGame {
             supporterPlayedThisTurn: currentPlayer.supporterPlayedThisTurn,
             stadiumPlayedThisTurn: currentPlayer.stadiumPlayedThisTurn
         });
-        
         // Player 1 draws a card at the start of their turn (including turn 1)
         // Player 2 draws a card at the start of their turn (but not turn 1 since they go second)
         const shouldDrawCard = (currentPlayerNumber === 1) || (currentPlayerNumber === 2 && this.gameState.turn > 1);
@@ -1869,8 +1971,15 @@ class ServerGame {
                 this.logAction(`Player ${currentPlayerNumber} loses - cannot draw from empty deck`);
             }
         }
-        
+
         this.logAction(`Turn ${this.gameState.turn} - Player ${currentPlayerNumber}'s turn begins`);
+
+        // Apply per-turn status effects for the player whose turn is starting
+        try {
+            this.applyStatusEffectsForPlayer(currentPlayerNumber);
+        } catch (errStatus) {
+            console.warn('Error applying status effects at start of turn:', errStatus);
+        }
     }
 
     // Turn management
@@ -1886,7 +1995,6 @@ class ServerGame {
             supporterPlayedThisTurn: currentPlayer.supporterPlayedThisTurn,
             stadiumPlayedThisTurn: currentPlayer.stadiumPlayedThisTurn
         });
-        
         this.gameState.drewCard = false;
         this.gameState.attackedThisTurn = false;
         
@@ -1934,6 +2042,15 @@ class ServerGame {
                     type: e.type || 'energy',
                     energyType: e.energyType || e.type || null,
                     description: e.description || ''
+                })),
+                // Include any attached trainer/tool items (e.g., PlusPower)
+                attachedTrainers: (card.attachedTrainers || []).map(t => ({
+                    cardName: t.cardName || t.name || null,
+                    name: t.name || t.cardName || null,
+                    imgUrl: t.imgUrl || t.image || null,
+                    trainerType: t.trainerType || t.type || null,
+                    value: t.value || null,
+                    trainerEffect: t.trainerEffect || t.effect || null
                 })),
                 weakness: card.weakness,
                 resistance: card.resistance,
@@ -1998,6 +2115,187 @@ class ServerGame {
             gameLog: this.gameState.gameLog.slice(-10) // Last 10 actions
         };
     }
+
+    // Apply per-turn status effects for a player (called at the start of their turn)
+    applyStatusEffectsForPlayer(playerNumber) {
+        const player = playerNumber === 1 ? this.gameState.player1 : this.gameState.player2;
+        const allPokemon = [player.activePokemon, ...player.bench].filter(p => p);
+
+        allPokemon.forEach(pokemon => {
+            if (!pokemon) return;
+
+            // Ensure statusTimers exists for time-limited statuses
+            if (!pokemon.statusTimers) pokemon.statusTimers = {};
+
+            // POISON: take 10 damage each turn
+            if (pokemon.statusConditions && pokemon.statusConditions.includes('poison')) {
+                try {
+                    pokemon.hp = Math.max(0, pokemon.hp - 10);
+                    this.logAction(`${pokemon.cardName} is Poisoned and takes 10 damage`);
+                    // Trigger GUI update via owner's guiHook
+                    if (pokemon.owner && pokemon.owner.guiHook && pokemon.owner.guiHook.damageCardElement) {
+                        pokemon.owner.guiHook.damageCardElement(pokemon, 10);
+                    }
+                } catch (err) {
+                    console.warn('Error applying poison damage:', err);
+                }
+            }
+
+            // Ensure statusTimers object exists
+            if (!pokemon.statusTimers) pokemon.statusTimers = {};
+
+            // BURN: coin flip each turn — if heads, remove burn; if tails, take 20
+            if (pokemon.statusConditions && pokemon.statusConditions.includes('burn')) {
+                try {
+                    // Use owner's coinFlip helper if available, fallback to RNG
+                    const coin = pokemon.owner && pokemon.owner.guiHook && pokemon.owner.guiHook.coinFlip ?
+                        pokemon.owner.guiHook.coinFlip() : Promise.resolve(Math.random() < 0.5);
+
+                    // coin may be a promise
+                    Promise.resolve(coin).then(result => {
+                        if (result) {
+                            // Heads: heal from burn (remove status)
+                            if (pokemon.removeStatusCondition && typeof pokemon.removeStatusCondition === 'function') {
+                                pokemon.removeStatusCondition('burn');
+                            } else if (pokemon.statusConditions && Array.isArray(pokemon.statusConditions)) {
+                                const idx = pokemon.statusConditions.indexOf('burn');
+                                if (idx !== -1) pokemon.statusConditions.splice(idx, 1);
+                            }
+                            this.logAction(`${pokemon.cardName} healed from Burn (coin flip heads) and Burn removed`);
+                        } else {
+                            // Tails: take 20 damage
+                            pokemon.hp = Math.max(0, pokemon.hp - 20);
+                            this.logAction(`${pokemon.cardName} is Burned and takes 20 damage`);
+                            if (pokemon.owner && pokemon.owner.guiHook && pokemon.owner.guiHook.damageCardElement) {
+                                pokemon.owner.guiHook.damageCardElement(pokemon, 20);
+                            }
+                        }
+                    }).catch(errCoin => console.warn('Error during burn coin flip:', errCoin));
+                } catch (err) {
+                    console.warn('Error applying burn effect:', err);
+                }
+            }
+
+            // SLEEP: coin flip each turn to wake up
+            if (pokemon.statusConditions && pokemon.statusConditions.includes('asleep')) {
+                try {
+                    const coin = pokemon.owner && pokemon.owner.guiHook && pokemon.owner.guiHook.coinFlip ?
+                        pokemon.owner.guiHook.coinFlip() : Promise.resolve(Math.random() < 0.5);
+                    Promise.resolve(coin).then(result => {
+                        if (result) {
+                            // Heads: wake up
+                            if (pokemon.removeStatusCondition && typeof pokemon.removeStatusCondition === 'function') {
+                                pokemon.removeStatusCondition('asleep');
+                            } else if (pokemon.statusConditions && Array.isArray(pokemon.statusConditions)) {
+                                const idx = pokemon.statusConditions.indexOf('asleep');
+                                if (idx !== -1) pokemon.statusConditions.splice(idx, 1);
+                            }
+                            this.logAction(`${pokemon.cardName} woke up from Sleep (coin flip heads)`);
+                        } else {
+                            this.logAction(`${pokemon.cardName} remains Asleep`);
+                        }
+                    }).catch(errCoin => console.warn('Error during sleep coin flip:', errCoin));
+                } catch (err) {
+                    console.warn('Error applying sleep effect:', err);
+                }
+            }
+
+            // PARALYSIS: handled via statusTimers set at time of application
+            if (pokemon.statusConditions && pokemon.statusConditions.includes('paralyzed')) {
+                if (typeof pokemon.statusTimers.paralyzed === 'number') {
+                    console.log(`[DEBUG] ${pokemon.cardName} paralysis timer before decrement:`, pokemon.statusTimers.paralyzed);
+                    pokemon.statusTimers.paralyzed -= 1;
+                    console.log(`[DEBUG] ${pokemon.cardName} paralysis timer after decrement:`, pokemon.statusTimers.paralyzed);
+                    if (pokemon.statusTimers.paralyzed <= 0) {
+                        console.log(`[DEBUG] Removing paralysis from ${pokemon.cardName}`);
+                        if (pokemon.removeStatusCondition && typeof pokemon.removeStatusCondition === 'function') {
+                            pokemon.removeStatusCondition('paralyzed');
+                        } else if (pokemon.statusConditions && Array.isArray(pokemon.statusConditions)) {
+                            const idx = pokemon.statusConditions.indexOf('paralyzed');
+                            if (idx !== -1) pokemon.statusConditions.splice(idx, 1);
+                        }
+                        delete pokemon.statusTimers.paralyzed;
+                        this.logAction(`${pokemon.cardName} is no longer Paralyzed (timer expired)`);
+                    }
+                } else {
+                    // No timer present — assume paralysis was newly added but timer should have been initialized when applied
+                    // Log for visibility and do not auto-initialize here (timer is set at application time)
+                    console.log(`[DEBUG] WARN: ${pokemon.cardName} is Paralyzed but has no status timer; skipping timer decrement`);
+                }
+            }
+
+            // Decrement any other numeric statusTimers and remove statuses when expired
+            Object.keys(pokemon.statusTimers || {}).forEach(key => {
+                if (key === 'paralyzed') return; // handled above
+                const val = pokemon.statusTimers[key];
+                if (typeof val === 'number' && val > 0) {
+                    pokemon.statusTimers[key] = val - 1;
+                        if (pokemon.statusTimers[key] <= 0) {
+                            // Remove corresponding status condition if present
+                            if (pokemon.removeStatusCondition && typeof pokemon.removeStatusCondition === 'function') {
+                                pokemon.removeStatusCondition(key);
+                            } else if (pokemon.statusConditions && Array.isArray(pokemon.statusConditions)) {
+                                const idx2 = pokemon.statusConditions.indexOf(key);
+                                if (idx2 !== -1) pokemon.statusConditions.splice(idx2, 1);
+                            }
+                            delete pokemon.statusTimers[key];
+                            this.logAction(`${pokemon.cardName} - status ${key} expired and removed`);
+                        }
+                }
+            });
+        });
+
+        // After applying effects, broadcast updated game state so clients see HP/status changes
+        try {
+            const game = this;
+            const gameId = this.id;
+            if (this.socketManager) {
+                // Send updated state for both players
+                this.socketManager.sendToPlayer(1, 'game_state_update', { gameState: this.getGameStateForPlayer(1) });
+                this.socketManager.sendToPlayer(2, 'game_state_update', { gameState: this.getGameStateForPlayer(2) });
+            }
+        } catch (errBroadcast) {
+            console.warn('Error broadcasting game state after applying status effects:', errBroadcast);
+        }
+    }
+
+    // Apply paralysis to a player's active Pokémon
+    applyParalysis(playerNumber) {
+        const playerState = this.gameState[`player${playerNumber}`];
+        const active = playerState.activePokemon;
+        if (!active) {
+            throw new Error(`Player ${playerNumber} has no active Pokémon to paralyze.`);
+        }
+        // Remove conflicting status conditions (asleep/confused)
+        active.statusConditions = (active.statusConditions || []).filter(
+            condition => !['asleep', 'confused'].includes(condition)
+        );
+        if (!active.statusConditions.includes('paralyzed')) {
+            active.statusConditions.push('paralyzed');
+        }
+        if (!active.statusTimers) active.statusTimers = {};
+        // Always set to 2 (official rules: wears off at end of next turn)
+        active.statusTimers.paralyzed = 2;
+        this.gameState.gameLog.push(`Player ${playerNumber}'s active Pokémon is now paralyzed.`);
+    }
+
+    // Remove paralysis at the end of the player's next turn
+    // Deprecated: handled by timer in applyStatusEffectsForPlayer
+    handleEndTurn(playerNumber) {
+        // No-op: paralysis removal is handled by timer in applyStatusEffectsForPlayer
+    }
+
+    // Handle curing paralysis through evolution, switching, or abilities
+    cureParalysis(playerNumber) {
+        const playerState = this.gameState[`player${playerNumber}`];
+        const active = playerState.activePokemon;
+        if (active && active.statusConditions && active.statusConditions.includes('paralyzed')) {
+            // Remove status and timer
+            active.statusConditions = active.statusConditions.filter(s => s !== 'paralyzed');
+            if (active.statusTimers) delete active.statusTimers.paralyzed;
+            this.gameState.gameLog.push(`Paralysis on Player ${playerNumber}'s active Pokémon has been cured.`);
+        }
+    }
     
     logAction(action) {
         this.gameState.gameLog.push({
@@ -2043,9 +2341,25 @@ class ServerGame {
 
     // Handle client selection response
     handleCardSelectionResponse(playerNumber, data) {
-        if (this.socketManager) {
-            // Emit the response for the ability context to handle
-            this.socketManager.io.emit('card_selection_response', data);
+        if (!this.socketManager) return;
+
+        // The SocketManager registers a handler on the parent GameServer instance
+        // under _socketManagerHandlers when ServerAbilityContext.requestCardSelection
+        // calls socketManager.on('card_selection_response', handler).
+        const gameServer = this.socketManager.gameServer;
+        if (gameServer && gameServer._socketManagerHandlers) {
+            const handler = gameServer._socketManagerHandlers.get('card_selection_response');
+            if (handler && typeof handler === 'function') {
+                try {
+                    handler(data);
+                } catch (err) {
+                    console.error('Error invoking card_selection_response handler:', err);
+                }
+            } else {
+                console.log('No handler registered for card_selection_response');
+            }
+        } else {
+            console.log('No gameServer or handlers map available to forward card selection response');
         }
     }
 

@@ -64,14 +64,14 @@ class ServerAbilityContext {
             this.socketManager.sendToPlayer(this.playerNumber, 'card_selection_request', {
                 selectionId,
                 cards: cards.map(card => ({
-                    id: card.id,
-                    name: card.name || card.cardName,
-                    type: card.type,
-                    hp: card.hp,
-                    maxHp: card.maxHp,
-                    imgUrl: card.imgUrl,
-                    // Add any other data needed for display
-                    ...card
+                    id: card && card.id,
+                    cardName: card && (card.cardName || card.name),
+                    type: card && card.type,
+                    hp: card && (card.hp === undefined ? null : card.hp),
+                    maxHp: card && (card.maxHp === undefined ? null : card.maxHp),
+                    imgUrl: card && card.imgUrl,
+                    // include lightweight owner reference if present
+                    ownerId: card && card.owner && card.owner.id ? card.owner.id : null
                 })),
                 options: {
                     title: options.title || 'Select a card',
@@ -929,22 +929,28 @@ class Pikachu extends Card {
             'https://images.pokemontcg.io/base1/58_hires.png',
             'Pikachu',
             PokemonType.LIGHTNING,
-            10,
+            40,
             'Pikachu',
             null,
-            false,
+            true,
             PokemonType.FIGHTING,
             null,
             1,
             1,
             CardModifiers.BASE
         );
+        this.addAttack('Gnaw', 'Does 10 damage.', [PokemonType.COLORLESS], this.Gnaw);
         this.addAttack('Thunder Jolt', 'Flip a coin. If tails, Pikachu does 10 damage to itself.', [PokemonType.LIGHTNING, PokemonType.COLORLESS], this.ThunderJolt);
+    }
+    async Gnaw(){
+        const attackingType = this.owner.guiHook.attackingPokemonType || this.type;
+        this.owner.opponent.activePokemon.damage(10, attackingType);
+        this.owner.guiHook.damageCardElement(this.owner.opponent.activePokemon, 10);
     }
     async ThunderJolt(){
         // Pass attacking Pokemon type for weakness/resistance calculation
         const attackingType = this.owner.guiHook.attackingPokemonType || this.type;
-        this.owner.opponent.activePokemon.damage(10, attackingType);
+        this.owner.opponent.activePokemon.damage(30, attackingType);
         if(!await this.owner.guiHook.coinFlip()){
             this.damage(10); // Self-damage without weakness/resistance calculation
             this.owner.guiHook.damageCardElement(this, 10);
@@ -1079,6 +1085,58 @@ class Arcanine extends Card {
     }
 }
 
+class Abra extends Card {
+    constructor(owner) {
+        super(
+            owner,
+            'https://images.pokemontcg.io/base1/43_hires.png',
+            'Abra',
+            PokemonType.PSYCHIC,
+            30,
+            'Abra',
+            null,
+            true,
+            null,
+            null,
+            0,
+            1,
+            CardModifiers.BASE
+        );
+        // Psyshock: Flip a coin. If heads, the Defending Pokémon is now Paralyzed. Does 10 damage.
+        this.addAttack('Psyshock', 'Flip a coin. If heads, the Defending Pokémon is now Paralyzed.', [PokemonType.PSYCHIC], this.Psyshock);
+    }
+
+    async Psyshock() {
+        // Flip a coin using owner's guiHook if available to allow animation
+        let result = true;
+        try {
+            if (this.owner && this.owner.guiHook && this.owner.guiHook.coinFlip) {
+                result = await this.owner.guiHook.coinFlip();
+            } else {
+                result = Math.random() < 0.5;
+            }
+        } catch (err) {
+            console.warn('Coin flip failed for Psyshock:', err);
+            result = Math.random() < 0.5;
+        }
+        console.log(`Psyshock coin flip result: ${result ? 'Heads' : 'Tails'}`);
+        if (result) {
+            // Heads: paralyze defending Pokemon
+            console.log('Psyshock: Paralyzing defending Pokemon');
+            console.log('Defending Pokemon before status:', this.owner.opponent.activePokemon);
+            this.owner.opponent.activePokemon.addStatusCondition('paralyzed');
+            console.log('Defending Pokemon after status:', this.owner.opponent.activePokemon);
+        }
+
+        // Deal 10 damage to defending Pokemon
+        const attackingType = this.owner.guiHook.attackingPokemonType || this.type;
+        this.owner.opponent.activePokemon.damage(10, attackingType);
+        if (this.owner && this.owner.guiHook && this.owner.guiHook.damageCardElement) {
+            this.owner.guiHook.damageCardElement(this.owner.opponent.activePokemon, 10);
+        }
+    }
+}
+
 // Register server callbacks immediately when module is loaded
 console.log('Initializing server callbacks for abilities...');
 Alakazam.registerDamageSwapAbility();
@@ -1133,7 +1191,7 @@ AbilityRegistry.registerServerCallback('Professor Oak', async (context) => {
     return { success: true, message: `Professor Oak: Discarded hand and drew ${drawn} card(s)` };
 });
 
-export default { Alakazam, Blastoise, Pikachu, Growlithe, Arcanine };
+export default { Alakazam, Blastoise, Pikachu, Growlithe, Arcanine, Abra };
 export { AbilityRegistry, ServerAbilityContext };
 
 // Trainer card definitions (SSoT for trainers as well)
@@ -1155,4 +1213,55 @@ export const trainerCards = [
         imgUrl: 'https://images.pokemontcg.io/base1/88_hires.png',
         trainerEffect: 'Discard your hand and draw 7 cards.'
     }
+    ,
+    {
+        cardName: 'PlusPower',
+        name: 'PlusPower',
+        type: 'trainer',
+        trainerType: 'item',
+        imgUrl: 'https://images.pokemontcg.io/base1/84_hires.png',
+        trainerEffect: 'Attach PlusPower to your Active Pokémon. At the end of your turn, discard PlusPower. If this Pokémon\'s attack does damage to the Defending Pokémon, that attack does 10 more damage.'
+    }
 ];
+
+// Register PlusPower server callback - attaches the item to the player's active Pokemon
+AbilityRegistry.registerServerCallback('PlusPower', async (context) => {
+    const playerState = context.player;
+
+    // Allow the player to choose any of their Pokémon (active or bench)
+    const candidates = context.getAllPokemon();
+    if (!candidates || candidates.length === 0) {
+        return { success: false, error: 'No Pokémon available to attach PlusPower' };
+    }
+
+    // Ask the client to choose a Pokemon target
+    const selected = await context.requestCardSelection(candidates, { title: 'Attach PlusPower', subtitle: 'Select a Pokémon to attach PlusPower to' });
+    if (!selected) {
+        return { success: false, error: 'Attachment cancelled' };
+    }
+
+    const targetPokemon = selected;
+
+    if (!targetPokemon.attachedTrainers) targetPokemon.attachedTrainers = [];
+
+    targetPokemon.attachedTrainers.push({
+        cardName: 'PlusPower',
+        name: 'PlusPower',
+        type: 'trainer',
+        trainerType: 'item',
+        effect: 'increases_attack_damage',
+        value: 10,
+        imgUrl: 'https://images.pokemontcg.io/base1/84_hires.png',
+        trainerEffect: 'Attach to 1 of your Pokémon. If that Pokémon\'s attack does damage to the Defending Pokémon (after applying Weakness and Resistance), the attack does 10 more damage.'
+    });
+
+    context.gameState.gameLog.push({
+        turn: context.gameState.turn,
+        player: context.playerNumber,
+        action: 'play_trainer',
+        trainer: 'PlusPower',
+        target: targetPokemon.cardName || targetPokemon.name
+    });
+
+    return { success: true, keepInPlay: true, message: `PlusPower attached to ${targetPokemon.cardName || targetPokemon.name}` };
+});

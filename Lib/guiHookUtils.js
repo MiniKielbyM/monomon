@@ -1123,14 +1123,21 @@ class GUIHookUtils {
             return;
         }
 
+        // Prevent direct swaps between active and bench except via retreat or special effect
+        const isActiveToBench = (sourceType === 'active' && targetEl.classList.contains('benched'));
+        const isBenchToActive = (sourceType === 'bench' && targetEl.id === 'ActivePokemon');
+        if (isActiveToBench || isBenchToActive) {
+            window.showGameMessage?.('You must use the Retreat action to switch Active and Benched Pokémon.', 2500);
+            return;
+        }
         if (targetEl.id === 'ActivePokemon') {
-            // Moving to active position
+            // Moving to active position (from hand or other legal source)
             this.player1.activePokemon = sourceCard;
             targetType = 'active';
             targetIndex = 0;
             this.removeCardFromSource(sourceType, sourceIndex);
         } else {
-            // Moving to bench position
+            // Moving to bench position (from hand or other legal source)
             const targetBenchIndex = benchCards.indexOf(targetEl);
             if (targetBenchIndex !== -1) {
                 this.player1.bench[targetBenchIndex] = sourceCard;
@@ -1533,6 +1540,74 @@ class GUIHookUtils {
 
         // Append to Pokemon card
         pokemonEl.appendChild(energyDisplay);
+    }
+
+    // Update the visual display of attached trainer items (e.g., PlusPower)
+    updateAttachedTrainersDisplay(pokemonEl, cardData) {
+        // Remove any existing trainers display
+        const existing = pokemonEl.querySelector('.attached-trainers-display');
+        if (existing) existing.remove();
+
+        if (!cardData || !cardData.attachedTrainers || cardData.attachedTrainers.length === 0) {
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'attached-trainers-display';
+        container.style.cssText = `
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            display: flex;
+            gap: 6px;
+            z-index: 11;
+            pointer-events: auto;
+            align-items: center;
+        `;
+
+        cardData.attachedTrainers.forEach(att => {
+            try {
+                const img = document.createElement('img');
+                img.src = att.imgUrl || att.image || att.cardUrl || '';
+                img.alt = att.cardName || att.name || 'trainer';
+                img.title = `${att.cardName || att.name || ''}${att.trainerEffect ? ' — ' + att.trainerEffect : ''}`;
+                img.style.cssText = `
+                    width: 22px;
+                    height: 22px;
+                    object-fit: cover;
+                    border-radius: 4px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+                    border: 1px solid rgba(255,255,255,0.6);
+                `;
+
+                // Optional: small label for item effects (e.g., +10)
+                if (typeof att.value === 'number') {
+                    const badge = document.createElement('div');
+                    badge.textContent = `+${att.value}`;
+                    badge.style.cssText = `
+                        font-size: 10px;
+                        color: white;
+                        background: rgba(0,0,0,0.6);
+                        padding: 1px 4px;
+                        border-radius: 8px;
+                        margin-left: -8px;
+                        margin-top: -12px;
+                        position: relative;
+                    `;
+                    const wrapper = document.createElement('div');
+                    wrapper.style.cssText = 'position: relative; display: inline-block;';
+                    wrapper.appendChild(img);
+                    wrapper.appendChild(badge);
+                    container.appendChild(wrapper);
+                } else {
+                    container.appendChild(img);
+                }
+            } catch (err) {
+                console.warn('Failed to render attached trainer', err, att);
+            }
+        });
+
+        pokemonEl.appendChild(container);
     }
 
     damageCardElement(cardElement, amount) {
@@ -2287,8 +2362,10 @@ class GUIHookUtils {
         
         // Update the local game state
         if (this.game && this.game.displayState) {
+            // The server sends { gameState: <state> } — normalize the payload
+            const payload = data && data.gameState ? data.gameState : data;
             // Merge the update with current state
-            Object.assign(this.game.displayState, data);
+            Object.assign(this.game.displayState, payload);
             
             // Trigger UI refresh
             if (this.game.updateDisplay) {
@@ -2401,6 +2478,72 @@ class GUIHookUtils {
 
     // Show card inspection modal with detailed information
     showCardInspectionModal(cardEl, cardData) {
+        // Create modal overlay (only once at the top of the function)
+        let modalOverlay = document.querySelector('.card-inspection-modal-overlay');
+        if (modalOverlay) {
+            modalOverlay.remove(); // Remove any existing modal to avoid duplicates
+        }
+        modalOverlay = document.createElement('div');
+        modalOverlay.className = 'card-inspection-modal-overlay';
+        modalOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        `;
+
+        // === Add a fixed-position retreat button to the modal overlay ===
+        const retreatBtn = document.createElement('button');
+        retreatBtn.textContent = `Retreat${cardData.retreatCost !== undefined ? ` (Pay ${cardData.retreatCost} Energy)` : ''}`;
+        retreatBtn.style.cssText = `
+            position: absolute;
+            bottom: 32px;
+            right: 48px;
+            padding: 14px 32px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 12px rgba(25, 118, 210, 0.18);
+            z-index: 1100;
+            display: none;
+        `;
+        retreatBtn.onclick = () => {
+            if (this.isMultiplayer && this.webSocketClient) {
+                this.webSocketClient.send(JSON.stringify({
+                    type: 'retreat_action',
+                    data: { benchIndex: 0 }
+                }));
+            } else if (this.game && typeof this.game.retreatActivePokemon === 'function') {
+                this.game.retreatActivePokemon();
+            } else {
+                window.showGameMessage?.('Retreat not available in this mode.', 2000);
+            }
+            modalOverlay.remove();
+        };
+        // Only show if this is the player's active Pokémon and it's their turn
+        const isPlayerActive = cardEl && cardEl.id === 'ActivePokemon' && this.isMyTurn && this.isMyTurn();
+        if (isPlayerActive && cardData.retreatCost !== undefined && cardData.hp > 0) {
+            retreatBtn.style.display = 'block';
+        }
+        modalOverlay.appendChild(retreatBtn);
+        // ...existing code...
+
+        // ...existing code...
+
+        // ...existing code...
+
+        // (Removed duplicate retreat button logic)
         // Safety check - if no card data provided, try to get it from the element
         if (!cardData) {
             cardData = this.getCardDataFromElement(cardEl);
@@ -2418,22 +2561,7 @@ class GUIHookUtils {
         console.log('NEW ENHANCED MODAL - Card data:', cardData);
         console.log('DEBUG: Attached energy in modal:', cardData.attachedEnergy);
         
-        // Create modal overlay
-        const modalOverlay = document.createElement('div');
-        modalOverlay.className = 'card-inspection-modal-overlay';
-        modalOverlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            backdrop-filter: blur(5px);
-        `;
+        // (Removed duplicate modalOverlay declaration)
 
         // Create modal content
         const modalContent = document.createElement('div');
@@ -3145,6 +3273,73 @@ class GUIHookUtils {
             infoSection.appendChild(attachedSection);
         }
 
+        // Attached Trainer Items (e.g., PlusPower)
+        if (cardData.attachedTrainers && cardData.attachedTrainers.length > 0) {
+            const trainerSection = document.createElement('div');
+            trainerSection.innerHTML = '<h3 style="color: #555; margin: 15px 0 10px 0;">Attached Items:</h3>';
+
+            const trainerContainer = document.createElement('div');
+            trainerContainer.style.cssText = `
+                padding: 12px;
+                background: #fff8e6;
+                border-radius: 8px;
+                border: 1px solid #ffe7b3;
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            `;
+
+            cardData.attachedTrainers.forEach((att, idx) => {
+                const attDiv = document.createElement('div');
+                attDiv.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px;
+                    width: 90px;
+                    background: white;
+                    border: 1px solid #f0e6d6;
+                    border-radius: 8px;
+                    cursor: pointer;
+                `;
+
+                const img = document.createElement('img');
+                img.src = att.imgUrl || att.image || '';
+                img.alt = att.cardName || att.name || 'item';
+                img.style.cssText = 'width:48px; height:48px; object-fit:cover; border-radius:6px;';
+                attDiv.appendChild(img);
+
+                const nameEl = document.createElement('div');
+                nameEl.textContent = att.cardName || att.name || 'Item';
+                nameEl.style.cssText = 'font-size:12px; color:#333; text-align:center; font-weight:600;';
+                attDiv.appendChild(nameEl);
+
+                if (typeof att.value === 'number') {
+                    const badge = document.createElement('div');
+                    badge.textContent = `+${att.value}`;
+                    badge.style.cssText = `
+                        background: #222;
+                        color: white;
+                        padding: 2px 6px;
+                        border-radius: 10px;
+                        font-size: 11px;
+                    `;
+                    attDiv.appendChild(badge);
+                }
+
+                attDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showAttachedTrainerDetails(att, modalOverlay);
+                });
+
+                trainerContainer.appendChild(attDiv);
+            });
+
+            trainerSection.appendChild(trainerContainer);
+            infoSection.appendChild(trainerSection);
+        }
+
         // Evolution section
         if (cardData.evolvesFrom || cardData.canEvolve !== undefined) {
             const evolutionSection = document.createElement('div');
@@ -3588,7 +3783,26 @@ class GUIHookUtils {
                 return;
             }
             
-            const success = this.webSocketClient.send('use_attack', { attackName: attackName });
+            // Resolve attack index from currently displayed active Pokemon if possible
+            let attackIndex = null;
+            try {
+                const activeEl = document.getElementById('ActivePokemon');
+                const activeData = activeEl && (activeEl.cardData || activeEl.cardInstance || activeEl.dataset && JSON.parse(activeEl.dataset.card || '{}'));
+                if (activeData && activeData.attacks) {
+                    // attacks may be array or object
+                    if (Array.isArray(activeData.attacks)) {
+                        attackIndex = activeData.attacks.findIndex(a => a && (a.name === attackName || a.name === String(attackName)));
+                    } else {
+                        const keys = Object.keys(activeData.attacks || {});
+                        attackIndex = keys.indexOf(attackName);
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not resolve attackIndex for attackName', attackName, err);
+            }
+
+            const payload = attackIndex !== null && attackIndex !== -1 ? { attackIndex, attackName } : { attackName };
+            const success = this.webSocketClient.send('use_attack', payload);
 
             if (success) {
                 // Show feedback message
@@ -4388,6 +4602,58 @@ class GUIHookUtils {
 
         // Add to page
         document.body.appendChild(detailOverlay);
+    }
+
+    // Show detailed information about an attached trainer/tool item
+    showAttachedTrainerDetails(attachedTrainerData, parentModal) {
+        const overlay = document.createElement('div');
+        overlay.className = 'attached-trainer-detail-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right:0; bottom:0;
+            display:flex; align-items:center; justify-content:center;
+            background: rgba(0,0,0,0.6); z-index: 1100; backdrop-filter: blur(2px);
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: white; padding: 18px; border-radius: 10px; max-width:420px; width:100%;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = attachedTrainerData.cardName || attachedTrainerData.name || 'Trainer Item';
+        title.style.cssText = 'margin:0 0 8px 0; font-size:18px; color:#333;';
+        content.appendChild(title);
+
+        const img = document.createElement('img');
+        img.src = attachedTrainerData.imgUrl || attachedTrainerData.image || '';
+        img.alt = attachedTrainerData.cardName || attachedTrainerData.name || '';
+        img.style.cssText = 'width:120px; height:120px; object-fit:cover; border-radius:8px; display:block; margin:8px auto;';
+        content.appendChild(img);
+
+        if (attachedTrainerData.trainerEffect) {
+            const effect = document.createElement('div');
+            effect.textContent = attachedTrainerData.trainerEffect;
+            effect.style.cssText = 'color:#444; font-size:14px; margin-top:8px;';
+            content.appendChild(effect);
+        }
+
+        if (typeof attachedTrainerData.value === 'number') {
+            const val = document.createElement('div');
+            val.textContent = `Value: +${attachedTrainerData.value}`;
+            val.style.cssText = 'margin-top:8px; font-weight:700; color:#222;';
+            content.appendChild(val);
+        }
+
+        const close = document.createElement('button');
+        close.textContent = 'Close';
+        close.style.cssText = 'display:block; margin:12px auto 0; padding:8px 14px; border-radius:8px; background:#333; color:white; border:none; cursor:pointer;';
+        close.addEventListener('click', () => overlay.remove());
+        content.appendChild(close);
+
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
     }
 
     // Close the inspection modal

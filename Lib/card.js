@@ -42,6 +42,14 @@ class Card {
     attacks = [];
     abilities = [];
     statusConditions = [];
+    // Explicit status properties for each condition
+    paralyzed = 0; // 0 = not paralyzed, >0 = turns remaining
+    asleep = false;
+    confused = false;
+    burned = false;
+    poisoned = false;
+    // Custom per-status properties (legacy/other uses)
+    statusProperties = {};
     //Constructor
     constructor(owner, imgUrl, cardName, type, hp, pokemon, evolvesFrom = null, canEvolve = true, weakness = null, resistance = null, retreatCost = 0, prizeCards = 1, cardMod = CardModifiers.Base) {
         // Generate unique ID for this card instance
@@ -98,9 +106,20 @@ class Card {
         
         // Initialize energy array for tracking attached energy
         this.energy = [];
+        // Initialize explicit status properties
+        this.paralyzed = 0;
+        this.asleep = false;
+        this.confused = false;
+        this.burned = false;
+        this.poisoned = false;
+    // Initialize custom status properties
+    this.statusProperties = {};
     }
     // Utility functions, dont edit these on children classes
     damage(amount, attackingType = null) {
+        if (this.isParalyzed()) {
+            throw new Error(`${this.cardName} is paralyzed and cannot attack.`);
+        }
         if (typeof amount !== 'number' || amount < 0) {
             throw new Error(`Invalid damage amount: ${amount}`);
         }
@@ -212,13 +231,24 @@ class Card {
         this.abilities.push(abilityConfig);
     }
     addStatusCondition(status) {
+        console.log(`Adding status condition: ${status}`);
         if (typeof status !== 'string') {
             throw new Error(`Invalid status condition: ${status}`);
         }
-        if (this.statusConditions.includes(status)) {
-            return;
-        } else {
+        if (!this.statusConditions.includes(status)) {
             this.statusConditions.push(status);
+        }
+        // Set explicit status properties
+        if (status === 'paralyzed') {
+            this.paralyzed = 1;
+        } else if (status === 'asleep') {
+            this.asleep = true;
+        } else if (status === 'confused') {
+            this.confused = true;
+        } else if (status === 'burned') {
+            this.burned = true;
+        } else if (status === 'poisoned') {
+            this.poisoned = true;
         }
     }
     removeStatusCondition(status) {
@@ -228,7 +258,49 @@ class Card {
         const index = this.statusConditions.indexOf(status);
         if (index !== -1) {
             this.statusConditions.splice(index, 1);
+            // Remove custom property for this status
+            if (status === 'paralyzed') {
+                delete this.statusProperties.paralysisTurns;
+            }
         }
+    }
+    // Check if the card is paralyzed
+    isParalyzed() {
+        // Effects are only active if paralyzed > 0
+        return this.paralyzed > 0;
+    }
+
+    // Call this after decrementing paralyzed each turn
+    updateParalysisStatus() {
+        if (this.paralyzed <= 0) {
+            this.paralyzed = 0;
+            // Remove 'paralyzed' from statusConditions if present
+            const idx = this.statusConditions.indexOf('paralyzed');
+            if (idx !== -1) this.statusConditions.splice(idx, 1);
+        } else {
+            // Ensure 'paralyzed' is present if paralyzed > 0
+            if (!this.statusConditions.includes('paralyzed')) {
+                this.statusConditions.push('paralyzed');
+            }
+        }
+    }
+
+    // Apply paralysis to the card (sets status and turn counter)
+    applyParalysis() {
+        this.addStatusCondition('paralyzed');
+    }
+
+    // Remove paralysis from the card (removes status and counter)
+    removeParalysis() {
+        this.removeStatusCondition('paralyzed');
+    }
+
+    // Override retreat logic to prevent retreating if paralyzed
+    retreat() {
+        if (this.isParalyzed()) {
+            throw new Error(`${this.cardName} is paralyzed and cannot retreat.`);
+        }
+        // ...existing code...
     }
 }
 Object.freeze(Card.damage);
