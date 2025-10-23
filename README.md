@@ -97,7 +97,7 @@ monomon/
 │       └── [other demo files]
 │
 ├── Server/                        # Server-side code
-│   ├── index.js                  # Server entry point
+│   ├── index.js                  # Login entry point
 │   ├── gameServer.js             # WebSocket server & lobby system
 │   ├── ServerGame.js             # Per-game authoritative logic
 │   ├── clientServer.js           # HTTP server for serving views
@@ -106,7 +106,7 @@ monomon/
 │   ├── generateCardData.js       # Card data generator
 │   ├── package.json              # Server dependencies
 │   └── views/
-│       └── home.ejs              # Home page template
+│       └── home.ejs              # Login page template
 │
 ├── package.json                   # Root package manifest
 ├── start-multiplayer.sh          # Server launch script
