@@ -630,9 +630,6 @@ npm install
 ```bash
 # From repository root
 ./start-multiplayer.sh
-
-# Or directly:
-node Server/index.js
 ```
 
 The server will start on port 8080 by default.
@@ -656,12 +653,7 @@ Navigate to `http://localhost:8080/` in your browser, or open `Lib/GUI.Demo/mult
 ```bash
 # Install dependencies
 cd Server && npm install
-
-# Start server with auto-reload (if nodemon installed)
-npm run dev
-
-# Or start normally
-node Server/index.js
+cd ../ && ./start-multiplayer.sh
 ```
 
 ### Project Development Environment
