@@ -1338,6 +1338,96 @@
             updateConnectionStatus('disconnected', 'Opponent disconnected');
             showGameMessage(data.message, 10000);
         });
+
+        // Big game-over modal: show when server signals final game over
+        function createGameOverModalIfNeeded() {
+            if (document.getElementById('game-over-modal')) return;
+            const modal = document.createElement('div');
+            modal.id = 'game-over-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.85);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 4000;
+            `;
+
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                text-align: center;
+                max-width: 600px;
+                width: 90%;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            `;
+
+            const title = document.createElement('h1');
+            title.id = 'game-over-title';
+            title.style.margin = '0 0 10px 0';
+            title.textContent = 'Game Over';
+
+            const desc = document.createElement('p');
+            desc.id = 'game-over-desc';
+            desc.style.fontSize = '18px';
+            desc.style.margin = '0 0 20px 0';
+
+            const btn = document.createElement('button');
+            btn.textContent = 'Return to Lobby';
+            btn.style.cssText = `
+                padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size:16px;
+            `;
+            btn.onclick = () => {
+                // Hide modal and reload page to reset UI / allow rejoin
+                modal.style.display = 'none';
+                try { wsClient.disconnect(); } catch (e) {}
+                // Optionally reload to reset state
+                window.location.reload();
+            };
+
+            content.appendChild(title);
+            content.appendChild(desc);
+            content.appendChild(btn);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+
+        function showGameOverModal(winnerNumber, winnerName, reason) {
+            createGameOverModalIfNeeded();
+            const modal = document.getElementById('game-over-modal');
+            const title = document.getElementById('game-over-title');
+            const desc = document.getElementById('game-over-desc');
+
+            // Build message
+            let who = '';
+            if (winnerName) who = `${winnerName} (Player ${winnerNumber})`;
+            else who = `Player ${winnerNumber}`;
+
+            title.textContent = `${who} wins!`;
+            desc.textContent = reason ? `Victory condition: ${reason}` : 'Victory!';
+
+            // Disable action buttons and end-turn UI
+            document.querySelectorAll('.action-btn, #end-turn-btn').forEach(el => {
+                el.disabled = true;
+                el.style.opacity = '0.5';
+                el.style.cursor = 'default';
+            });
+
+            // Show modal
+            modal.style.display = 'flex';
+        }
+
+        wsClient.on('game_over', (data) => {
+            console.log('GAME OVER message received:', data);
+            const { winner, winnerName, reason } = data || {};
+            showGameOverModal(winner, winnerName, reason);
+        });
         
         wsClient.on('connection_lost', (data) => {
             updateConnectionStatus('disconnected', 'Connection lost');

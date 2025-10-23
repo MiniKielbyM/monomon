@@ -1369,17 +1369,45 @@ class GameServer {
     }
 
     endGame(game, winnerNumber, reason) {
-        game.state = 'finished';
-        game.winner = winnerNumber;
-        game.winReason = reason;
-        
-        this.broadcastToGame(game.id, {
-            type: 'game_ended',
-            winner: winnerNumber,
-            reason: reason
-        });
-        
-        console.log(`Game ${game.id} ended. Winner: Player ${winnerNumber} (${reason})`);
+        try {
+            game.state = 'finished';
+            game.winner = winnerNumber;
+            game.winReason = reason;
+
+            // Determine winner's username where available
+            const winnerName = (winnerNumber === 1 && game.player1 && game.player1.username) ? game.player1.username :
+                (winnerNumber === 2 && game.player2 && game.player2.username) ? game.player2.username : null;
+
+            // Broadcast a legacy short message and a richer game_over message that clients should use to show a blocking modal
+            this.broadcastToGame(game.id, {
+                type: 'game_ended',
+                winner: winnerNumber,
+                reason: reason
+            });
+
+            this.broadcastToGame(game.id, {
+                type: 'game_over',
+                winner: winnerNumber,
+                winnerName: winnerName,
+                reason: reason,
+                message: `Player ${winnerNumber} won (${reason})`
+            });
+
+            console.log(`Game ${game.id} ended. Winner: Player ${winnerNumber} (${reason})`);
+
+            // Clear client associations for this game so the server stops referencing it
+            for (const [ws, clientInfo] of this.clients.entries()) {
+                if (clientInfo && clientInfo.gameId === game.id) {
+                    clientInfo.gameId = null;
+                    clientInfo.playerNumber = null;
+                }
+            }
+
+            // Remove the game from the active games map to free resources
+            if (this.games.has(game.id)) this.games.delete(game.id);
+        } catch (err) {
+            console.error('Error during endGame cleanup:', err);
+        }
     }
 
     handleGameStateUpdate(ws, data) {

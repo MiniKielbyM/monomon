@@ -1920,6 +1920,55 @@ class ServerGame {
         
         // Make sure HP doesn't go below 0 or above max
         evolvedPokemon.hp = Math.max(0, Math.min(evolvedPokemon.hp, evolvedPokemon.maxHp));
+
+        // Ensure evolved form has attacks preserved.
+        // Some cards coming from hand or templates may represent attacks as arrays;
+        // class instances use an object map. Normalize by copying attacks from the
+        // evolutionCard if the created instance has no attacks recorded.
+        try {
+            const hasOwnAttacks = evolvedPokemon.attacks && (
+                (Array.isArray(evolvedPokemon.attacks) && evolvedPokemon.attacks.length > 0) ||
+                (typeof evolvedPokemon.attacks === 'object' && Object.keys(evolvedPokemon.attacks).length > 0)
+            );
+
+            if (!hasOwnAttacks && evolutionCard && evolutionCard.attacks) {
+                // Normalize attacks into object map form { name: { description, cost, energyCost, damage } }
+                const normalized = {};
+                if (Array.isArray(evolutionCard.attacks)) {
+                    evolutionCard.attacks.forEach(a => {
+                        const attackName = a.name || a.attackName || '';
+                        if (!attackName) return;
+                        normalized[attackName] = {
+                            description: a.description || '',
+                            cost: a.cost || a.energyCost || [],
+                            energyCost: a.energyCost || a.cost || [],
+                            damage: a.damage
+                        };
+                    });
+                } else if (typeof evolutionCard.attacks === 'object') {
+                    Object.keys(evolutionCard.attacks).forEach(key => {
+                        const a = evolutionCard.attacks[key] || {};
+                        const attackName = a.name || key || '';
+                        if (!attackName) return;
+                        normalized[attackName] = {
+                            description: a.description || '',
+                            cost: a.cost || a.energyCost || [],
+                            energyCost: a.energyCost || a.cost || [],
+                            damage: a.damage
+                        };
+                    });
+                }
+
+                // Attach normalized attacks to evolvedPokemon in a compatible shape
+                // If evolvedPokemon is a class instance that expects a map, set map; otherwise set array for fallback
+                if (typeof evolvedPokemon === 'object') {
+                    // Prefer object map so instance methods can reference attacks by name
+                    evolvedPokemon.attacks = normalized;
+                }
+            }
+        } catch (errPreserve) {
+            console.warn('Failed to preserve attacks on evolved Pokemon:', errPreserve);
+        }
         
         // After transferring energies to the evolved form, clear them from the original pokemon object
         try {
@@ -2153,13 +2202,23 @@ class ServerGame {
                         hasValidator: !!(card.abilities[abilityName].effectValidator)
                     }))
                 ) : [],
-                attacks: card.attacks ? Object.keys(card.attacks).map(attackName => ({
-                    name: attackName,
-                    description: card.attacks[attackName].description || '',
-                    cost: card.attacks[attackName].cost || [],
-                    energyCost: card.attacks[attackName].energyCost || card.attacks[attackName].cost || [],
-                    damage: card.attacks[attackName].damage
-                })) : []
+                attacks: card.attacks ? (
+                    Array.isArray(card.attacks)
+                        ? card.attacks.map(attack => ({
+                            name: attack.name || attack.attackName || '',
+                            description: attack.description || '',
+                            cost: attack.cost || [],
+                            energyCost: attack.energyCost || attack.cost || [],
+                            damage: attack.damage
+                        }))
+                        : Object.keys(card.attacks).map(attackName => ({
+                            name: attackName,
+                            description: card.attacks[attackName].description || '',
+                            cost: card.attacks[attackName].cost || [],
+                            energyCost: card.attacks[attackName].energyCost || card.attacks[attackName].cost || [],
+                            damage: card.attacks[attackName].damage
+                        }))
+                ) : []
             };
         };
         

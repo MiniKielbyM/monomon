@@ -39,7 +39,8 @@ class Card {
     //Global card properties
     static energy = [];
     static attachments = [];
-    attacks = [];
+    // attacks stored as a map: { attackName: { description, cost, callback } }
+    attacks = {};
     abilities = [];
     statusConditions = [];
     // Explicit status properties for each condition
