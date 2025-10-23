@@ -2,7 +2,7 @@
 
 A server-authoritative, WebSocket-based multiplayer Pokémon Trading Card Game (TCG) implementation built with Node.js and vanilla JavaScript. This project demonstrates real-time game state synchronization, defensive server programming, and rich client-side interactions.
 
-<img src="https://hackatime-badge.hackclub.com/U0925ST8U4B/monomon"/>
+<img src="https://hackatime-badge.hackclub.com/U0925ST8U4B/monomon"/> [![Athena Award Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Faward.athena.hackclub.com%2Fapi%2Fbadge)](https://award.athena.hackclub.com?utm_source=readme)
 
 ---
 
