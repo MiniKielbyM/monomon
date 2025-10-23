@@ -60,16 +60,18 @@ class SocketManager {
 
 // Server-side Game class - handles all game logic and state
 class ServerGame {
-    constructor(player1, player2, gameServer = null) {
+    constructor(player1, player2, gameServer = null, deck1 = null, deck2 = null) {
         this.id = uuidv4();
         this.player1 = { ...player1, playerNumber: 1 };
         this.player2 = { ...player2, playerNumber: 2 };
         this.state = 'waiting_for_ready';
         this.created = new Date();
-        
+
         // Socket manager for client communication
         this.socketManager = gameServer ? new SocketManager(gameServer, this.id) : null;
-        
+        // Keep a back-reference to the GameServer so we can call endGame and other host-level APIs
+        this.gameServer = gameServer || null;
+
         // Authoritative game state
         this.gameState = {
             player1: {
@@ -104,11 +106,69 @@ class ServerGame {
             winner: null,
             gameLog: []
         };
-        
-        this.initializeDecks();
-        
+
+        // If both decks are provided, use them; otherwise, initialize default decks
+        if (deck1 && deck2) {
+            this.initializeWithSubmittedDecks(deck1, deck2);
+        } else {
+            this.initializeDecks();
+        }
         // Remove automatic test game initialization - let players play normally
         // this.initializeTestGame();
+    }
+
+    // Initialize the game using submitted decks from both players
+    initializeWithSubmittedDecks(deck1, deck2) {
+        // Defensive copy and assign owner references
+        const assignOwner = (deck, playerObj) => {
+            return deck.map(card => {
+                // Defensive copy
+                const cardCopy = { ...card };
+                cardCopy.owner = playerObj;
+                if (!cardCopy.attachedEnergy) cardCopy.attachedEnergy = [];
+                return cardCopy;
+            });
+        };
+
+        this.gameState.player1.deck = this.shuffleDeck(assignOwner(deck1, this.gameState.player1));
+        this.gameState.player2.deck = this.shuffleDeck(assignOwner(deck2, this.gameState.player2));
+
+        // Set up opponent references for card instances
+        this.setupCardOpponentReferences();
+
+        // Draw initial hands (7 cards each)
+        this.gameState.player1.hand = this.gameState.player1.deck.splice(0, 7);
+        this.gameState.player2.hand = this.gameState.player2.deck.splice(0, 7);
+
+        // Set up prize cards (6 cards each)
+        for (let i = 0; i < 6; i++) {
+            if (this.gameState.player1.deck.length > 0) {
+                this.gameState.player1.prizeCards[i] = this.gameState.player1.deck.splice(0, 1)[0];
+            }
+            if (this.gameState.player2.deck.length > 0) {
+                this.gameState.player2.prizeCards[i] = this.gameState.player2.deck.splice(0, 1)[0];
+            }
+        }
+
+        // Assign ownership for all cards that are now in players' zones (deck, hand, prize, discard, bench, active)
+        const assignOwnersForPlayer = (playerObj) => {
+            const assign = (card) => {
+                if (card && typeof card === 'object') {
+                    card.owner = playerObj;
+                    if (!card.attachedEnergy) card.attachedEnergy = [];
+                }
+            };
+            ['deck', 'hand', 'discardPile', 'prizeCards', 'bench'].forEach(zone => {
+                if (Array.isArray(playerObj[zone])) playerObj[zone].forEach(assign);
+            });
+            if (playerObj.activePokemon) assign(playerObj.activePokemon);
+        };
+        assignOwnersForPlayer(this.gameState.player1);
+        assignOwnersForPlayer(this.gameState.player2);
+
+        this.logAction('Game initialized with submitted decks, hands, and prize cards');
+        // Start the first turn (Player 1 draws their first card)
+        this.startTurn();
     }
     
     // Fisher-Yates shuffle algorithm for proper randomization
@@ -490,7 +550,8 @@ class ServerGame {
             console.error('Error while handling knockouts after attack:', err);
         }
 
-        return { success: true, result: attackResult };
+        // Return resolved attack name for clients to display (helps when numeric indexes were passed)
+        return { success: true, result: attackResult, attackNameResolved: attackName };
     }
 
     // Use a Pokemon's ability
@@ -1709,7 +1770,24 @@ class ServerGame {
             console.log(`DEBUG: No prize cards were drawn - all slots were null`);
         }
         
-        return cardsDrawn;
+        // After drawing, check remaining prizes and end game if none left
+        const remaining = player.prizeCards.filter(card => card !== null).length;
+        if (remaining === 0) {
+            // The player who just drew the last prize cards wins the game
+            const winnerNumber = player === this.gameState.player1 ? 1 : 2;
+            try {
+                if (this.gameServer && typeof this.gameServer.endGame === 'function') {
+                    this.gameServer.endGame(this, winnerNumber, 'prize_cards');
+                } else {
+                    // Fallback to local endGame method if available
+                    if (typeof this.endGame === 'function') this.endGame(this, winnerNumber, 'prize_cards');
+                }
+            } catch (errEnd) {
+                console.warn('Error ending game after prize depletion:', errEnd);
+            }
+        }
+
+        return { cardsDrawn, remaining };
     }
 
     // Evolution system
@@ -1776,11 +1854,12 @@ class ServerGame {
         const handIndex = player.hand.indexOf(evolutionCard);
         player.hand.splice(handIndex, 1);
         
-        // Preserve important state from the target Pokemon
-        const currentHp = targetPokemon.hp;
-        const currentDamage = targetPokemon.maxHp - currentHp;
-        const attachedEnergy = targetPokemon.attachedEnergy || [];
-        const statusConditions = targetPokemon.statusConditions || [];
+    // Preserve important state from the target Pokemon
+    const currentHp = Number.isFinite(targetPokemon.hp) ? targetPokemon.hp : (targetPokemon.maxHp || targetPokemon.hp || 0);
+    const currentMaxHp = Number.isFinite(targetPokemon.maxHp) ? targetPokemon.maxHp : (targetPokemon.hp || targetPokemon.maxHp || 0);
+    const currentDamage = (Number.isFinite(currentMaxHp) ? currentMaxHp : 0) - (Number.isFinite(currentHp) ? currentHp : 0);
+    const attachedEnergy = Array.isArray(targetPokemon.attachedEnergy) ? targetPokemon.attachedEnergy.slice() : [];
+    const statusConditions = Array.isArray(targetPokemon.statusConditions) ? targetPokemon.statusConditions.slice() : [];
         
         // Create the evolved Pokemon with preserved state and evolution stack
         // Move attached energy from the target Pokemon to the evolved Pokemon to avoid shared references
@@ -1797,9 +1876,11 @@ class ServerGame {
                 const instance = new CardClass(ownerForNew);
                 // Assign a stable id and preserve HP/damage
                 instance.id = uuidv4();
-                instance.maxHp = instance.maxHp || (evolutionCard.hp || instance.maxHp);
-                // Apply preserved damage
-                instance.hp = Math.max(0, instance.maxHp - currentDamage);
+                // Determine evolved maxHp: prefer class-provided maxHp, fallback to evolutionCard fields
+                const candidateMaxHp = Number.isFinite(instance.maxHp) ? instance.maxHp : (Number.isFinite(evolutionCard.maxHp) ? evolutionCard.maxHp : (Number.isFinite(evolutionCard.hp) ? evolutionCard.hp : instance.maxHp));
+                instance.maxHp = Number.isFinite(candidateMaxHp) ? candidateMaxHp : (instance.maxHp || evolutionCard.maxHp || evolutionCard.hp || 0);
+                // Apply preserved damage to compute new hp
+                instance.hp = Math.max(0, (Number.isFinite(instance.maxHp) ? instance.maxHp : 0) - (Number.isFinite(currentDamage) ? currentDamage : 0));
                 // Transfer attached energy objects
                 instance.attachedEnergy = movedAttachedEnergy;
                 // Preserve status conditions
@@ -1820,14 +1901,16 @@ class ServerGame {
 
         // Fallback to plain object if we couldn't create a class instance
         if (!evolvedPokemon) {
-            evolvedPokemon = {
-                ...evolutionCard,
-                hp: (evolutionCard.hp || 0) - currentDamage, // Preserve damage taken
-                maxHp: evolutionCard.hp || evolutionCard.maxHp || 0,
-                attachedEnergy: movedAttachedEnergy, // Transfer attached energy to evolved form
-                statusConditions: statusConditions, // Preserve status conditions
+            // Fallback plain-object evolved form
+            const fallbackMaxHp = Number.isFinite(evolutionCard.maxHp) ? evolutionCard.maxHp : (Number.isFinite(evolutionCard.hp) ? evolutionCard.hp : 0);
+            const fallbackHp = Math.max(0, fallbackMaxHp - (Number.isFinite(currentDamage) ? currentDamage : 0));
+            evolvedPokemon = Object.assign({}, evolutionCard, {
+                maxHp: fallbackMaxHp,
+                hp: Math.min(fallbackHp, fallbackMaxHp),
+                attachedEnergy: movedAttachedEnergy,
+                statusConditions: statusConditions,
                 evolutionStack: [ ...(targetPokemon.evolutionStack || []), targetPokemon ]
-            };
+            });
             // Clear evolution markers on the plain-object fallback too
             evolvedPokemon.isEvolution = false;
             evolvedPokemon.evolvesFrom = null;

@@ -233,6 +233,7 @@
 </head>
 
 <body>
+
     <!-- Username Modal -->
     <div id="username-modal">
         <div id="username-form">
@@ -241,6 +242,17 @@
             <br>
             <button id="join-button">Join Game</button>
         </div>
+    </div>
+
+    <!-- Deck Builder Modal -->
+    <div id="deck-builder-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:3000; align-items:center; justify-content:center;">
+      <div style="background:white; padding:30px; border-radius:10px; max-width:500px; margin:auto;">
+        <h2>Build Your Deck</h2>
+                <div id="deck-opponent" style="margin-bottom:8px; font-weight:600;">Opponent: <span id="deck-opponent-name">Waiting for opponent...</span></div>
+        <div id="deck-builder-list" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
+        <div>Cards in deck: <span id="deck-card-count">0</span>/60</div>
+        <button id="submit-deck-button" disabled>Submit Deck</button>
+      </div>
     </div>
     
     <!-- Coin Flip Modal -->
@@ -366,11 +378,114 @@
         const turnNumberSpan = document.getElementById('turn-number');
         const turnStatusDiv = document.getElementById('turn-status');
         
-        let currentUsername = '';
-        let playerNumber = 0;
-        let currentTurn = 0;
-        let isMyTurn = false;
-        let player1, player2, game;
+    let currentUsername = '';
+    let playerNumber = 0;
+    let currentTurn = 0;
+    let isMyTurn = false;
+    let player1, player2, game;
+    let deckSubmitted = false;
+    let currentDeck = [];
+                // --- Deck builder logic ---
+                const deckBuilderModal = document.getElementById('deck-builder-modal');
+                const deckBuilderList = document.getElementById('deck-builder-list');
+                const deckCardCount = document.getElementById('deck-card-count');
+                const submitDeckButton = document.getElementById('submit-deck-button');
+
+
+                        // Fetch card data from cardData.js (ESM import via dynamic import)
+                        let cardPool = [];
+                        async function loadCardPool() {
+                            // Try to import cardData.js as an ES module
+                            try {
+                                const cardData = await import('/Server/cardData.js');
+                                // Merge all cards into one pool
+                                cardPool = [];
+                                if (Array.isArray(cardData.pokemonCards)) cardPool = cardPool.concat(cardData.pokemonCards);
+                                if (Array.isArray(cardData.energyCards)) cardPool = cardPool.concat(cardData.energyCards);
+                                // Normalize for builder
+                                cardPool = cardPool.map(card => ({
+                                    cardName: card.name || card.cardName,
+                                    type: card.type,
+                                    imgUrl: card.imgUrl,
+                                    ...card
+                                }));
+                                // Sort alphabetically by cardName for predictable builder ordering
+                                cardPool.sort((a, b) => (a.cardName || '').toLowerCase().localeCompare((b.cardName || '').toLowerCase()));
+                            } catch (e) {
+                                // Fallback: minimal pool
+                                cardPool = [
+                                    { cardName: 'Pikachu', type: 'pokemon', imgUrl: 'https://images.pokemontcg.io/base1/58_hires.png' },
+                                    { cardName: 'Blastoise', type: 'pokemon', imgUrl: 'https://images.pokemontcg.io/base1/2_hires.png' },
+                                    { cardName: 'Fire Energy', type: 'energy', imgUrl: 'https://images.pokemontcg.io/base1/98_hires.png' },
+                                    { cardName: 'Water Energy', type: 'energy', imgUrl: 'https://images.pokemontcg.io/base1/102_hires.png' },
+                                    { cardName: 'Bill', type: 'trainer', imgUrl: 'https://images.pokemontcg.io/base1/91_hires.png' },
+                                ];
+                                cardPool.sort((a, b) => (a.cardName || '').toLowerCase().localeCompare((b.cardName || '').toLowerCase()));
+                            }
+                        }
+
+                        async function openDeckBuilder(opponentName) {
+                            currentDeck = [];
+                            await loadCardPool();
+                            updateDeckBuilder();
+                            // Show opponent name if provided
+                            const opponentSpan = document.getElementById('deck-opponent-name');
+                            if (opponentSpan) opponentSpan.textContent = opponentName || 'Waiting for opponent...';
+                            deckBuilderModal.style.display = 'flex';
+                        }
+
+                        function updateDeckBuilder() {
+                            deckBuilderList.innerHTML = '';
+                            cardPool.forEach(card => {
+                                const count = currentDeck.filter(c => c.cardName === card.cardName).length;
+                                const cardDiv = document.createElement('div');
+                                cardDiv.style.display = 'flex';
+                                cardDiv.style.alignItems = 'center';
+                                cardDiv.style.marginBottom = '4px';
+                                cardDiv.innerHTML = `<img src="${card.imgUrl}" style="width:40px; height:56px; object-fit:cover; margin-right:8px;"> <span>${card.cardName}</span> <span style="margin-left:auto;">x${count}</span>`;
+                                const addBtn = document.createElement('button');
+                                addBtn.textContent = '+';
+                                addBtn.style.marginLeft = '8px';
+                                addBtn.onclick = () => {
+                                    if (currentDeck.length < 60) {
+                                        currentDeck.push(card);
+                                        updateDeckBuilder();
+                                    }
+                                };
+                                const removeBtn = document.createElement('button');
+                                removeBtn.textContent = '-';
+                                removeBtn.onclick = () => {
+                                    const idx = currentDeck.findIndex(c => c.cardName === card.cardName);
+                                    if (idx !== -1) {
+                                        currentDeck.splice(idx, 1);
+                                        updateDeckBuilder();
+                                    }
+                                };
+                                cardDiv.appendChild(addBtn);
+                                cardDiv.appendChild(removeBtn);
+                                deckBuilderList.appendChild(cardDiv);
+                            });
+                            deckCardCount.textContent = currentDeck.length;
+                            submitDeckButton.disabled = currentDeck.length !== 60;
+                        }
+
+                        submitDeckButton.onclick = () => {
+                            wsClient.send('submit_deck', { deck: currentDeck });
+                        };
+                // Listen for server deck messages
+                wsClient.on('deck_required', (data) => {
+                    // data may include opponent name when available
+                    const opponent = data && data.opponent ? data.opponent : null;
+                    openDeckBuilder(opponent);
+                });
+                wsClient.on('deck_received', () => {
+                    deckSubmitted = true;
+                    deckBuilderModal.style.display = 'none';
+                    showGameMessage('Deck submitted! Waiting for opponent...', 3000);
+                });
+                wsClient.on('deck_error', (data) => {
+                    showGameMessage('Deck error: ' + (data.message || 'Unknown error'), 4000);
+                });
         
         // Update connection status
         function updateConnectionStatus(status, message) {
@@ -1077,22 +1192,30 @@
             updateConnectionStatus('connected', 'Connected');
             playerNumberSpan.textContent = data.playerNumber;
             opponentNameSpan.textContent = data.opponent;
+            // Update deck builder opponent display if open
+            const opponentSpan = document.getElementById('deck-opponent-name');
+            if (opponentSpan) opponentSpan.textContent = data.opponent || 'Waiting for opponent...';
             showGameMessage(`Game found! You are Player ${data.playerNumber}. Opponent: ${data.opponent}`);
-            
             // Set up the game
             setupGame(data.playerNumber);
-            
-            // Send ready signal
-            setTimeout(() => {
+            // Prompt for deck if not already submitted
+            if (!deckSubmitted) {
+                openDeckBuilder();
+            } else {
                 wsClient.sendPlayerReady();
-            }, 1000);
+            }
+        });
+
+        wsClient.on('joined_lobby', (data) => {
+            // Show opponent if server provided username in lobby (may be null until other joins)
+            const opponentSpan = document.getElementById('deck-opponent-name');
+            if (opponentSpan) opponentSpan.textContent = data.opponent || 'Waiting for opponent...';
         });
         
         wsClient.on('game_start', (data) => {
             showGameMessage('Game started! You can now move your cards.');
             // The game.start() method already initializes drag and drop with game reference
             // and sends initial state for synchronization
-            
             // Initialize deck count displays when game starts
             initializeDeckCounts();
         });
@@ -1290,16 +1413,14 @@
                 alert('Please enter a username');
                 return;
             }
-            
             currentUsername = username;
             currentUsernameSpan.textContent = username;
-            
             try {
                 updateConnectionStatus('connecting', 'Connecting...');
-                // Let WebSocketClient auto-detect the correct URL for Codespaces
                 await wsClient.connect();
                 wsClient.joinGame(username);
                 usernameModal.style.display = 'none';
+                // Deck builder will open after game_found or deck_required
             } catch (error) {
                 console.error('Failed to connect:', error);
                 updateConnectionStatus('disconnected', 'Connection failed');

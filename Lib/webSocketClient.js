@@ -130,7 +130,6 @@ class WebSocketClient {
     handleMessage(message) {
         const { type, ...data } = message;
         console.log('Received message:', type, data);
-        
         switch (type) {
             case 'waiting_for_opponent':
                 this.triggerCallback('waiting_for_opponent', data);
@@ -139,6 +138,16 @@ class WebSocketClient {
                 this.gameId = data.gameId;
                 this.playerNumber = data.playerNumber;
                 this.triggerCallback('game_found', data);
+                break;
+            case 'joined_lobby':
+                // Server places us in a temporary lobby; surface to UI
+                this.triggerCallback('joined_lobby', data);
+                break;
+            case 'submit_deck':
+                // Server asks client to submit a deck before creating the game
+                // For backward compatibility, also surface as 'deck_required'
+                this.triggerCallback('submit_deck', data);
+                this.triggerCallback('deck_required', data);
                 break;
             case 'game_start':
                 this.triggerCallback('game_start', data);
@@ -164,16 +173,22 @@ class WebSocketClient {
             case 'action_error':
                 this.triggerCallback('action_error', data);
                 break;
+            case 'deck_received':
+                this.triggerCallback('deck_received', data);
+                break;
+            case 'deck_required':
+                this.triggerCallback('deck_required', data);
+                break;
+            case 'deck_error':
+                this.triggerCallback('deck_error', data);
+                break;
             case 'card_selection_request':
-                // Forward card selection requests to the GUI system
                 this.triggerCallback('card_selection_request', data);
                 break;
             case 'coin_flip_show':
-                // Show coin flip animation to all clients
                 this.triggerCallback('coin_flip_show', data);
                 break;
             case 'pokemon_knockout':
-                // Handle Pokemon knockout events
                 this.triggerCallback('pokemon_knockout', data);
                 break;
             case 'game_ended':

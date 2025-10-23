@@ -8,9 +8,9 @@ class GameServer {
         this.port = port;
         this.wss = new WebSocketServer({ port });
         this.games = new Map(); // gameId -> Game instance
-        this.waitingPlayers = []; // Players waiting for a match
+        this.lobbies = new Map(); // lobbyId -> { players: [], readyCount: 0 }
         this.clients = new Map(); // ws -> client info
-        
+
         console.log(`Game server started on port ${port}`);
         this.setupWebSocketHandlers();
     }
@@ -45,6 +45,9 @@ class GameServer {
         switch (type) {
             case 'join_game':
                 this.handleJoinGame(ws, data);
+                break;
+            case 'submit_deck':
+                this.handleSubmitDeck(ws, data);
                 break;
             case 'card_move':
                 this.handleCardMove(ws, data);
@@ -87,44 +90,100 @@ class GameServer {
     handleJoinGame(ws, data) {
         const { username } = data;
         const clientId = uuidv4();
-        
+
         const clientInfo = {
             id: clientId,
             username,
             ws,
             gameId: null,
             playerNumber: null,
-            ready: false
+            ready: false,
+            deck: null // Will be set on submit_deck
         };
-        
+
         this.clients.set(ws, clientInfo);
-        
-        // Try to match with waiting player
-        if (this.waitingPlayers.length > 0) {
-            const opponent = this.waitingPlayers.shift();
-            this.createGame(opponent, clientInfo);
-        } else {
-            this.waitingPlayers.push(clientInfo);
-            ws.send(JSON.stringify({
-                type: 'waiting_for_opponent',
-                clientId,
-                message: 'Waiting for another player to join...'
-            }));
+
+        // Assign to a lobby
+        let lobby = Array.from(this.lobbies.values()).find(l => l.players.length < 2);
+        if (!lobby) {
+            const lobbyId = uuidv4();
+            lobby = { id: lobbyId, players: [], readyCount: 0 };
+            this.lobbies.set(lobbyId, lobby);
+        }
+        lobby.players.push(clientInfo);
+        clientInfo.lobbyId = lobby.id;
+
+        ws.send(JSON.stringify({
+            type: 'joined_lobby',
+            lobbyId: lobby.id,
+            message: 'Joined a lobby. Waiting for another player...'
+        }));
+
+        // Start game if lobby is full
+        if (lobby.players.length === 2) {
+            this.startLobbyGame(lobby);
         }
     }
 
-    createGame(player1, player2) {
+    startLobbyGame(lobby) {
+        const [player1, player2] = lobby.players;
+
+        // Notify players to submit decks
+        player1.ws.send(JSON.stringify({
+            type: 'submit_deck',
+            message: 'Please submit your deck to start the game.'
+        }));
+        player2.ws.send(JSON.stringify({
+            type: 'submit_deck',
+            message: 'Please submit your deck to start the game.'
+        }));
+
+        // Don't delete the lobby yet - keep it until both decks are submitted
+        lobby.started = true;
+    }
+
+    handleSubmitDeck(ws, data) {
+        const client = this.clients.get(ws);
+        if (!client) {
+            ws.send(JSON.stringify({ type: 'deck_error', message: 'Client not found' }));
+            return;
+        }
+        if (!Array.isArray(data.deck) || data.deck.length < 1) {
+            ws.send(JSON.stringify({ type: 'deck_error', message: 'Invalid or empty deck submitted' }));
+            return;
+        }
+        client.deck = data.deck;
+        ws.send(JSON.stringify({ type: 'deck_received', message: 'Deck submitted successfully' }));
+
+        // Check if both players in the lobby have submitted decks
+        const lobby = this.lobbies.get(client.lobbyId);
+        if (!lobby) return;
+
+        lobby.readyCount = (lobby.readyCount || 0) + 1;
+        if (lobby.readyCount >= 2) {
+            const [player1, player2] = lobby.players;
+            // Create the game
+            this.createGame(player1, player2, player1.deck, player2.deck);
+
+            // Clean up lobby after game creation
+            this.lobbies.delete(lobby.id);
+            player1.lobbyId = null;
+            player2.lobbyId = null;
+        }
+    }
+
+    createGame(player1, player2, deck1 = null, deck2 = null) {
         // Create new server-side game instance with GameServer reference for abilities
-        const game = new ServerGame(player1, player2, this);
-        
+        const game = new ServerGame(player1, player2, this, deck1, deck2);
+
         this.games.set(game.id, game);
-        
+
         // Update client info
         player1.gameId = game.id;
         player1.playerNumber = 1;
         player2.gameId = game.id;
         player2.playerNumber = 2;
-        
+
         // Notify both players
         player1.ws.send(JSON.stringify({
             type: 'game_found',
@@ -133,7 +192,7 @@ class GameServer {
             opponent: player2.username,
             message: 'Game found! Get ready...'
         }));
-        
+
         player2.ws.send(JSON.stringify({
             type: 'game_found',
             gameId: game.id,
@@ -143,52 +202,46 @@ class GameServer {
         }));
 
         console.log(`Game ${game.id} created between ${player1.username} and ${player2.username}`);
-        
+
         return game.id;
     }
 
-    handlePlayerReady(ws, data) {
-        const client = this.clients.get(ws);
-        if (!client || !client.gameId) {
-            console.log('Player ready: No client or gameId found');
-            return;
-        }
-        
-        const game = this.games.get(client.gameId);
-        if (!game) {
-            console.log('Player ready: No game found for ID:', client.gameId);
-            return;
-        }
-        
-        console.log(`Player ${client.username} (${client.playerNumber}) is ready`);
-        client.ready = true;
-        
-        // Update game state
-        if (client.playerNumber === 1) {
-            game.player1.ready = true;
-        } else {
-            game.player2.ready = true;
-        }
-        
-        console.log(`Game ${game.id} - Player 1 ready: ${game.player1.ready}, Player 2 ready: ${game.player2.ready}`);
-        
-        // Check if both players are ready
-        if (game.player1.ready && game.player2.ready) {
-            console.log('Both players ready, starting game');
-            game.state = 'playing';
-            game.gameState.phase = 'playing';
-            
-            // Send complete game state to both players
-            console.log('Sending initial game state to players');
-            this.sendGameStateToPlayers(game);
-            
-            // Start the game
-            this.broadcastToGame(game.id, {
-                type: 'game_start',
-                message: 'Both players ready! Game starting...'
-            });
-        }
+  handlePlayerReady(ws, data) {
+    const client = this.clients.get(ws);
+    if (!client || !client.gameId) {
+        console.log('Player ready: No client or gameId found');
+        return;
     }
+
+    const game = this.games.get(client.gameId);
+    if (!game) {
+        console.log('Player ready: No game found for ID:', client.gameId);
+        return;
+    }
+
+    console.log(`Player ${client.username} (${client.playerNumber}) is ready`);
+    client.ready = true;
+
+    // Update game state
+    if (client.playerNumber === 1) {
+        game.player1.ready = true;
+    } else {
+        game.player2.ready = true;
+    }
+
+    console.log(`Game ${game.id} - Player 1 ready: ${game.player1.ready}, Player 2 ready: ${game.player2.ready}`);
+
+    // Only start the game if both are ready (decks are guaranteed by game creation)
+    if (game.player1.ready && game.player2.ready) {
+        game.state = 'playing';
+        game.gameState.phase = 'playing';
+        this.sendGameStateToPlayers(game);
+        this.broadcastToGame(game.id, {
+            type: 'game_start',
+            message: 'Both players ready! Game starting...'
+        });
+    }
+}
 
     handleCardSelectionResponse(ws, data) {
         const client = this.clients.get(ws);
@@ -295,30 +348,48 @@ class GameServer {
         
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
+        // Defensive snapshot: capture player's hand before attempting evolution so we can restore
+        try {
+            const playerState = game.gameState[`player${client.playerNumber}`];
+            const handSnapshot = Array.isArray(playerState.hand) ? playerState.hand.slice() : [];
 
-        // Use ServerGame's evolveCard method
-        const result = game.evolveCard(
-            client.playerNumber,
-            data.evolutionCardIndex,
-            data.targetPokemonLocation,
-            data.targetPokemonIndex
-        );
-        
-        if (result.success) {
-            // Send updated game state to both players
-            this.sendGameStateToPlayers(game);
-            
-            // Send success confirmation to the evolving player
-            ws.send(JSON.stringify({
-                type: 'evolution_success',
-                message: 'Pokemon evolved successfully'
-            }));
-        } else {
-            // Send error message to the evolving player
-            ws.send(JSON.stringify({
-                type: 'evolution_error',
-                message: result.error
-            }));
+            // Use ServerGame's evolveCard method
+            const result = game.evolveCard(
+                client.playerNumber,
+                data.evolutionCardIndex,
+                data.targetPokemonLocation,
+                data.targetPokemonIndex
+            );
+
+            if (result.success) {
+                // Send updated game state to both players
+                this.sendGameStateToPlayers(game);
+
+                // Send success confirmation to the evolving player
+                ws.send(JSON.stringify({
+                    type: 'evolution_success',
+                    message: 'Pokemon evolved successfully'
+                }));
+            } else {
+                // On failure, restore the player's hand from snapshot (defensive)
+                try {
+                    playerState.hand = handSnapshot;
+                } catch (restoreErr) {
+                    console.error('Error restoring hand after failed evolution:', restoreErr);
+                }
+
+                // Broadcast the restored state so client UI reflects the rollback immediately
+                this.sendGameStateToPlayers(game);
+
+                // Send error message to the evolving player
+                ws.send(JSON.stringify({
+                    type: 'evolution_error',
+                    message: result.error
+                }));
+            }
+        } catch (err) {
+            console.error('Exception during handleEvolution:', err);
+            ws.send(JSON.stringify({ type: 'evolution_error', message: 'Server error during evolution' }));
         }
     }
 
@@ -584,7 +655,7 @@ class GameServer {
         // Send success response including the resolved attack name from the ServerGame result
         ws.send(JSON.stringify({
             type: 'attack_used',
-            attackName: result.attackNameResolved || data.attackName,
+            attackName: result.attackNameResolved || (data.attackName !== undefined ? data.attackName : data.attackIndex),
             result: result.result
         }));
         
@@ -754,7 +825,7 @@ class GameServer {
         try {
             if (retreatCost > 0 && activePokemon && Array.isArray(activePokemon.attachedEnergy) && activePokemon.attachedEnergy.length > 0) {
                 // Build minimal payload of attached energies
-                const cards = activePokemon.attachedEnergy.map(e => ({ id: e.id, cardName: e.cardName || e.name, type: e.type || 'energy', imgUrl: e.imgUrl || null }));
+                const cards = activePokemon.attachedEnergy.map(e => ({ id: e.id, cardName: e.name, type: e.type || 'energy', imgUrl: e.imgUrl || null }));
 
                 // Create a promise that resolves when selection response is received
                 const selectionId = `retreat_${Date.now()}_${Math.random()}`;
@@ -1171,7 +1242,7 @@ class GameServer {
             drewCard: gs.drewCard,
             attackedThisTurn: gs.attackedThisTurn,
             winner: gs.winner,
-            gameLog: gs.gameLog.slice()
+            gameLog: Array.isArray(gs.gameLog) ? gs.gameLog.slice() : []
         };
 
         try {
@@ -1217,13 +1288,13 @@ class GameServer {
                 }
 
                 // Broadcast restored state
-                game.broadcastGameState();
+                if (typeof game.broadcastGameState === 'function') game.broadcastGameState();
 
                 return result || { success: false, error: 'Trainer effect failed' };
             }
 
             // Broadcast game state if callback succeeded
-            if (result && result.success) {
+            if (result && result.success && typeof game.broadcastGameState === 'function') {
                 game.broadcastGameState();
             }
 
@@ -1268,7 +1339,7 @@ class GameServer {
                 console.error('Error restoring game state after trainer exception:', restoreErr);
             }
 
-            game.broadcastGameState();
+            if (typeof game.broadcastGameState === 'function') game.broadcastGameState();
             return { success: false, error: 'Error executing trainer effect' };
         }
     }
@@ -1336,10 +1407,17 @@ class GameServer {
         
         console.log(`Client ${client.username} disconnected`);
         
-        // Remove from waiting players
-        const waitingIndex = this.waitingPlayers.findIndex(p => p.ws === ws);
-        if (waitingIndex !== -1) {
-            this.waitingPlayers.splice(waitingIndex, 1);
+        // Remove from any lobby they were part of
+        if (client.lobbyId) {
+            const lobby = this.lobbies.get(client.lobbyId);
+            if (lobby) {
+                const idx = lobby.players.findIndex(p => p.ws === ws);
+                if (idx !== -1) {
+                    lobby.players.splice(idx, 1);
+                }
+                // If lobby is empty, remove it
+                if (lobby.players.length === 0) this.lobbies.delete(client.lobbyId);
+            }
         }
         
         // Handle game disconnect

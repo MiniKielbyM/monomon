@@ -814,27 +814,48 @@ class GUIHookUtils {
             } else if (this.currentDropTarget.dropType === 'evolve') {
                 // Evolution - handle the evolution drop
                 console.log('Evolution drop detected');
-                
+
                 const evolutionCardData = this.getCardDataFromElement(this.dragging.cardEl);
                 const targetPokemonData = this.getCardDataFromElement(this.currentDropTarget);
-                
+
                 if (this.canEvolve(evolutionCardData, targetPokemonData)) {
                     console.log('Evolution validation passed, triggering evolution');
                     console.log('Target Pokemon before evolution:', targetPokemonData);
-                    
-                    // Clear the source card since it's being used for evolution
-                    this.dragging.cardEl.style.backgroundImage = '';
-                    this.dragging.cardEl.classList.add('empty');
-                    this.dragging.cardEl.removeAttribute('data-card-name');
-                    
-                    // Trigger evolution through the game system
+
+                    // Instead of clearing the source card immediately (which causes a blank slot
+                    // when the server rejects the evolution), mark the card as pending and
+                    // store hand index information so we can rollback precisely if needed.
+                    try {
+                        const handCards = Array.from(document.querySelectorAll('#PlayerHand .card'));
+                        const handIndex = handCards.indexOf(this.dragging.cardEl);
+
+                        if (!this.lastMove) this.lastMove = {};
+                        // Merge handIndex into stored cardData for rollback
+                        this.lastMove.cardData = Object.assign({}, evolutionCardData, { handIndex });
+                        this.lastMove.moveType = 'evolve';
+                        this.lastMove.sourceEl = this.dragging.cardEl;
+                        this.lastMove.sourceBackground = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
+                        this.lastMove.sourceWasEmpty = this.dragging.cardEl.classList.contains('empty');
+                    } catch (errLastMove) {
+                        console.warn('Failed to record lastMove for evolution', errLastMove);
+                    }
+
+                    // Mark pending state in UI until server confirms or rejects
+                    try {
+                        this.dragging.cardEl.classList.add('pending-evolve');
+                        this.dragging.cardEl.style.opacity = '0.45';
+                    } catch (errPending) {
+                        console.warn('Failed to mark pending evolve', errPending);
+                    }
+
+                    // Trigger evolution through the game system (server-authoritative)
                     this.handleEvolutionDrop(evolutionCardData, this.currentDropTarget);
                 } else {
-                    // Invalid evolution - rollback
+                    // Invalid evolution - rollback visuals immediately
                     console.log('Evolution not allowed - rolling back');
                     this.dragging.cardEl.style.backgroundImage = window.getComputedStyle(this.dragging.dragEl).backgroundImage;
                     this.dragging.cardEl.classList.remove('empty');
-                    
+
                     // Show error message
                     if (window.showGameMessage) {
                         window.showGameMessage('Cannot evolve: Invalid evolution target', 3000);
@@ -1264,10 +1285,38 @@ class GUIHookUtils {
             return false;
         }
 
-        // Check if the target is a Pokemon
-        if (targetCardData.type !== 'pokemon' && !targetCardData.hp) {
-            console.log('Energy attachment failed: Target is not a Pokemon');
+        // Check if the target is a Pokemon.
+        // Older/newer card data may encode Pokemon by elemental type (e.g. 'fire')
+        // and may use alternate HP fields. Treat anything that is explicitly
+        // a 'trainer' or 'energy' as non-Pokémon; otherwise try several fallbacks.
+        const explicitNonPokemon = (targetCardData.type === 'trainer' || targetCardData.type === 'energy');
+        const hasHpField = (targetCardData.hp !== undefined && targetCardData.hp !== null) ||
+                           (targetCardData.maxHp !== undefined && targetCardData.maxHp !== null) ||
+                           (targetCardData.health !== undefined && targetCardData.health !== null);
+        const hasPokemonMarker = !!(targetCardData.pokemonType || targetCardData.pokemon || targetCardData.species);
+
+        if (explicitNonPokemon) {
+            console.log('Energy attachment failed: Target card is explicitly non-Pokemon (trainer/energy)');
             return false;
+        }
+
+        // If we can detect HP or a pokemon marker, accept it as a Pokemon
+        if (!hasHpField && !hasPokemonMarker) {
+            // Fallback to DOM-based heuristics: check for active/benched slot classes
+            try {
+                if (targetPokemonEl && (targetPokemonEl.classList.contains('active') || targetPokemonEl.classList.contains('benched'))) {
+                    // Accept as Pokemon slot
+                    console.log('Energy attachment: Fallback DOM detection considers target a Pokemon slot');
+                } else {
+                    console.log('Energy attachment failed: Target does not appear to be a Pokemon (no hp/pokemon markers and DOM fallback failed)', {
+                        targetCardDataKeys: Object.keys(targetCardData || {})
+                    });
+                    return false;
+                }
+            } catch (err) {
+                console.log('Energy attachment failed: Error during DOM fallback check', err);
+                return false;
+            }
         }
 
         // Check if it's the player's turn and they haven't already attached energy this turn
@@ -2259,6 +2308,74 @@ class GUIHookUtils {
 
         this.webSocketClient.on('game_state_update', (data) => {
             this.handleGameStateUpdate(data);
+        });
+
+        // Evolution result handlers: finalize or rollback pending evolve visuals
+        this.webSocketClient.on('evolution_success', (data) => {
+            console.log('Evolution succeeded:', data);
+            try {
+                // If we had marked a pending-evolve element, remove pending styling
+                if (this.lastMove && this.lastMove.moveType === 'evolve' && this.lastMove.sourceEl) {
+                    const el = this.lastMove.sourceEl;
+                    el.classList.remove('pending-evolve');
+                    el.style.opacity = '';
+                    // The server will send a full game state update; rely on that to re-render hand
+                    this.lastMove = null;
+                }
+            } catch (err) {
+                console.warn('Error handling evolution_success', err);
+            }
+        });
+
+        this.webSocketClient.on('evolution_error', (err) => {
+            console.warn('Evolution rejected by server:', err);
+            try {
+                // If we have a lastMove recorded for an evolve, attempt immediate rollback
+                if (this.lastMove && this.lastMove.moveType === 'evolve' && this.lastMove.cardData) {
+                    const cardData = this.lastMove.cardData;
+
+                    // Restore logical hand state if game object exists
+                    if (this.game && this.player1 && Array.isArray(this.player1.hand)) {
+                        const handIndex = (cardData.handIndex !== undefined && cardData.handIndex !== null) ? cardData.handIndex : this.player1.hand.length;
+                        if (handIndex >= 0 && handIndex <= this.player1.hand.length) {
+                            this.player1.hand.splice(handIndex, 0, cardData);
+                        } else {
+                            this.player1.hand.push(cardData);
+                        }
+
+                        // Re-render hand DOM: create a new card element for the restored card if needed
+                        const handEl = document.querySelector('#PlayerHand');
+                        if (handEl) {
+                            const cardEl = document.createElement('div');
+                            cardEl.className = 'card player hand-card';
+                            cardEl.setAttribute('data-card-name', cardData.cardName || cardData.name || 'Unknown');
+                            cardEl.style.backgroundImage = `url(${cardData.imgUrl || ''})`;
+                            this.setCardInstance(cardEl, cardData);
+                            handEl.appendChild(cardEl);
+                        }
+                    } else {
+                        // DOM-only fallback: try to restore the original element
+                        try {
+                            if (this.lastMove.sourceEl) {
+                                const el = this.lastMove.sourceEl;
+                                el.classList.remove('pending-evolve');
+                                el.style.opacity = '';
+                                el.style.backgroundImage = this.lastMove.sourceBackground || el.style.backgroundImage;
+                                el.classList.remove('empty');
+                                el.setAttribute('data-card-name', cardData.cardName || cardData.name || 'Unknown');
+                            }
+                        } catch (domErr) {
+                            console.warn('Failed to restore card DOM during evolution rollback', domErr);
+                        }
+                    }
+
+                    // Clear lastMove and inform user
+                    this.lastMove = null;
+                    if (window.showGameMessage) window.showGameMessage('Evolution rejected by server, card returned to hand', 3000);
+                }
+            } catch (errRollback) {
+                console.error('Error during evolution rollback handling:', errRollback);
+            }
         });
 
         // If the server returns an action_error (e.g., rejected play_card), perform rollback
