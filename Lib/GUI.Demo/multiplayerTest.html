@@ -1505,16 +1505,26 @@
             }
             currentUsername = username;
             currentUsernameSpan.textContent = username;
-            try {
-                updateConnectionStatus('connecting', 'Connecting...');
-                await wsClient.connect();
+            let connected = false;
+            let attempts = 0;
+            updateConnectionStatus('connecting', 'Connecting...');
+            while (!connected && attempts < 20) { // Try for up to ~1 minute
+                try {
+                    await wsClient.connect();
+                    connected = true;
+                } catch (error) {
+                    attempts++;
+                    updateConnectionStatus('connecting', `Connecting... (retry ${attempts})`);
+                    await new Promise(res => setTimeout(res, 3000));
+                }
+            }
+            if (connected) {
                 wsClient.joinGame(username);
                 usernameModal.style.display = 'none';
                 // Deck builder will open after game_found or deck_required
-            } catch (error) {
-                console.error('Failed to connect:', error);
+            } else {
                 updateConnectionStatus('disconnected', 'Connection failed');
-                alert('Failed to connect to server. Please try again.');
+                alert('Failed to connect to server after multiple attempts. Please try again later.');
             }
         });
         
