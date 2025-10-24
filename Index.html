@@ -21,12 +21,23 @@
             font-weight: bold;
             z-index: 1000;
         }
-        
-        .status-connected { background-color: #4CAF50; }
-        .status-connecting { background-color: #FF9800; }
-        .status-disconnected { background-color: #f44336; }
-        .status-waiting { background-color: #2196F3; }
-        
+
+        .status-connected {
+            background-color: #4CAF50;
+        }
+
+        .status-connecting {
+            background-color: #FF9800;
+        }
+
+        .status-disconnected {
+            background-color: #f44336;
+        }
+
+        .status-waiting {
+            background-color: #2196F3;
+        }
+
         /* Game messages */
         #game-messages {
             position: fixed;
@@ -40,7 +51,7 @@
             z-index: 1000;
             display: none;
         }
-        
+
         /* Player info */
         #player-info {
             position: fixed;
@@ -52,24 +63,24 @@
             border-radius: 5px;
             z-index: 1000;
         }
-        
+
         #turn-status {
             font-weight: bold;
             padding: 5px;
             border-radius: 3px;
             margin-top: 5px;
         }
-        
-        .your-turn { 
-            background-color: #4CAF50; 
+
+        .your-turn {
+            background-color: #4CAF50;
             color: white;
         }
-        
-        .opponent-turn { 
-            background-color: #FF9800; 
+
+        .opponent-turn {
+            background-color: #FF9800;
             color: white;
         }
-        
+
         /* Username input */
         #username-modal {
             position: fixed;
@@ -83,14 +94,14 @@
             align-items: center;
             z-index: 2000;
         }
-        
+
         #username-form {
             background: white;
             padding: 30px;
             border-radius: 10px;
             text-align: center;
         }
-        
+
         #username-input {
             padding: 10px;
             margin: 10px;
@@ -98,7 +109,7 @@
             border-radius: 5px;
             font-size: 16px;
         }
-        
+
         #join-button {
             padding: 10px 20px;
             background: #4CAF50;
@@ -108,11 +119,11 @@
             cursor: pointer;
             font-size: 16px;
         }
-        
+
         #join-button:hover {
             background: #45a049;
         }
-        
+
         /* Deck count display */
         .deck-count {
             position: absolute;
@@ -129,11 +140,11 @@
             z-index: 10;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
-        
+
         .deck {
             position: relative;
         }
-        
+
         /* Coin Flip Modal */
         #coin-flip-modal {
             position: fixed;
@@ -147,7 +158,7 @@
             align-items: center;
             z-index: 3000;
         }
-        
+
         #coin-flip-container {
             background: white;
             padding: 40px;
@@ -155,14 +166,14 @@
             text-align: center;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
-        
+
         #coin-flip-title {
             font-size: 24px;
             font-weight: bold;
             margin-bottom: 20px;
             color: #333;
         }
-        
+
         #coin {
             width: 120px;
             height: 120px;
@@ -172,7 +183,7 @@
             transform-style: preserve-3d;
             transition: transform 0.6s;
         }
-        
+
         .coin-side {
             position: absolute;
             width: 100%;
@@ -186,37 +197,51 @@
             color: white;
             backface-visibility: hidden;
         }
-        
+
         .coin-heads {
             background: linear-gradient(45deg, #FFD700, #FFA500);
             transform: rotateY(0deg);
         }
-        
+
         .coin-tails {
             background: linear-gradient(45deg, #C0C0C0, #808080);
             transform: rotateY(180deg);
         }
-        
+
         .coin-spinning {
             animation: coinSpin 2s ease-in-out;
         }
-        
+
         .coin-result-heads {
             transform: rotateY(0deg);
         }
-        
+
         .coin-result-tails {
             transform: rotateY(180deg);
         }
-        
+
         @keyframes coinSpin {
-            0% { transform: rotateY(0deg); }
-            25% { transform: rotateY(450deg); }
-            50% { transform: rotateY(900deg); }
-            75% { transform: rotateY(1350deg); }
-            100% { transform: rotateY(1800deg); }
+            0% {
+                transform: rotateY(0deg);
+            }
+
+            25% {
+                transform: rotateY(450deg);
+            }
+
+            50% {
+                transform: rotateY(900deg);
+            }
+
+            75% {
+                transform: rotateY(1350deg);
+            }
+
+            100% {
+                transform: rotateY(1800deg);
+            }
         }
-        
+
         #coin-result {
             font-size: 20px;
             font-weight: bold;
@@ -225,7 +250,7 @@
             opacity: 0;
             transition: opacity 0.5s;
         }
-        
+
         .result-visible {
             opacity: 1 !important;
         }
@@ -245,16 +270,18 @@
     </div>
 
     <!-- Deck Builder Modal -->
-    <div id="deck-builder-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:3000; align-items:center; justify-content:center;">
-      <div style="background:white; padding:30px; border-radius:10px; max-width:500px; margin:auto;">
-        <h2>Build Your Deck</h2>
-                <div id="deck-opponent" style="margin-bottom:8px; font-weight:600;">Opponent: <span id="deck-opponent-name">Waiting for opponent...</span></div>
-        <div id="deck-builder-list" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
-        <div>Cards in deck: <span id="deck-card-count">0</span>/60</div>
-        <button id="submit-deck-button" disabled>Submit Deck</button>
-      </div>
+    <div id="deck-builder-modal"
+        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:3000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:30px; border-radius:10px; max-width:500px; margin:auto;">
+            <h2>Build Your Deck</h2>
+            <div id="deck-opponent" style="margin-bottom:8px; font-weight:600;">Opponent: <span
+                    id="deck-opponent-name">Waiting for opponent...</span></div>
+            <div id="deck-builder-list" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
+            <div>Cards in deck: <span id="deck-card-count">0</span>/60</div>
+            <button id="submit-deck-button" disabled>Submit Deck</button>
+        </div>
     </div>
-    
+
     <!-- Coin Flip Modal -->
     <div id="coin-flip-modal">
         <div id="coin-flip-container">
@@ -271,10 +298,10 @@
     <div id="connection-status" class="status-disconnected">
         Disconnected
     </div>
-    
+
     <!-- Game Messages -->
     <div id="game-messages"></div>
-    
+
     <!-- Player Info -->
     <div id="player-info">
         <div>Player: <span id="current-username">-</span></div>
@@ -346,7 +373,7 @@
 
         </div>
     </div>
-    
+
     <script type="module">
         import Client from '/Lib/client.js';
         import Game from '/Lib/game.js';
@@ -362,10 +389,10 @@
         // Initialize WebSocket client and GUI
         const wsClient = new WebSocketClient();
         const guiHook = new GUIHookUtils(document.body, wsClient);
-        
+
         // Make wsClient available globally for attack functions
         window.wsClient = wsClient;
-        
+
         // UI Elements
         const usernameModal = document.getElementById('username-modal');
         const usernameInput = document.getElementById('username-input');
@@ -377,127 +404,127 @@
         const opponentNameSpan = document.getElementById('opponent-name');
         const turnNumberSpan = document.getElementById('turn-number');
         const turnStatusDiv = document.getElementById('turn-status');
-        
-    let currentUsername = '';
-    let playerNumber = 0;
-    let currentTurn = 0;
-    let isMyTurn = false;
-    let player1, player2, game;
-    let deckSubmitted = false;
-    let currentDeck = [];
-                // --- Deck builder logic ---
-                const deckBuilderModal = document.getElementById('deck-builder-modal');
-                const deckBuilderList = document.getElementById('deck-builder-list');
-                const deckCardCount = document.getElementById('deck-card-count');
-                const submitDeckButton = document.getElementById('submit-deck-button');
+
+        let currentUsername = '';
+        let playerNumber = 0;
+        let currentTurn = 0;
+        let isMyTurn = false;
+        let player1, player2, game;
+        let deckSubmitted = false;
+        let currentDeck = [];
+        // --- Deck builder logic ---
+        const deckBuilderModal = document.getElementById('deck-builder-modal');
+        const deckBuilderList = document.getElementById('deck-builder-list');
+        const deckCardCount = document.getElementById('deck-card-count');
+        const submitDeckButton = document.getElementById('submit-deck-button');
 
 
-                        // Fetch card data from cardData.js (ESM import via dynamic import)
-                        let cardPool = [];
-                        async function loadCardPool() {
-                            // Try to import cardData.js as an ES module
-                            try {
-                                const cardData = await import('/Server/cardData.js');
-                                // Merge all cards into one pool
-                                cardPool = [];
-                                if (Array.isArray(cardData.pokemonCards)) cardPool = cardPool.concat(cardData.pokemonCards);
-                                if (Array.isArray(cardData.energyCards)) cardPool = cardPool.concat(cardData.energyCards);
-                                // Normalize for builder
-                                cardPool = cardPool.map(card => ({
-                                    cardName: card.name || card.cardName,
-                                    type: card.type,
-                                    imgUrl: card.imgUrl,
-                                    ...card
-                                }));
-                                // Sort alphabetically by cardName for predictable builder ordering
-                                cardPool.sort((a, b) => (a.cardName || '').toLowerCase().localeCompare((b.cardName || '').toLowerCase()));
-                            } catch (e) {
-                                // Fallback: minimal pool
-                                cardPool = [
-                                    { cardName: 'Pikachu', type: 'pokemon', imgUrl: 'https://images.pokemontcg.io/base1/58_hires.png' },
-                                    { cardName: 'Blastoise', type: 'pokemon', imgUrl: 'https://images.pokemontcg.io/base1/2_hires.png' },
-                                    { cardName: 'Fire Energy', type: 'energy', imgUrl: 'https://images.pokemontcg.io/base1/98_hires.png' },
-                                    { cardName: 'Water Energy', type: 'energy', imgUrl: 'https://images.pokemontcg.io/base1/102_hires.png' },
-                                    { cardName: 'Bill', type: 'trainer', imgUrl: 'https://images.pokemontcg.io/base1/91_hires.png' },
-                                ];
-                                cardPool.sort((a, b) => (a.cardName || '').toLowerCase().localeCompare((b.cardName || '').toLowerCase()));
-                            }
-                        }
+        // Fetch card data from cardData.js (ESM import via dynamic import)
+        let cardPool = [];
+        async function loadCardPool() {
+            // Try to import cardData.js as an ES module
+            try {
+                const cardData = await import('/Server/cardData.js');
+                // Merge all cards into one pool
+                cardPool = [];
+                if (Array.isArray(cardData.pokemonCards)) cardPool = cardPool.concat(cardData.pokemonCards);
+                if (Array.isArray(cardData.energyCards)) cardPool = cardPool.concat(cardData.energyCards);
+                // Normalize for builder
+                cardPool = cardPool.map(card => ({
+                    cardName: card.name || card.cardName,
+                    type: card.type,
+                    imgUrl: card.imgUrl,
+                    ...card
+                }));
+                // Sort alphabetically by cardName for predictable builder ordering
+                cardPool.sort((a, b) => (a.cardName || '').toLowerCase().localeCompare((b.cardName || '').toLowerCase()));
+            } catch (e) {
+                // Fallback: minimal pool
+                cardPool = [
+                    { cardName: 'Pikachu', type: 'pokemon', imgUrl: 'https://images.pokemontcg.io/base1/58_hires.png' },
+                    { cardName: 'Blastoise', type: 'pokemon', imgUrl: 'https://images.pokemontcg.io/base1/2_hires.png' },
+                    { cardName: 'Fire Energy', type: 'energy', imgUrl: 'https://images.pokemontcg.io/base1/98_hires.png' },
+                    { cardName: 'Water Energy', type: 'energy', imgUrl: 'https://images.pokemontcg.io/base1/102_hires.png' },
+                    { cardName: 'Bill', type: 'trainer', imgUrl: 'https://images.pokemontcg.io/base1/91_hires.png' },
+                ];
+                cardPool.sort((a, b) => (a.cardName || '').toLowerCase().localeCompare((b.cardName || '').toLowerCase()));
+            }
+        }
 
-                        async function openDeckBuilder(opponentName) {
-                            currentDeck = [];
-                            await loadCardPool();
-                            updateDeckBuilder();
-                            // Show opponent name if provided
-                            const opponentSpan = document.getElementById('deck-opponent-name');
-                            if (opponentSpan) opponentSpan.textContent = opponentName || 'Waiting for opponent...';
-                            deckBuilderModal.style.display = 'flex';
-                        }
+        async function openDeckBuilder(opponentName) {
+            currentDeck = [];
+            await loadCardPool();
+            updateDeckBuilder();
+            // Show opponent name if provided
+            const opponentSpan = document.getElementById('deck-opponent-name');
+            if (opponentSpan) opponentSpan.textContent = opponentName || 'Waiting for opponent...';
+            deckBuilderModal.style.display = 'flex';
+        }
 
-                        function updateDeckBuilder() {
-                            deckBuilderList.innerHTML = '';
-                            cardPool.forEach(card => {
-                                const count = currentDeck.filter(c => c.cardName === card.cardName).length;
-                                const cardDiv = document.createElement('div');
-                                cardDiv.style.display = 'flex';
-                                cardDiv.style.alignItems = 'center';
-                                cardDiv.style.marginBottom = '4px';
-                                cardDiv.innerHTML = `<img src="${card.imgUrl}" style="width:40px; height:56px; object-fit:cover; margin-right:8px;"> <span>${card.cardName}</span> <span style="margin-left:auto;">x${count}</span>`;
-                                const addBtn = document.createElement('button');
-                                addBtn.textContent = '+';
-                                addBtn.style.marginLeft = '8px';
-                                addBtn.onclick = () => {
-                                    if (currentDeck.length < 60) {
-                                        currentDeck.push(card);
-                                        updateDeckBuilder();
-                                    }
-                                };
-                                const removeBtn = document.createElement('button');
-                                removeBtn.textContent = '-';
-                                removeBtn.onclick = () => {
-                                    const idx = currentDeck.findIndex(c => c.cardName === card.cardName);
-                                    if (idx !== -1) {
-                                        currentDeck.splice(idx, 1);
-                                        updateDeckBuilder();
-                                    }
-                                };
-                                cardDiv.appendChild(addBtn);
-                                cardDiv.appendChild(removeBtn);
-                                deckBuilderList.appendChild(cardDiv);
-                            });
-                            deckCardCount.textContent = currentDeck.length;
-                            submitDeckButton.disabled = currentDeck.length !== 60;
-                        }
+        function updateDeckBuilder() {
+            deckBuilderList.innerHTML = '';
+            cardPool.forEach(card => {
+                const count = currentDeck.filter(c => c.cardName === card.cardName).length;
+                const cardDiv = document.createElement('div');
+                cardDiv.style.display = 'flex';
+                cardDiv.style.alignItems = 'center';
+                cardDiv.style.marginBottom = '4px';
+                cardDiv.innerHTML = `<img src="${card.imgUrl}" style="width:40px; height:56px; object-fit:cover; margin-right:8px;"> <span>${card.cardName}</span> <span style="margin-left:auto;">x${count}</span>`;
+                const addBtn = document.createElement('button');
+                addBtn.textContent = '+';
+                addBtn.style.marginLeft = '8px';
+                addBtn.onclick = () => {
+                    if (currentDeck.length < 60) {
+                        currentDeck.push(card);
+                        updateDeckBuilder();
+                    }
+                };
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = '-';
+                removeBtn.onclick = () => {
+                    const idx = currentDeck.findIndex(c => c.cardName === card.cardName);
+                    if (idx !== -1) {
+                        currentDeck.splice(idx, 1);
+                        updateDeckBuilder();
+                    }
+                };
+                cardDiv.appendChild(addBtn);
+                cardDiv.appendChild(removeBtn);
+                deckBuilderList.appendChild(cardDiv);
+            });
+            deckCardCount.textContent = currentDeck.length;
+            submitDeckButton.disabled = currentDeck.length !== 60;
+        }
 
-                        submitDeckButton.onclick = () => {
-                            wsClient.send('submit_deck', { deck: currentDeck });
-                        };
-                // Listen for server deck messages
-                wsClient.on('deck_required', (data) => {
-                    // data may include opponent name when available
-                    const opponent = data && data.opponent ? data.opponent : null;
-                    openDeckBuilder(opponent);
-                });
-                wsClient.on('deck_received', () => {
-                    deckSubmitted = true;
-                    deckBuilderModal.style.display = 'none';
-                    showGameMessage('Deck submitted! Waiting for opponent...', 3000);
-                });
-                wsClient.on('deck_error', (data) => {
-                    showGameMessage('Deck error: ' + (data.message || 'Unknown error'), 4000);
-                });
-        
+        submitDeckButton.onclick = () => {
+            wsClient.send('submit_deck', { deck: currentDeck });
+        };
+        // Listen for server deck messages
+        wsClient.on('deck_required', (data) => {
+            // data may include opponent name when available
+            const opponent = data && data.opponent ? data.opponent : null;
+            openDeckBuilder(opponent);
+        });
+        wsClient.on('deck_received', () => {
+            deckSubmitted = true;
+            deckBuilderModal.style.display = 'none';
+            showGameMessage('Deck submitted! Waiting for opponent...', 3000);
+        });
+        wsClient.on('deck_error', (data) => {
+            showGameMessage('Deck error: ' + (data.message || 'Unknown error'), 4000);
+        });
+
         // Update connection status
         function updateConnectionStatus(status, message) {
             connectionStatus.className = `status-${status}`;
             connectionStatus.textContent = message;
         }
-        
+
         // Initialize deck count displays
         function initializeDeckCounts() {
             const playerDeck = document.querySelector('.deck.player');
             const opponentDeck = document.querySelector('.deck.opp');
-            
+
             if (playerDeck && !playerDeck.querySelector('.deck-count')) {
                 const playerDeckCount = document.createElement('div');
                 playerDeckCount.className = 'deck-count';
@@ -505,7 +532,7 @@
                 playerDeckCount.textContent = '60';
                 playerDeck.appendChild(playerDeckCount);
             }
-            
+
             if (opponentDeck && !opponentDeck.querySelector('.deck-count')) {
                 const opponentDeckCount = document.createElement('div');
                 opponentDeckCount.className = 'deck-count';
@@ -514,18 +541,18 @@
                 opponentDeck.appendChild(opponentDeckCount);
             }
         }
-        
+
         // Update deck count displays
         function updateDeckCounts(gameState) {
             if (!gameState) return;
-            
+
             const playerDeckCount = document.getElementById('player-deck-count');
             const opponentDeckCount = document.getElementById('opponent-deck-count');
-            
+
             if (playerDeckCount && gameState.yourState) {
                 const deckCount = gameState.yourState.deckCount || (gameState.yourState.deck ? gameState.yourState.deck.length : 0);
                 playerDeckCount.textContent = deckCount;
-                
+
                 // Change color based on deck count
                 if (deckCount === 0) {
                     playerDeckCount.style.background = 'rgba(244, 67, 54, 0.9)'; // Red for empty
@@ -535,11 +562,11 @@
                     playerDeckCount.style.background = 'rgba(0, 0, 0, 0.8)'; // Default black
                 }
             }
-            
+
             if (opponentDeckCount && gameState.opponentState) {
                 const deckCount = gameState.opponentState.deckCount || (gameState.opponentState.deck ? gameState.opponentState.deck.length : 0);
                 opponentDeckCount.textContent = deckCount;
-                
+
                 // Change color based on deck count
                 if (deckCount === 0) {
                     opponentDeckCount.style.background = 'rgba(244, 67, 54, 0.9)'; // Red for empty
@@ -550,7 +577,7 @@
                 }
             }
         }
-        
+
         // Show game message
         function showGameMessage(message, duration = 3000) {
             gameMessages.textContent = message;
@@ -559,16 +586,16 @@
                 gameMessages.style.display = 'none';
             }, duration);
         }
-        
+
         function updatePrizeCards(gameState) {
             if (!gameState) return;
-            
+
             // Update player prize cards
             if (gameState.yourState && gameState.yourState.prizeCards) {
                 const playerPrizeCards = document.querySelectorAll('.card.player.prize');
                 const prizeCards = gameState.yourState.prizeCards;
                 const remainingPrizes = prizeCards.filter(card => card !== null).length;
-                
+
                 // Remove excess card elements if we have more DOM elements than remaining prizes
                 if (playerPrizeCards.length > remainingPrizes) {
                     const cardsToRemove = playerPrizeCards.length - remainingPrizes;
@@ -580,13 +607,13 @@
                     }
                 }
             }
-            
+
             // Update opponent prize cards
             if (gameState.opponentState && gameState.opponentState.prizeCards) {
                 const opponentPrizeCards = document.querySelectorAll('.card.opp.prize');
                 const prizeCards = gameState.opponentState.prizeCards;
                 const remainingPrizes = prizeCards.filter(card => card !== null).length;
-                
+
                 // Remove excess card elements if we have more DOM elements than remaining prizes
                 if (opponentPrizeCards.length > remainingPrizes) {
                     const cardsToRemove = opponentPrizeCards.length - remainingPrizes;
@@ -602,7 +629,7 @@
 
         function updateDiscardPiles(gameState) {
             if (!gameState) return;
-            
+
             // Update player's discard pile
             if (gameState.yourState && gameState.yourState.discardPile) {
                 const playerDiscardElement = document.querySelector('.card.discard.player');
@@ -623,7 +650,7 @@
                     playerDiscardElement.removeAttribute('data-card-count');
                 }
             }
-            
+
             // Update opponent's discard pile
             if (gameState.opponentState && gameState.opponentState.discardPile) {
                 const oppDiscardElement = document.querySelector('.card.discard.opp');
@@ -648,56 +675,56 @@
 
         // Make showGameMessage globally available
         window.showGameMessage = showGameMessage;
-        
+
         function showCoinFlipToAllClients(result, playerName) {
             const modal = document.getElementById('coin-flip-modal');
             const coin = document.getElementById('coin');
             const coinResult = document.getElementById('coin-result');
             const coinTitle = document.getElementById('coin-flip-title');
-            
+
             if (!modal) {
                 console.warn('Coin flip modal not found');
                 return;
             }
-            
+
             // Reset coin state
             coin.className = '';
             coinResult.textContent = '';
             coinResult.classList.remove('result-visible');
-            
+
             // Set title to show which player flipped
             coinTitle.textContent = playerName ? `${playerName} flips a coin` : 'Coin Flip';
-            
+
             // Show modal
             modal.style.display = 'flex';
-            
+
             // Start spinning animation
             coin.classList.add('coin-spinning');
-            
+
             // After spinning, show result
             setTimeout(() => {
                 coin.classList.remove('coin-spinning');
                 coin.classList.add(result ? 'coin-result-heads' : 'coin-result-tails');
                 coinResult.textContent = result ? 'HEADS!' : 'TAILS!';
                 coinResult.classList.add('result-visible');
-                
+
                 // Hide modal after showing result
                 setTimeout(() => {
                     modal.style.display = 'none';
                 }, 1500);
             }, 2000); // Match animation duration
         }
-        
+
         // Make showCoinFlipToAllClients globally available
         window.showCoinFlipToAllClients = showCoinFlipToAllClients;
-        
+
         // Update turn display
         function updateTurnDisplay(gameInfo) {
             currentTurn = gameInfo.turn;
             isMyTurn = gameInfo.isYourTurn;
-            
+
             turnNumberSpan.textContent = currentTurn;
-            
+
             if (isMyTurn) {
                 turnStatusDiv.textContent = 'YOUR TURN';
                 turnStatusDiv.className = 'your-turn';
@@ -707,11 +734,11 @@
                 turnStatusDiv.className = 'opponent-turn';
             }
         }
-        
+
         // Add End Turn button functionality
         function addEndTurnButton() {
             if (document.getElementById('end-turn-btn')) return; // Already exists
-            
+
             const endTurnBtn = document.createElement('button');
             endTurnBtn.id = 'end-turn-btn';
             endTurnBtn.textContent = 'End Turn';
@@ -729,7 +756,7 @@
                 z-index: 1000;
                 display: none;
             `;
-            
+
             endTurnBtn.addEventListener('click', () => {
                 if (isMyTurn) {
                     wsClient.sendEndTurn();
@@ -737,7 +764,7 @@
                     showGameMessage('Turn ended. Waiting for opponent...', 2000);
                 }
             });
-            
+
             document.body.appendChild(endTurnBtn);
             return endTurnBtn;
         }
@@ -769,14 +796,14 @@
             if (pokemonData.attacks && pokemonData.attacks.length > 0) {
                 pokemonData.attacks.forEach((attack, index) => {
                     // Create energy cost display
-                    const energyCostText = attack.energyCost && attack.energyCost.length > 0 
-                        ? ` (${attack.energyCost.length} energy)` 
+                    const energyCostText = attack.energyCost && attack.energyCost.length > 0
+                        ? ` (${attack.energyCost.length} energy)`
                         : '';
-                    
+
                     const canUseAttack = checkCanUseAttack(pokemonData, attack);
                     const buttonText = `⚔️ ${attack.name}${energyCostText}`;
                     const tooltipText = `${attack.description}\nEnergy Cost: ${attack.energyCost ? attack.energyCost.join(', ') : 'None'}${canUseAttack ? '' : '\n❌ Not enough energy!'}`;
-                    
+
                     const attackBtn = createActionButton(
                         buttonText,
                         tooltipText,
@@ -784,14 +811,14 @@
                         () => useAttack(attack.name),
                         'attack'
                     );
-                    
+
                     // Disable button if can't use attack
                     if (!canUseAttack) {
                         attackBtn.style.opacity = '0.5';
                         attackBtn.style.cursor = 'not-allowed';
                         attackBtn.title += '\n❌ Not enough energy!';
                     }
-                    
+
                     document.body.appendChild(attackBtn);
                 });
             }
@@ -816,12 +843,12 @@
             if (window.currentGame && window.currentGame.serverGameState && window.currentGame.serverGameState.yourState) {
                 const hand = window.currentGame.serverGameState.yourState.hand || [];
                 const evolutionCards = hand.filter(card => card.evolvesFrom);
-                
+
                 if (evolutionCards.length > 0) {
                     evolutionCards.forEach((evolutionCard, index) => {
                         // Check if we have valid targets for this evolution
                         const canEvolve = checkCanEvolve(evolutionCard);
-                        
+
                         const evolutionBtn = createActionButton(
                             `🔄 Evolve to ${evolutionCard.cardName}`,
                             `Evolve from ${evolutionCard.evolvesFrom} to ${evolutionCard.cardName}${canEvolve ? '' : '\n❌ No valid targets to evolve!'}`,
@@ -829,13 +856,13 @@
                             () => startEvolution(evolutionCard),
                             'evolution'
                         );
-                        
+
                         // Disable button if can't evolve
                         if (!canEvolve) {
                             evolutionBtn.style.opacity = '0.5';
                             evolutionBtn.style.cursor = 'not-allowed';
                         }
-                        
+
                         document.body.appendChild(evolutionBtn);
                     });
                 }
@@ -847,9 +874,9 @@
             btn.className = 'action-btn';
             btn.innerHTML = text; // Use innerHTML to support energy icons
             btn.title = title;
-            
+
             const bgColor = type === 'attack' ? '#f44336' : type === 'ability' ? '#4CAF50' : '#FF9800'; // Red for attacks, green for abilities, orange for evolution
-            
+
             btn.style.cssText = `
                 position: fixed;
                 bottom: ${10 + (index * 50)}px;
@@ -867,15 +894,15 @@
                 box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 transition: transform 0.1s;
             `;
-            
+
             btn.addEventListener('mousedown', () => {
                 btn.style.transform = 'scale(0.95)';
             });
-            
+
             btn.addEventListener('mouseup', () => {
                 btn.style.transform = 'scale(1)';
             });
-            
+
             btn.addEventListener('click', onClick);
             return btn;
         }
@@ -883,28 +910,28 @@
         // Use attack function
         function useAttack(attackName) {
             console.log(`Attempting to use attack: ${attackName}`);
-            
+
             // Check WebSocket connection
             if (!wsClient.connected) {
                 showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
                 return;
             }
-            
+
             // Check if game is in progress
             if (!wsClient.gameId) {
                 showGameMessage('❌ Not in a game! Please join a game first.', 3000);
                 return;
             }
-            
+
             // Check if it's the player's turn
             if (!isMyTurn) {
                 showGameMessage('❌ Not your turn!', 2000);
                 return;
             }
-            
+
             console.log(`Sending attack: ${attackName}`);
             const success = wsClient.send('use_attack', { attackName: attackName });
-            
+
             if (success) {
                 showGameMessage(`⚔️ Using ${attackName}...`, 2000);
             } else {
@@ -915,28 +942,28 @@
         // Use ability function  
         function useAbility(abilityName) {
             console.log(`Attempting to use ability: ${abilityName}`);
-            
+
             // Check WebSocket connection
             if (!wsClient.connected) {
                 showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
                 return;
             }
-            
+
             // Check if game is in progress
             if (!wsClient.gameId) {
                 showGameMessage('❌ Not in a game! Please join a game first.', 3000);
                 return;
             }
-            
+
             // Check if it's the player's turn
             if (!isMyTurn) {
                 showGameMessage('❌ Not your turn!', 2000);
                 return;
             }
-            
+
             console.log(`Sending ability: ${abilityName}`);
             const success = wsClient.send('use_ability', { abilityName: abilityName });
-            
+
             if (success) {
                 showGameMessage(`✨ Using ${abilityName}...`, 2000);
             } else {
@@ -949,39 +976,39 @@
             if (!window.currentGame || !window.currentGame.serverGameState || !window.currentGame.serverGameState.yourState) {
                 return false;
             }
-            
+
             const playerState = window.currentGame.serverGameState.yourState;
             const allPokemon = [playerState.activePokemon, ...playerState.bench].filter(card => card !== null);
-            
+
             // Check if we have any Pokemon that this card can evolve from
             return allPokemon.some(pokemon => pokemon.pokemon === evolutionCard.evolvesFrom);
         }
-        
+
         function startEvolution(evolutionCard) {
             console.log(`Starting evolution with card: ${evolutionCard.cardName}`);
-            
+
             // Check WebSocket connection
             if (!wsClient.connected) {
                 showGameMessage('❌ Not connected to server! Please join a game first.', 3000);
                 return;
             }
-            
+
             // Check if game is in progress
             if (!wsClient.gameId) {
                 showGameMessage('❌ Not in a game! Please join a game first.', 3000);
                 return;
             }
-            
+
             // Check if it's the player's turn
             if (!isMyTurn) {
                 showGameMessage('❌ Not your turn!', 2000);
                 return;
             }
-            
+
             // Find valid targets for evolution
             const playerState = window.currentGame.serverGameState.yourState;
             const validTargets = [];
-            
+
             // Check active Pokemon
             if (playerState.activePokemon && playerState.activePokemon.pokemon === evolutionCard.evolvesFrom) {
                 validTargets.push({
@@ -991,7 +1018,7 @@
                     name: `Active ${playerState.activePokemon.cardName}`
                 });
             }
-            
+
             // Check bench Pokemon
             playerState.bench.forEach((pokemon, index) => {
                 if (pokemon && pokemon.pokemon === evolutionCard.evolvesFrom) {
@@ -1003,23 +1030,23 @@
                     });
                 }
             });
-            
+
             if (validTargets.length === 0) {
                 showGameMessage(`❌ No ${evolutionCard.evolvesFrom} found to evolve!`, 3000);
                 return;
             }
-            
+
             // If only one target, evolve automatically
             if (validTargets.length === 1) {
                 const target = validTargets[0];
                 performEvolution(evolutionCard, target.location, target.index);
                 return;
             }
-            
+
             // Multiple targets - show selection interface
             showEvolutionTargetSelection(evolutionCard, validTargets);
         }
-        
+
         function showEvolutionTargetSelection(evolutionCard, validTargets) {
             // Create selection modal
             const modal = document.createElement('div');
@@ -1035,7 +1062,7 @@
                 align-items: center;
                 z-index: 2000;
             `;
-            
+
             const content = document.createElement('div');
             content.style.cssText = `
                 background: white;
@@ -1044,12 +1071,12 @@
                 max-width: 400px;
                 text-align: center;
             `;
-            
+
             content.innerHTML = `
                 <h3>Choose Pokemon to Evolve</h3>
                 <p>Select which ${evolutionCard.evolvesFrom} to evolve into ${evolutionCard.cardName}:</p>
             `;
-            
+
             validTargets.forEach(target => {
                 const btn = document.createElement('button');
                 btn.textContent = target.name;
@@ -1070,7 +1097,7 @@
                 };
                 content.appendChild(btn);
             });
-            
+
             const cancelBtn = document.createElement('button');
             cancelBtn.textContent = 'Cancel';
             cancelBtn.style.cssText = `
@@ -1084,29 +1111,29 @@
             `;
             cancelBtn.onclick = () => modal.remove();
             content.appendChild(cancelBtn);
-            
+
             modal.appendChild(content);
             document.body.appendChild(modal);
         }
-        
+
         function performEvolution(evolutionCard, targetLocation, targetIndex) {
             console.log(`Evolving ${targetLocation} Pokemon at index ${targetIndex}`);
-            
+
             // Find the evolution card index in hand
             const playerState = window.currentGame.serverGameState.yourState;
             const handIndex = playerState.hand.findIndex(card => card.id === evolutionCard.id);
-            
+
             if (handIndex === -1) {
                 showGameMessage('❌ Evolution card not found in hand!', 3000);
                 return;
             }
-            
+
             const success = wsClient.send('evolve_pokemon', {
                 evolutionCardIndex: handIndex,
                 targetPokemonLocation: targetLocation,
                 targetPokemonIndex: targetIndex
             });
-            
+
             if (success) {
                 showGameMessage(`🔄 Evolving to ${evolutionCard.cardName}...`, 2000);
             } else {
@@ -1181,13 +1208,13 @@
             `;
             document.body.appendChild(helpDiv);
         }
-        
+
         // Set up WebSocket event listeners
         wsClient.on('waiting_for_opponent', (data) => {
             updateConnectionStatus('waiting', 'Waiting for opponent...');
             showGameMessage('Waiting for another player to join...', 5000);
         });
-        
+
         wsClient.on('game_found', (data) => {
             updateConnectionStatus('connected', 'Connected');
             playerNumberSpan.textContent = data.playerNumber;
@@ -1211,7 +1238,7 @@
             const opponentSpan = document.getElementById('deck-opponent-name');
             if (opponentSpan) opponentSpan.textContent = data.opponent || 'Waiting for opponent...';
         });
-        
+
         wsClient.on('game_start', (data) => {
             showGameMessage('Game started! You can now move your cards.');
             // The game.start() method already initializes drag and drop with game reference
@@ -1219,7 +1246,7 @@
             // Initialize deck count displays when game starts
             initializeDeckCounts();
         });
-        
+
         // Handle game state updates from server
         wsClient.on('game_state_update', (data) => {
             console.log('Received game state update:', data);
@@ -1227,22 +1254,22 @@
             const gameState = data.gameState;
             if (window.currentGame && gameState) {
                 window.currentGame.updateFromServerState(gameState);
-                
+
                 // Update turn display - turn info is directly in gameState
                 updateTurnDisplay({
                     turn: gameState.turn,
                     isYourTurn: gameState.isYourTurn
                 });
-                
+
                 // Update deck counts
                 updateDeckCounts(gameState);
-                
+
                 // Update prize card displays
                 updatePrizeCards(gameState);
-                
+
                 // Update discard pile displays
                 updateDiscardPiles(gameState);
-                
+
                 // Show/hide end turn button
                 const endTurnBtn = document.getElementById('end-turn-btn') || addEndTurnButton();
                 if (gameState.isYourTurn) {
@@ -1262,36 +1289,36 @@
         wsClient.on('turn_changed', (data) => {
             console.log('Turn changed:', data);
             const newIsMyTurn = data.currentPlayer === playerNumber;
-            
+
             // Update global turn state for guiHookUtils.isMyTurn() method
             window.isMyTurn = newIsMyTurn;
             console.log('DEBUG: Set window.isMyTurn to:', window.isMyTurn);
-            
+
             updateTurnDisplay({
                 turn: data.turn,
                 isYourTurn: newIsMyTurn
             });
-            
+
             // Update deck counts if gameState is provided
             if (data.gameState) {
                 updateDeckCounts(data.gameState);
                 updatePrizeCards(data.gameState);
             }
-            
+
             // Update drag controls when turn changes
             if (window.currentGame && window.currentGame.guiHook) {
-                const turnReason = newIsMyTurn ? 
-                    'Your turn - you can move cards' : 
+                const turnReason = newIsMyTurn ?
+                    'Your turn - you can move cards' :
                     'Opponent\'s turn - wait for your turn';
                 window.currentGame.guiHook.setDragEnabled(newIsMyTurn, turnReason);
-                
+
                 // Force reset energy flag when it becomes my turn
                 if (newIsMyTurn) {
                     console.log('DEBUG: My turn detected - forcing energy flag reset');
                     window.currentGame.guiHook.onTurnStart();
                 }
             }
-            
+
             showGameMessage(data.message, 3000);
         });
 
@@ -1304,13 +1331,13 @@
         wsClient.on('move_error', (data) => {
             console.error('Move error from server:', data);
             showGameMessage(`Move error: ${data.message}`, 5000);
-            
+
             // Rollback the move on client side
             if (window.currentGame && window.currentGame.guiHook && window.currentGame.guiHook.rollbackLastMove) {
                 window.currentGame.guiHook.rollbackLastMove();
             }
         });
-        
+
         wsClient.on('move_success', (data) => {
             console.log('Move confirmed by server:', data);
             // Clear rollback data since move was successful
@@ -1333,7 +1360,7 @@
             console.log('Action error:', data);
             showGameMessage(`❌ ${data.message}`, 3000);
         });
-        
+
         wsClient.on('opponent_disconnected', (data) => {
             updateConnectionStatus('disconnected', 'Opponent disconnected');
             showGameMessage(data.message, 10000);
@@ -1386,7 +1413,7 @@
             btn.onclick = () => {
                 // Hide modal and reload page to reset UI / allow rejoin
                 modal.style.display = 'none';
-                try { wsClient.disconnect(); } catch (e) {}
+                try { wsClient.disconnect(); } catch (e) { }
                 // Optionally reload to reset state
                 window.location.reload();
             };
@@ -1428,24 +1455,24 @@
             const { winner, winnerName, reason } = data || {};
             showGameOverModal(winner, winnerName, reason);
         });
-        
+
         wsClient.on('connection_lost', (data) => {
             updateConnectionStatus('disconnected', 'Connection lost');
             showGameMessage('Lost connection to server. Please refresh to reconnect.', 10000);
         });
-        
+
         wsClient.on('coin_flip_show', (data) => {
             console.log('Coin flip:', data);
             showCoinFlipToAllClients(data.result, data.player);
         });
-        
+
         wsClient.on('pokemon_knockout', (data) => {
             console.log('Pokemon knockout:', data);
             const winnerText = data.winner === window.playerNumber ? 'You' : 'Your opponent';
-            
+
             // Show knockout message
             showGameMessage(`💥 ${data.knockedOutCard.cardName} was knocked out! ${winnerText} drew ${data.prizeCardsDrawn} prize card(s)!`, 5000);
-            
+
             // Animate prize card taking
             animatePrizeCardTaking(data.winner === window.playerNumber, data.prizeCardsDrawn);
         });
@@ -1460,12 +1487,12 @@
             console.log('Evolution failed:', data);
             showGameMessage(`❌ Evolution failed: ${data.message}`, 3000);
         });
-        
+
         function animatePrizeCardTaking(isPlayer, numCards) {
             // Determine which player's prize cards to animate
             const prizeSelector = isPlayer ? '.card.player.prize' : '.card.opp.prize';
             const availablePrizeCards = document.querySelectorAll(prizeSelector);
-            
+
             // Animate the taking of prize cards one by one (from the end)
             for (let i = 0; i < Math.min(numCards, availablePrizeCards.length); i++) {
                 setTimeout(() => {
@@ -1474,13 +1501,13 @@
                         // Add glow effect before removing
                         card.style.boxShadow = '0 0 20px #FFD700';
                         card.style.transform = 'scale(1.1)';
-                        
+
                         setTimeout(() => {
                             // Animate the card flying away and then remove it
                             card.style.transition = 'all 0.5s ease-out';
                             card.style.transform = 'translateY(-100px) scale(0)';
                             card.style.opacity = '0';
-                            
+
                             // Remove the element after animation
                             setTimeout(() => {
                                 card.remove();
@@ -1490,12 +1517,12 @@
                 }, i * 200); // Stagger the animations
             }
         }
-        
+
         wsClient.on('test_result', (data) => {
             console.log('Test result:', data);
             showGameMessage(`🧪 ${data.message}`, 3000);
         });
-        
+
         // Join game button handler
         joinButton.addEventListener('click', async () => {
             const username = usernameInput.value.trim();
@@ -1527,45 +1554,45 @@
                 alert('Failed to connect to server after multiple attempts. Please try again later.');
             }
         });
-        
+
         // Enter key handler for username input
         usernameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 joinButton.click();
             }
         });
-        
+
         // Set up game based on player number
         function setupGame(pNum) {
             playerNumber = pNum; // Store globally for turn management
             window.playerNumber = pNum; // Store for WebSocket handlers
-            
+
             // Create minimal client objects (server manages all game state)
             player1 = new Client(currentUsername);
             player2 = new Client('Opponent');
 
             // Create the game with centralized state management
             game = new Game(player1, player2, guiHook);
-            
+
             // Link the WebSocket client to the game for action handling
             game.wsClient = wsClient;
-            
+
             // Store game globally for WebSocket handlers
             window.currentGame = game;
 
             try {
                 // Server will send initial game state including decks and hands
                 game.start();
-                
+
                 // Initialize deck count displays
                 initializeDeckCounts();
 
                 // Add debug helper to window for troubleshooting
-                window.debugEnergy = function() {
+                window.debugEnergy = function () {
                     console.log('=== ENERGY DEBUG INFO ===');
                     const handCards = document.querySelectorAll('#PlayerHand .card');
                     console.log('Hand cards found:', handCards.length);
-                    
+
                     handCards.forEach((card, i) => {
                         const cardData = card.cardData || card._cardData;
                         console.log(`Card ${i}:`, cardData);
@@ -1573,14 +1600,14 @@
                             console.log(`  -> Energy card detected: ${cardData.cardName}`);
                         }
                     });
-                    
+
                     const pokemonSlots = document.querySelectorAll('.card.player:not(.empty):not(.hand .card)');
                     console.log('Pokemon slots with cards:', pokemonSlots.length);
                     pokemonSlots.forEach((slot, i) => {
                         console.log(`Pokemon slot ${i}:`, slot);
                     });
                 };
-                
+
                 console.log('Game setup complete. Type "debugEnergy()" in console to debug energy attachment issues.');
                 console.log('Type "testKnockout()" in console to test the knockout and prize card system.');
 
@@ -1588,9 +1615,9 @@
                 console.error('Error setting up game:', error);
             }
         }
-        
+
         // Global test function for knockout system
-        window.testKnockout = function() {
+        window.testKnockout = function () {
             if (wsClient && wsClient.socket && wsClient.socket.readyState === WebSocket.OPEN) {
                 console.log('Sending knockout test message to server...');
                 wsClient.send('test_knockout', {});
