@@ -38,7 +38,7 @@ class WebSocketClient {
             }*/
 
             // Generic case - use same protocol as page, port 8080
-            serverUrl = `http://avocadocat.hackclub.app`;
+            serverUrl = `wss://avocadocat.hackclub.app`;
         }
 
         console.log('Connecting to WebSocket:', serverUrl);
