@@ -10,23 +10,29 @@ class WebSocketClient {
     }
 
     connect(serverUrl = null) {
-        // Auto-detect the WebSocket URL for Codespaces
+        // Auto-detect the WebSocket URL based on environment
         if (!serverUrl) {
             const hostname = window.location.hostname;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            
             if (hostname.includes('.app.github.dev')) {
                 // GitHub Codespace - use the forwarded port URL
                 const baseUrl = hostname.replace('-3000.', '-8080.');
                 serverUrl = `wss://${baseUrl}`;
-                
-                // Log the detected environment
                 console.log('GitHub Codespace detected, using WSS connection');
                 console.log('Base URL:', baseUrl);
+            } else if (hostname.includes('.onrender.com')) {
+                // Render deployment - use wss on same domain (no port needed)
+                serverUrl = `wss://${hostname}`;
+                console.log('Render deployment detected, using WSS connection:', serverUrl);
             } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
                 // Local development
                 serverUrl = 'ws://localhost:8080';
+                console.log('Local development detected, using WS connection');
             } else {
-                // Generic case - try WebSocket on port 8080
-                serverUrl = `ws://${hostname}:8080`;
+                // Generic case - use same protocol as page, port 8080
+                serverUrl = `${protocol}//${hostname}:8080`;
+                console.log('Generic deployment detected, using:', serverUrl);
             }
         }
         
