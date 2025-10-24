@@ -1,5 +1,5 @@
 // Auto-generated card data from Cards.js classes
-// Generated on 2025-10-23T04:06:05.896Z
+// Generated on 2025-10-24T01:32:45.194Z
 
 export const pokemonCards = [
     {

@@ -98,6 +98,14 @@
             border-radius: 5px;
             font-size: 16px;
         }
+
+        #server-url {
+            padding: 10px;
+            margin: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
         
         #join-button {
             padding: 10px 20px;
@@ -238,6 +246,9 @@
     <div id="username-modal">
         <div id="username-form">
             <h2>Join Pokemon TCG Game</h2>
+            <h3>Server URL</h3>
+            <input type="url" id="server-url" content="Localhost::8080"><br>
+            <h3>Username</h3>
             <input type="text" id="username-input" placeholder="Enter your username" maxlength="20">
             <br>
             <button id="join-button">Join Game</button>
