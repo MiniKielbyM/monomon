@@ -5,15 +5,18 @@ echo "compiling cards..."
 node Server/buildCardData.js
 echo "Starting Pokemon TCG Multiplayer System..."
 
+# Get the directory where the script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # Start the game server in the background
-cd /workspaces/monomon/Server
+cd "$SCRIPT_DIR/Server"
 echo "Starting game server on port 8080..."
 npm start &
 GAME_SERVER_PID=$!
 
 # Start the client server in the background
 echo "Starting client server on port 3000..."
-cd /workspaces/monomon/Server
+cd "$SCRIPT_DIR/Server"
 node clientServer.js &
 CLIENT_SERVER_PID=$!
 
