@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/Lib/GUI.Demo/BoardLayout.css">
+    <link rel="stylesheet" href="Lib/GUI.Demo/BoardLayout.css">
     <style>
         /* Connection status styles */
         #connection-status {
@@ -375,12 +375,12 @@
     </div>
 
     <script type="module">
-        import Client from '/Lib/client.js';
-        import Game from '/Lib/game.js';
-        // Deck import removed - server manages all deck state
-        import GUIHookUtils from '/Lib/guiHookUtils.js';
-        import WebSocketClient from '/Lib/webSocketClient.js';
-        import enums from '/Lib/enums.js';
+    import Client from 'Lib/client.js';
+    import Game from 'Lib/game.js';
+    // Deck import removed - server manages all deck state
+    import GUIHookUtils from 'Lib/guiHookUtils.js';
+    import WebSocketClient from 'Lib/webSocketClient.js';
+    import enums from 'Lib/enums.js';
         // Card imports removed - server creates all card instances
 
         const { PokemonType, CardModifiers } = enums;
@@ -424,7 +424,7 @@
         async function loadCardPool() {
             // Try to import cardData.js as an ES module
             try {
-                const cardData = await import('/Server/cardData.js');
+                const cardData = await import('Server/cardData.js');
                 // Merge all cards into one pool
                 cardPool = [];
                 if (Array.isArray(cardData.pokemonCards)) cardPool = cardPool.concat(cardData.pokemonCards);
@@ -1627,6 +1627,6 @@
         };
     </script>
 </body>
-<script src="/Lib/GUI.Demo/BoardDynamicSizing.js"></script>
+<script src="Lib/GUI.Demo/BoardDynamicSizing.js"></script>
 
 </html>
