@@ -38,7 +38,7 @@ class WebSocketClient {
             }*/
 
             // Generic case - use same protocol as page, port 8080
-            serverUrl = `https://monomon.onrender.com`;
+            serverUrl = `http://avocadocat.hackclub.app`;
         }
 
         console.log('Connecting to WebSocket:', serverUrl);
@@ -60,7 +60,7 @@ class WebSocketClient {
                         } catch (error) {
                             console.error('Error parsing server message:', error);
                         }
-                
+
                 };
 
                 this.ws.onclose = (event) => {
