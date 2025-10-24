@@ -18,7 +18,7 @@ class GameServer {
     setupWebSocketHandlers() {
         this.wss.on('connection', (ws) => {
             console.log('New client connected');
-            
+
             ws.on('message', (data) => {
                 try {
                     const message = JSON.parse(data.toString());
@@ -249,15 +249,15 @@ class GameServer {
             console.log('Card selection response: No client or gameId found');
             return;
         }
-        
+
         const game = this.games.get(client.gameId);
         if (!game) {
             console.log('Card selection response: No game found for ID:', client.gameId);
             return;
         }
-        
+
         console.log(`Received card selection response from player ${client.playerNumber}:`, data);
-        
+
         // Forward the response to the game's SocketManager event handlers
         if (game.socketManager && game.socketManager.gameServer._socketManagerHandlers) {
             const handler = game.socketManager.gameServer._socketManagerHandlers.get('card_selection_response');
@@ -271,7 +271,7 @@ class GameServer {
 
     sendGameStateToPlayers(game) {
         console.log('Sending game state update to players');
-        
+
         // Debug: Log the HP of active Pokemon before sending
         if (game.gameState?.player1?.activePokemon) {
             console.log('Player 1 active Pokemon HP:', game.gameState.player1.activePokemon.hp);
@@ -279,23 +279,23 @@ class GameServer {
         if (game.gameState?.player2?.activePokemon) {
             console.log('Player 2 active Pokemon HP:', game.gameState.player2.activePokemon.hp);
         }
-        
+
         // Use ServerGame's method to get safe game state for each player
         const player1State = {
             type: 'game_state_update',
             gameState: game.getGameStateForPlayer(1)
         };
-        
+
         const player2State = {
             type: 'game_state_update',
             gameState: game.getGameStateForPlayer(2)
         };
-        
+
         // Send to each player
         if (game.player1.ws && game.player1.ws.readyState === WebSocket.OPEN) {
             game.player1.ws.send(JSON.stringify(player1State));
         }
-        
+
         if (game.player2.ws && game.player2.ws.readyState === WebSocket.OPEN) {
             game.player2.ws.send(JSON.stringify(player2State));
         }
@@ -304,7 +304,7 @@ class GameServer {
     handleCardMove(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
-        
+
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
 
@@ -323,11 +323,11 @@ class GameServer {
             data.targetType,
             data.targetIndex
         );
-        
+
         if (result.success) {
             // Send updated game state to both players
             this.sendGameStateToPlayers(game);
-            
+
             // Send success confirmation to the moving player
             ws.send(JSON.stringify({
                 type: 'move_success',
@@ -345,7 +345,7 @@ class GameServer {
     handleEvolution(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
-        
+
         const game = this.games.get(client.gameId);
         if (!game || game.state !== 'playing') return;
         // Defensive snapshot: capture player's hand before attempting evolution so we can restore
@@ -396,7 +396,7 @@ class GameServer {
     executeMove(playerState, sourceType, sourceIndex, targetType, targetIndex) {
         const newState = JSON.parse(JSON.stringify(playerState)); // Deep copy
         let card = null;
-        
+
         // Validate and remove from source
         try {
             if (sourceType === 'hand') {
@@ -419,7 +419,7 @@ class GameServer {
             } else {
                 return { success: false, error: 'Invalid source type' };
             }
-            
+
             // Validate and add to target
             if (targetType === 'active') {
                 if (newState.activePokemon) {
@@ -437,9 +437,9 @@ class GameServer {
             } else {
                 return { success: false, error: 'Invalid target type' };
             }
-            
+
             return { success: true, newState };
-            
+
         } catch (error) {
             return { success: false, error: 'Move execution failed: ' + error.message };
         }
@@ -484,7 +484,7 @@ class GameServer {
         }
 
         const card = playerState.hand[cardIndex];
-        
+
         // Check if it's actually a Pokemon card
         if (!this.isPokemonCard(card)) {
             return { valid: false, error: 'Card is not a Pokemon' };
@@ -524,7 +524,7 @@ class GameServer {
         }
 
         const activePokemon = playerState.activePokemon;
-        
+
         // Check if attack exists
         if (!activePokemon.attacks || attackIndex >= activePokemon.attacks.length) {
             return { valid: false, error: 'Invalid attack' };
@@ -569,7 +569,7 @@ class GameServer {
         }
 
         const card = playerState.hand[cardIndex];
-        
+
         if (!this.isTrainerCard(card)) {
             return { valid: false, error: 'Card is not a Trainer card' };
         }
@@ -589,7 +589,7 @@ class GameServer {
     validateEndTurn(gameState, playerNumber) {
         // Check if player has completed mandatory actions
         const playerState = gameState[`player${playerNumber}`];
-        
+
         // Must have drawn a card (except first turn)
         if (gameState.turn > 1 && !gameState.drewCard) {
             return { valid: false, error: 'Must draw a card before ending turn' };
@@ -643,7 +643,7 @@ class GameServer {
 
         // Use ServerGame's attack method (now async)
         const result = await game.useAttack(client.playerNumber, attackParam);
-        
+
         if (!result || !result.success) {
             ws.send(JSON.stringify({
                 type: 'action_error',
@@ -658,10 +658,10 @@ class GameServer {
             attackName: result.attackNameResolved || (data.attackName !== undefined ? data.attackName : data.attackIndex),
             result: result.result
         }));
-        
+
         // Send updated state to all players
         this.sendGameStateToPlayers(game);
-        
+
         // After a successful attack, end the player's turn server-side (attacking ends your turn)
         // This ensures the authoritative server advances the turn instead of relying on clients.
         try {
@@ -692,9 +692,9 @@ class GameServer {
 
         // Use ServerGame's ability method (now async)
         const result = await game.useAbility(client.playerNumber, data.abilityName);
-        
+
         console.log('Ability result from ServerGame:', result);
-        
+
         if (!result.success) {
             const errorResponse = {
                 type: 'action_error',
@@ -711,7 +711,7 @@ class GameServer {
             abilityName: data.abilityName,
             result: result.result
         }));
-        
+
         // Send updated state to all players
         this.sendGameStateToPlayers(game);
     }
@@ -724,10 +724,10 @@ class GameServer {
         if (!game || game.state !== 'playing') return;
 
         const { cardType } = data;
-        
+
         // Validate based on card type
         const validation = this.validateGameAction(game, client.playerNumber, `play_${cardType}`, data);
-        
+
         if (!validation.valid) {
             ws.send(JSON.stringify({
                 type: 'action_error',
@@ -774,7 +774,7 @@ class GameServer {
 
         // Validate end turn
         const validation = this.validateGameAction(game, client.playerNumber, 'end_turn', data);
-        
+
         if (!validation.valid) {
             ws.send(JSON.stringify({
                 type: 'action_error',
@@ -785,7 +785,7 @@ class GameServer {
 
         // Execute turn end
         this.executeEndTurn(game);
-        
+
         // Send updated state
         this.sendGameStateToPlayers(game);
     }
@@ -808,7 +808,7 @@ class GameServer {
 
         // Validate retreat
         const validation = this.validateGameAction(game, client.playerNumber, 'retreat', data);
-        
+
         if (!validation.valid) {
             ws.send(JSON.stringify({
                 type: 'action_error',
@@ -891,17 +891,17 @@ class GameServer {
         const playerState = game.gameState[`player${playerNumber}`];
         const opponentNumber = playerNumber === 1 ? 2 : 1;
         const opponentState = game.gameState[`player${opponentNumber}`];
-        
+
         const attacker = playerState.activePokemon;
         const defender = opponentState.activePokemon;
         const attack = attacker.attacks[attackData.attackIndex];
-        
+
         // Calculate damage
         let damage = attack.damage || 0;
-        
+
         // Apply damage
         defender.health -= damage;
-        
+
         // Check if Pokemon is knocked out
         if (defender.health <= 0) {
             // Move to discard pile
@@ -913,11 +913,11 @@ class GameServer {
                 opponentState.discardPile.push(defender);
             }
             opponentState.activePokemon = null;
-            
+
             // Award prize card (simplified)
             this.awardPrizeCard(game, playerNumber);
         }
-        
+
         console.log(`Player ${playerNumber} attacked for ${damage} damage`);
     }
 
@@ -1042,7 +1042,7 @@ class GameServer {
     executeRetreat(game, playerNumber, retreatData) {
         const playerState = game.gameState[`player${playerNumber}`];
         const { benchIndex } = retreatData;
-        
+
         // Switch active Pokemon with bench Pokemon
         const activePokemon = playerState.activePokemon;
         const benchPokemon = playerState.bench[benchIndex];
@@ -1088,17 +1088,17 @@ class GameServer {
 
     executeEndTurn(game) {
         const gameState = game.gameState;
-        
+
         // Get current player before switching
         const currentPlayerNumber = gameState.currentPlayer;
         const currentPlayerState = gameState[`player${currentPlayerNumber}`];
-        
+
         // Reset turn flags for current player (ending their turn)
         currentPlayerState.energyAttachedThisTurn = false;
         currentPlayerState.supporterPlayedThisTurn = false;
         currentPlayerState.stadiumPlayedThisTurn = false;
         currentPlayerState.abilitiesUsedThisTurn = new Set(); // Reset ability usage tracking
-        
+
         console.log(`DEBUG: executeEndTurn - Reset flags for ending Player ${currentPlayerNumber}:`, {
             energyAttachedThisTurn: currentPlayerState.energyAttachedThisTurn,
             supporterPlayedThisTurn: currentPlayerState.supporterPlayedThisTurn,
@@ -1168,14 +1168,14 @@ class GameServer {
         newPlayerState.supporterPlayedThisTurn = false;
         newPlayerState.stadiumPlayedThisTurn = false;
         newPlayerState.abilitiesUsedThisTurn = new Set(); // Reset ability usage tracking
-        
+
         console.log(`DEBUG: executeEndTurn - Reset flags for starting Player ${gameState.currentPlayer}:`, {
             energyAttachedThisTurn: newPlayerState.energyAttachedThisTurn,
             supporterPlayedThisTurn: newPlayerState.supporterPlayedThisTurn,
             stadiumPlayedThisTurn: newPlayerState.stadiumPlayedThisTurn,
             abilitiesUsedThisTurn: Array.from(newPlayerState.abilitiesUsedThisTurn)
         });
-        
+
         // Draw card for new active player (mandatory at start of turn)
         if (newPlayerState.deck.length > 0) {
             const drawnCard = newPlayerState.deck.pop();
@@ -1188,9 +1188,9 @@ class GameServer {
             this.endGame(game, winnerNumber, 'deck_out');
             return;
         }
-        
+
         console.log(`Turn ended. Now player ${gameState.currentPlayer}'s turn (Turn ${gameState.turn})`);
-        
+
         // Notify players of turn change
         this.broadcastToGame(game.id, {
             type: 'turn_changed',
@@ -1350,7 +1350,7 @@ class GameServer {
 
     awardPrizeCard(game, winnerNumber) {
         const winnerState = game.gameState[`player${winnerNumber}`];
-        
+
         // Take prize card (simplified)
         for (let i = 0; i < winnerState.prizeCards.length; i++) {
             if (winnerState.prizeCards[i]) {
@@ -1360,7 +1360,7 @@ class GameServer {
                 break;
             }
         }
-        
+
         // Check win condition
         const remainingPrizes = winnerState.prizeCards.filter(card => card !== null).length;
         if (remainingPrizes === 0) {
@@ -1413,13 +1413,13 @@ class GameServer {
     handleGameStateUpdate(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) return;
-        
+
         const game = this.games.get(client.gameId);
         if (!game) return;
-        
+
         // Update the player's board state
         game.board[`player${client.playerNumber}`] = data.playerState;
-        
+
         // Broadcast to opponent
         const opponent = client.playerNumber === 1 ? game.player2 : game.player1;
         opponent.ws.send(JSON.stringify({
@@ -1432,9 +1432,9 @@ class GameServer {
     handleDisconnect(ws) {
         const client = this.clients.get(ws);
         if (!client) return;
-        
+
         console.log(`Client ${client.username} disconnected`);
-        
+
         // Remove from any lobby they were part of
         if (client.lobbyId) {
             const lobby = this.lobbies.get(client.lobbyId);
@@ -1447,7 +1447,7 @@ class GameServer {
                 if (lobby.players.length === 0) this.lobbies.delete(client.lobbyId);
             }
         }
-        
+
         // Handle game disconnect
         if (client.gameId) {
             const game = this.games.get(client.gameId);
@@ -1462,33 +1462,33 @@ class GameServer {
                 this.games.delete(client.gameId);
             }
         }
-        
+
         this.clients.delete(ws);
     }
-    
+
     handleTestKnockout(ws, data) {
         const client = this.clients.get(ws);
         if (!client || !client.gameId) {
             ws.send(JSON.stringify({ type: 'error', message: 'Not in a game' }));
             return;
         }
-        
+
         const game = this.games.get(client.gameId);
         if (!game) {
             ws.send(JSON.stringify({ type: 'error', message: 'Game not found' }));
             return;
         }
-        
+
         console.log('Admin triggered knockout test');
         game.testKnockout();
-        
+
         ws.send(JSON.stringify({ type: 'test_result', message: 'Knockout test executed' }));
     }
 
     broadcastToGame(gameId, message) {
         const game = this.games.get(gameId);
         if (!game) return;
-        
+
         [game.player1, game.player2].forEach(player => {
             if (player.ws.readyState === WebSocket.OPEN) {
                 player.ws.send(JSON.stringify(message));
@@ -1498,6 +1498,6 @@ class GameServer {
 }
 
 // Start the server
-const server = new GameServer(8080);
+const server = new GameServer(38831);
 
 export default GameServer;
