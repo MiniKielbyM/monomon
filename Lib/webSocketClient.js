@@ -14,7 +14,9 @@ class WebSocketClient {
         if (!serverUrl) {
             const hostname = window.location.hostname;
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            
+
+
+            /*
             if (hostname.includes('.app.github.dev')) {
                 // GitHub Codespace - use the forwarded port URL
                 const baseUrl = hostname.replace('-3000.', '-8080.');
@@ -33,61 +35,65 @@ class WebSocketClient {
                 // Generic case - use same protocol as page, port 8080
                 serverUrl = `${protocol}//${hostname}:8080`;
                 console.log('Generic deployment detected, using:', serverUrl);
-            }
+            }*/
+
+            // Generic case - use same protocol as page, port 8080
+            serverUrl = `https://monomon.onrender.com`;
         }
-        
+
         console.log('Connecting to WebSocket:', serverUrl);
         return new Promise((resolve, reject) => {
             try {
                 this.ws = new WebSocket(serverUrl);
-                
+
                 this.ws.onopen = () => {
                     console.log('Connected to game server');
                     this.connected = true;
                     this.reconnectAttempts = 0;
                     resolve();
                 };
-                
+
                 this.ws.onmessage = (event) => {
-                    try {
-                        const message = JSON.parse(event.data);
-                        this.handleMessage(message);
-                    } catch (error) {
-                        console.error('Error parsing server message:', error);
-                    }
-                };
+                        try {
+                            const message = JSON.parse(event.data);
+                            this.handleMessage(message);
+                        } catch (error) {
+                            console.error('Error parsing server message:', error);
+                        }
                 
+                };
+
                 this.ws.onclose = (event) => {
                     console.log('WebSocket connection closed:', event.code, event.reason);
                     this.connected = false;
-                    
+
                     // If we're in a Codespace and got a connection failure, try alternative methods
-                    if (window.location.hostname.includes('.app.github.dev') && 
+                    if (window.location.hostname.includes('.app.github.dev') &&
                         event.code === 1006 && this.reconnectAttempts === 0) {
                         console.log('WSS connection failed in Codespace, this might be a port forwarding issue');
                         console.log('GitHub Codespaces may not properly forward WebSocket connections on port 8080');
                         console.log('Please check that port 8080 is set to "Public" visibility in the Ports tab');
-                        
+
                         // Show user-friendly error message
                         if (window.showGameMessage) {
                             window.showGameMessage(
-                                'Connection failed: Please ensure port 8080 is set to "Public" in VS Code Ports tab', 
+                                'Connection failed: Please ensure port 8080 is set to "Public" in VS Code Ports tab',
                                 10000
                             );
                         }
                     }
-                    
+
                     if (this.reconnectAttempts < this.maxReconnectAttempts) {
                         this.reconnectAttempts++;
                         console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
                         setTimeout(() => this.connect(serverUrl), 2000 * this.reconnectAttempts);
                     }
                 };
-                
+
                 this.ws.onerror = (error) => {
                     console.error('WebSocket connection error:', error);
                     console.log('This might indicate a port forwarding or connectivity issue');
-                    
+
                     // If in Codespace, provide specific guidance
                     if (window.location.hostname.includes('.app.github.dev')) {
                         console.log('Codespace troubleshooting:');
@@ -95,12 +101,12 @@ class WebSocketClient {
                         console.log('2. Try refreshing the page');
                         console.log('3. Restart the servers if needed');
                     }
-                    
+
                     if (!this.connected) {
                         reject(error);
                     }
                 };
-                
+
                 // Set a connection timeout
                 setTimeout(() => {
                     if (!this.connected) {
@@ -109,7 +115,7 @@ class WebSocketClient {
                         reject(new Error('Connection timeout'));
                     }
                 }, 10000); // 10 second timeout
-                
+
             } catch (error) {
                 console.error('Failed to create WebSocket:', error);
                 reject(error);
@@ -121,7 +127,7 @@ class WebSocketClient {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            
+
             setTimeout(() => {
                 this.connect(serverUrl).catch(error => {
                     console.error('Reconnection failed:', error);
@@ -220,7 +226,7 @@ class WebSocketClient {
 
     send(messageOrType, data = null) {
         let message;
-        
+
         // Handle both send(message) and send(type, data) signatures
         if (typeof messageOrType === 'string' && data !== null) {
             message = {
@@ -233,7 +239,7 @@ class WebSocketClient {
             console.error('Invalid send arguments:', messageOrType, data);
             return false;
         }
-        
+
         if (this.connected && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
             return true;
