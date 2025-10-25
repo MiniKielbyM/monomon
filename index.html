@@ -259,6 +259,7 @@
             // data may include opponent name when available
             const opponent = data && data.opponent ? data.opponent : null;
             openDeckBuilder(opponent);
+            document.querySelector('#connection-status').style.setProperty('--connecting-message', `"Waiting for ${opponent || "opponent"}..."`);
         });
         wsClient.on('deck_received', () => {
             deckSubmitted = true;
@@ -526,102 +527,7 @@
 
         // Add Attack and Ability buttons for active Pokemon
         function addActionButtons() {
-            // Remove existing action buttons
-            const existingButtons = document.querySelectorAll('.action-btn, .help-message');
-            existingButtons.forEach(btn => btn.remove());
-
-            if (!isMyTurn) return; // Only show buttons on player's turn
-
-            const activePokemon = document.getElementById('ActivePokemon');
-            if (!activePokemon || !activePokemon.cardData) {
-                // Show help message if no active Pokemon
-                showHelpMessage("Place a Pokémon in your Active slot to see attack options!");
-                return;
-            }
-
-            const pokemonData = activePokemon.cardData;
-            let buttonIndex = 0;
-
-            // Show help message about attacks
-            if (pokemonData.attacks && pokemonData.attacks.length > 0) {
-                showHelpMessage("Click attack buttons to battle! Energy requirements are shown.");
-            }
-
-            // Add attack buttons
-            if (pokemonData.attacks && pokemonData.attacks.length > 0) {
-                pokemonData.attacks.forEach((attack, index) => {
-                    // Create energy cost display
-                    const energyCostText = attack.energyCost && attack.energyCost.length > 0
-                        ? ` (${attack.energyCost.length} energy)`
-                        : '';
-
-                    const canUseAttack = checkCanUseAttack(pokemonData, attack);
-                    const buttonText = `⚔️ ${attack.name}${energyCostText}`;
-                    const tooltipText = `${attack.description}\nEnergy Cost: ${attack.energyCost ? attack.energyCost.join(', ') : 'None'}${canUseAttack ? '' : '\n❌ Not enough energy!'}`;
-
-                    const attackBtn = createActionButton(
-                        buttonText,
-                        tooltipText,
-                        buttonIndex++,
-                        () => useAttack(attack.name),
-                        'attack'
-                    );
-
-                    // Disable button if can't use attack
-                    if (!canUseAttack) {
-                        attackBtn.style.opacity = '0.5';
-                        attackBtn.style.cursor = 'not-allowed';
-                        attackBtn.title += '\n❌ Not enough energy!';
-                    }
-
-                    document.body.appendChild(attackBtn);
-                });
-            }
-
-            // Add ability buttons  
-            if (pokemonData.abilities && pokemonData.abilities.length > 0) {
-                console.log('DEBUG: Action buttons abilities data:', pokemonData.abilities);
-                pokemonData.abilities.forEach((ability, index) => {
-                    console.log(`DEBUG: Processing ability ${index} for action button:`, ability);
-                    const abilityBtn = createActionButton(
-                        `✨ ${ability.name}`,
-                        `${ability.name}: ${ability.description}`,
-                        buttonIndex++,
-                        () => useAbility(ability.name),
-                        'ability'
-                    );
-                    document.body.appendChild(abilityBtn);
-                });
-            }
-
-            // Add evolution buttons
-            if (window.currentGame && window.currentGame.serverGameState && window.currentGame.serverGameState.yourState) {
-                const hand = window.currentGame.serverGameState.yourState.hand || [];
-                const evolutionCards = hand.filter(card => card.evolvesFrom);
-
-                if (evolutionCards.length > 0) {
-                    evolutionCards.forEach((evolutionCard, index) => {
-                        // Check if we have valid targets for this evolution
-                        const canEvolve = checkCanEvolve(evolutionCard);
-
-                        const evolutionBtn = createActionButton(
-                            `🔄 Evolve to ${evolutionCard.cardName}`,
-                            `Evolve from ${evolutionCard.evolvesFrom} to ${evolutionCard.cardName}${canEvolve ? '' : '\n❌ No valid targets to evolve!'}`,
-                            buttonIndex++,
-                            () => startEvolution(evolutionCard),
-                            'evolution'
-                        );
-
-                        // Disable button if can't evolve
-                        if (!canEvolve) {
-                            evolutionBtn.style.opacity = '0.5';
-                            evolutionBtn.style.cursor = 'not-allowed';
-                        }
-
-                        document.body.appendChild(evolutionBtn);
-                    });
-                }
-            }
+            //no longer needed, but i dont feel like removing the refrences everywhere :3
         }
 
         function createActionButton(text, title, index, onClick, type = 'attack') {

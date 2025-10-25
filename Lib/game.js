@@ -87,7 +87,6 @@ class Game {
     // Start the game and initialize GUI
     start() {
         this.isRunning = true;
-        document.body.style.backgroundColor = '#4CAF50';
         
         // Initialize drag and drop through GUI hook with game reference
         if (this.domElements.board) {
