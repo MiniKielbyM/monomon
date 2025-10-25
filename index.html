@@ -6,255 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="Lib/GUI.Demo/BoardLayout.css">
-    <style>
-        /* Connection status styles */
-        #connection-status {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            padding: 10px 15px;
-            border-radius: 5px;
-            color: white;
-            font-weight: bold;
-            z-index: 1000;
-        }
-
-        .status-connected {
-            background-color: #4CAF50;
-        }
-
-        .status-connecting {
-            background-color: #FF9800;
-        }
-
-        .status-disconnected {
-            background-color: #f44336;
-        }
-
-        .status-waiting {
-            background-color: #2196F3;
-        }
-
-        /* Game messages */
-        #game-messages {
-            position: fixed;
-            top: 60px;
-            left: 10px;
-            right: 10px;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border-radius: 5px;
-            z-index: 1000;
-            display: none;
-        }
-
-        /* Player info */
-        #player-info {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border-radius: 5px;
-            z-index: 1000;
-        }
-
-        #turn-status {
-            font-weight: bold;
-            padding: 5px;
-            border-radius: 3px;
-            margin-top: 5px;
-        }
-
-        .your-turn {
-            background-color: #4CAF50;
-            color: white;
-        }
-
-        .opponent-turn {
-            background-color: #FF9800;
-            color: white;
-        }
-
-        /* Username input */
-        #username-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-
-        #username-form {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        #username-input {
-            padding: 10px;
-            margin: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-
-        #join-button {
-            padding: 10px 20px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        #join-button:hover {
-            background: #45a049;
-        }
-
-        /* Deck count display */
-        .deck-count {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-            pointer-events: none;
-            z-index: 10;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        .deck {
-            position: relative;
-        }
-
-        /* Coin Flip Modal */
-        #coin-flip-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 3000;
-        }
-
-        #coin-flip-container {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-
-        #coin-flip-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        #coin {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            margin: 20px auto;
-            position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.6s;
-        }
-
-        .coin-side {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: white;
-            backface-visibility: hidden;
-        }
-
-        .coin-heads {
-            background: linear-gradient(45deg, #FFD700, #FFA500);
-            transform: rotateY(0deg);
-        }
-
-        .coin-tails {
-            background: linear-gradient(45deg, #C0C0C0, #808080);
-            transform: rotateY(180deg);
-        }
-
-        .coin-spinning {
-            animation: coinSpin 2s ease-in-out;
-        }
-
-        .coin-result-heads {
-            transform: rotateY(0deg);
-        }
-
-        .coin-result-tails {
-            transform: rotateY(180deg);
-        }
-
-        @keyframes coinSpin {
-            0% {
-                transform: rotateY(0deg);
-            }
-
-            25% {
-                transform: rotateY(450deg);
-            }
-
-            50% {
-                transform: rotateY(900deg);
-            }
-
-            75% {
-                transform: rotateY(1350deg);
-            }
-
-            100% {
-                transform: rotateY(1800deg);
-            }
-        }
-
-        #coin-result {
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 20px;
-            color: #333;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-
-        .result-visible {
-            opacity: 1 !important;
-        }
-    </style>
 </head>
 
 <body>
@@ -263,20 +17,20 @@
     <div id="username-modal">
         <div id="username-form">
             <h2>Join Pokemon TCG Game</h2>
-            <input type="text" id="username-input" placeholder="Enter your username" maxlength="20">
+            <input type="text" id="username-input" placeholder="Enter your username " maxlength="20">
             <br>
             <button id="join-button">Join Game</button>
         </div>
+        
     </div>
 
     <!-- Deck Builder Modal -->
-    <div id="deck-builder-modal"
-        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:3000; align-items:center; justify-content:center;">
-        <div style="background:white; padding:30px; border-radius:10px; max-width:500px; margin:auto;">
+    <div id="deck-builder-modal">
+        <div>
             <h2>Build Your Deck</h2>
-            <div id="deck-opponent" style="margin-bottom:8px; font-weight:600;">Opponent: <span
+            <div id="deck-opponent">Opponent: <span
                     id="deck-opponent-name">Waiting for opponent...</span></div>
-            <div id="deck-builder-list" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
+            <div id="deck-builder-list"></div>
             <div>Cards in deck: <span id="deck-card-count">0</span>/60</div>
             <button id="submit-deck-button" disabled>Submit Deck</button>
         </div>
@@ -297,6 +51,7 @@
     <!-- Connection Status -->
     <div id="connection-status" class="status-disconnected">
         Disconnected
+        <span class="loader"></span>
     </div>
 
     <!-- Game Messages -->
@@ -375,12 +130,12 @@
     </div>
 
     <script type="module">
-    import Client from './Lib/client.js';
-    import Game from './Lib/game.js';
-    // Deck import removed - server manages all deck state
-    import GUIHookUtils from './Lib/guiHookUtils.js';
-    import WebSocketClient from './Lib/webSocketClient.js';
-    import enums from './Lib/enums.js';
+        import Client from './Lib/client.js';
+        import Game from './Lib/game.js';
+        // Deck import removed - server manages all deck state
+        import GUIHookUtils from './Lib/guiHookUtils.js';
+        import WebSocketClient from './Lib/webSocketClient.js';
+        import enums from './Lib/enums.js';
         // Card imports removed - server creates all card instances
 
         const { PokemonType, CardModifiers } = enums;
@@ -517,7 +272,7 @@
         // Update connection status
         function updateConnectionStatus(status, message) {
             connectionStatus.className = `status-${status}`;
-            connectionStatus.textContent = message;
+            connectionStatus.innerHTML = message + ' <span class="loader"></span>';
         }
 
         // Initialize deck count displays
@@ -1534,14 +1289,14 @@
             currentUsernameSpan.textContent = username;
             let connected = false;
             let attempts = 0;
-            updateConnectionStatus('connecting', 'Connecting...');
+            updateConnectionStatus('connecting', '');
             while (!connected && attempts < 20) { // Try for up to ~1 minute
                 try {
                     await wsClient.connect();
                     connected = true;
                 } catch (error) {
                     attempts++;
-                    updateConnectionStatus('connecting', `Connecting... (retry ${attempts})`);
+                    updateConnectionStatus('connecting', `(retry ${attempts})`);
                     await new Promise(res => setTimeout(res, 3000));
                 }
             }

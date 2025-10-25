@@ -131,11 +131,13 @@ class GameServer {
         // Notify players to submit decks
         player1.ws.send(JSON.stringify({
             type: 'submit_deck',
-            message: 'Please submit your deck to start the game.'
+            message: 'Please submit your deck to start the game.',
+            opponent: player2.username
         }));
         player2.ws.send(JSON.stringify({
             type: 'submit_deck',
-            message: 'Please submit your deck to start the game.'
+            message: 'Please submit your deck to start the game.',
+            opponent: player1.username
         }));
 
         // Don't delete the lobby yet - keep it until both decks are submitted
