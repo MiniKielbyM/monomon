@@ -1,7 +1,7 @@
 @font-face {
     font-family: 'Exo2';
     /* Name you'll use in CSS */
-    src: url(./Assets/Exo2-Black.otf) format('opentype');
+    src: url(https://github.com/MiniKielbyM/monomon/blob/main/Assets/Exo2-Black.otf) format('opentype');
     /* Path to your .otf file */
     font-weight: normal;
     font-style: normal;
@@ -155,7 +155,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-image: url(./Assets/blue-section-stripes.webp);
+    background-image: url(https://github.com/MiniKielbyM/monomon/blob/main/Assets/blue-section-stripes.webp);
     background-size: cover;
     background-position: center;
     color: rgb(0, 0, 0);
@@ -260,7 +260,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: url(./Assets/blue-section-stripes.webp);
+    background-image: url(https://github.com/MiniKielbyM/monomon/blob/main/Assets/blue-section-stripes.webp);
     background-size: cover;
     z-index: -1;
 }
@@ -285,7 +285,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: url(./Assets/bottom-texture.webp);
+    background-image: url(https://github.com/MiniKielbyM/monomon/blob/main/Assets/bottom-texture.webp);
     background-size: cover;
     pointer-events: none;
     z-index: 1;
@@ -549,7 +549,7 @@ body::after {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: url(./Assets/blue-section-stripes.webp);
+    background-image: url(https://github.com/MiniKielbyM/monomon/blob/main/Assets/blue-section-stripes.webp);
     background-size: cover;
     pointer-events: none;
     z-index: 0;
